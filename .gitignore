@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.env
+
+# Runtime state and output: the database is the system's memory, reports are
+# generated from it. Neither belongs in git.
+data/
+reports/

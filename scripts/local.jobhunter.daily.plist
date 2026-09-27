@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Daily run at 09:00 local time. If the Mac is asleep then, launchd runs it on wake.
+  Install:   cp scripts/local.jobhunter.daily.plist ~/Library/LaunchAgents/
+             launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/local.jobhunter.daily.plist
+  Run now:   launchctl kickstart gui/$(id -u)/local.jobhunter.daily
+  Remove:    launchctl bootout gui/$(id -u)/local.jobhunter.daily
+             rm ~/Library/LaunchAgents/local.jobhunter.daily.plist
+  Pipeline output goes to data/run.log; launchd's own errors to ~/Library/Logs/jobhunter.log.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>local.jobhunter.daily</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/sh</string>
+        <string>/Users/mohamadshoumar/job-hunter/scripts/run_daily.sh</string>
+    </array>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>9</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>/Users/mohamadshoumar/Library/Logs/jobhunter.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/mohamadshoumar/Library/Logs/jobhunter.log</string>
+</dict>
+</plist>

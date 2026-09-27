@@ -1,0 +1,107 @@
+{
+ "jobs": [
+  {
+   "absolute_url": "https://job-boards.greenhouse.io/gitlab/jobs/8556658002",
+   "data_compliance": [
+    {
+     "type": "gdpr",
+     "requires_consent": false,
+     "requires_processing_consent": false,
+     "requires_retention_consent": false,
+     "retention_period": null,
+     "demographic_data_consent_applies": false
+    }
+   ],
+   "internal_job_id": 6417799002,
+   "location": {
+    "name": "Remote, Bangalore"
+   },
+   "metadata": [
+    {
+     "id": 4595831002,
+     "name": "Quota Coverage Type",
+     "value": "n/a",
+     "value_type": "single_select"
+    }
+   ],
+   "id": 8556658002,
+   "updated_at": "2026-09-14T16:01:39-04:00",
+   "requisition_id": "6401",
+   "title": "AI Engineer",
+   "company_name": "GitLab",
+   "first_published": "2026-05-22T09:16:29-04:00",
+   "language": "en",
+   "application_deadline": null,
+   "content": "&lt;div class=&quot;content-intro&quot;&gt;&lt;p&gt;GitLab is the intelligent orchestration platform for DevSecOps. GitLab enables organizations to increase developer productivity, improve operational efficiency, reduce security and compliance risk, and accelerate digital transformation. More than 50 million registered users and more than 50% of the Fortune 100* trust GitLab to ship better, more secure software faster.&lt;/p&gt;\n&lt;p&gt;The same principles built into our products are reflected in how our team works: we embrace AI as a core productivity multiplier, with all team members expected to incorporate AI into their daily workflows to drive efficiency, innovation, and impact. GitLab is where careers accelerate, innovation flourishes, and every voice is valued. Our high-performance culture is driven by our values&amp;nbsp;and continuous knowledge exchange, enabling our team members to reach their full potential while collaborating with industry leaders to solve complex problems. &lt;a href=&quot;https://www.youtube.com/watch?v=OuZIb5zszQI&quot;&gt;Co-create the future with us&lt;/a&gt; as we build technology that transforms how the world develops software.&lt;/p&gt;\n&lt;p&gt;*&lt;em&gt;Fortune 500® is a registered trademark of Fortune Media IP Limited, used under license. Claim based on GitLab data. Fortune 100 refers to the top 20% ranked companies in the 2025 Fortune 500 list, published in June 2025. Fortune and Fortune Media IP Limited are not affiliated with, and do not endorse products or services of GitLab.&lt;/em&gt;&lt;/p&gt;&lt;/div&gt;&lt;h2&gt;&lt;strong&gt;An overview of this role&lt;/strong&gt;&lt;/h2&gt;\n&lt;p&gt;As an AI Engineer at GitLab, you&#39;ll help build the foundation for GitLab&#39;s transformation into an AI-first company. Reporting to the Director, Enterprise AI, you&#39;ll be a hands-on technical leader responsible for delivering internal AI-powered solutions that drive measurable business outcomes.&lt;/p&gt;\n&lt;p&gt;Building fast matters, but it&#39;s not enough on its own. This role starts with understanding the real problem: mapping how work moves across teams, tools, and handoffs, identifying the true constraint, and validating whether AI is the right solution before you begin development. From there, you&#39;ll take ownership from discovery through deployment, combining strong engineering skills with systems thinking and business understanding.&lt;/p&gt;\n&lt;p&gt;Your initial focus will span Sales, Marketing, and Cu",
+   "departments": [
+    {
+     "id": 4069215002,
+     "name": "Enterprise Applications",
+     "child_ids": [],
+     "parent_id": 4118834002
+    }
+   ],
+   "offices": [
+    {
+     "id": 4112140002,
+     "name": "India",
+     "location": null,
+     "child_ids": [],
+     "parent_id": 4019590002
+    }
+   ],
+   "ai_disclaimer": null,
+   "include_ai_disclaimer": null,
+   "ai_opt_out_request_url": null
+  },
+  {
+   "absolute_url": "https://job-boards.greenhouse.io/gitlab/jobs/8638232002",
+   "data_compliance": [
+    {
+     "type": "gdpr",
+     "requires_consent": false,
+     "requires_processing_consent": false,
+     "requires_retention_consent": false,
+     "retention_period": null,
+     "demographic_data_consent_applies": false
+    }
+   ],
+   "internal_job_id": 6449994002,
+   "location": {
+    "name": "Remote, United States"
+   },
+   "metadata": [
+    {
+     "id": 4595831002,
+     "name": "Quota Coverage Type",
+     "value": "n/a",
+     "value_type": "single_select"
+    }
+   ],
+   "id": 8638232002,
+   "updated_at": "2026-09-14T16:01:39-04:00",
+   "requisition_id": "6682",
+   "title": "AI Transformation Owner, CRO",
+   "company_name": "GitLab",
+   "first_published": "2026-07-22T13:38:40-04:00",
+   "language": "en",
+   "application_deadline": null,
+   "content": "&lt;div class=&quot;content-intro&quot;&gt;&lt;p&gt;GitLab is the intelligent orchestration platform for DevSecOps. GitLab enables organizations to increase developer productivity, improve operational efficiency, reduce security and compliance risk, and accelerate digital transformation. More than 50 million registered users and more than 50% of the Fortune 100* trust GitLab to ship better, more secure software faster.&lt;/p&gt;\n&lt;p&gt;The same principles built into our products are reflected in how our team works: we embrace AI as a core productivity multiplier, with all team members expected to incorporate AI into their daily workflows to drive efficiency, innovation, and impact. GitLab is where careers accelerate, innovation flourishes, and every voice is valued. Our high-performance culture is driven by our values&amp;nbsp;and continuous knowledge exchange, enabling our team members to reach their full potential while collaborating with industry leaders to solve complex problems. &lt;a href=&quot;https://www.youtube.com/watch?v=OuZIb5zszQI&quot;&gt;Co-create the future with us&lt;/a&gt; as we build technology that transforms how the world develops software.&lt;/p&gt;\n&lt;p&gt;*&lt;em&gt;Fortune 500® is a registered trademark of Fortune Media IP Limited, used under license. Claim based on GitLab data. Fortune 100 refers to the top 20% ranked companies in the 2025 Fortune 500 list, published in June 2025. Fortune and Fortune Media IP Limited are not affiliated with, and do not endorse products or services of GitLab.&lt;/em&gt;&lt;/p&gt;&lt;/div&gt;&lt;h4&gt;&lt;strong&gt;An overview of this role&lt;/strong&gt;&lt;/h4&gt;\n&lt;p&gt;The AI Transformation Owner drives the end-to-end AI agenda for the field organization, translating emerging AI capabilities into concrete enablement roadmaps, field use cases, and org-level strategy. You will partner closely with product and engineering teams to pilot and scale AI solutions, own the operational transformation plan needed to embed AI into day-to-day field workflows, and establish the governance framework that keeps AI adoption safe, compliant, and aligned with company standards. This is a hands-on role for someone who can move from strategy to execution without heavy oversight.&lt;/p&gt;\n&lt;p&gt;This role reports to the Vice President, Enablement &amp;amp; AI.&lt;/p&gt;\n&lt;p&gt;&lt;strong&gt;What You’ll Do&lt;/strong&gt; &amp;nbsp;&lt;/p&gt;\n&lt;ul&gt;\n&lt;li&gt;&lt;strong&gt;AI Enablement Roadmap:&lt;/stron",
+   "departments": [
+    {
+     "id": 4114891002,
+     "name": "Enablement",
+     "child_ids": [],
+     "parent_id": 4011049002
+    }
+   ],
+   "offices": [],
+   "ai_disclaimer": null,
+   "include_ai_disclaimer": null,
+   "ai_opt_out_request_url": null
+  }
+ ],
+ "meta": {
+  "total": 2
+ }
+}

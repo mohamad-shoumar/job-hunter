@@ -1,0 +1,187 @@
+{
+ "apiVersion": "1",
+ "jobs": [
+  {
+   "id": "99ee2a07-7925-4b8e-9b3c-fb5e43cacc50",
+   "title": "PostgreSQL Database Support Engineer - EMEA (Remote)",
+   "department": "GLOBAL SERVICES",
+   "team": "Support Services",
+   "employmentType": "FullTime",
+   "location": "EMEA",
+   "shouldDisplayCompensationOnJobPostings": false,
+   "secondaryLocations": [
+    {
+     "location": "Bucharest",
+     "address": {
+      "postalAddress": {
+       "addressRegion": "Bucharest",
+       "addressCountry": "Romania",
+       "addressLocality": "Bucharest"
+      }
+     }
+    },
+    {
+     "location": "Dublin",
+     "address": {
+      "postalAddress": {
+       "addressRegion": "Ireland",
+       "addressCountry": "Ireland",
+       "addressLocality": "Dublin"
+      }
+     }
+    },
+    {
+     "location": "UK",
+     "address": {
+      "postalAddress": {
+       "addressRegion": "United Kingdom",
+       "addressCountry": "UK",
+       "addressLocality": "United Kingdom"
+      }
+     }
+    },
+    {
+     "location": "Warsaw",
+     "address": {
+      "postalAddress": {
+       "addressRegion": "Poland",
+       "addressCountry": "Poland",
+       "addressLocality": "Warsaw"
+      }
+     }
+    },
+    {
+     "location": "Lisbon",
+     "address": {
+      "postalAddress": {
+       "addressRegion": "Portugal",
+       "addressCountry": "Portugal",
+       "addressLocality": "Lisbon"
+      }
+     }
+    },
+    {
+     "location": "Frankfurt",
+     "address": {
+      "postalAddress": {
+       "addressRegion": "Frankfurt",
+       "addressCountry": "Germany",
+       "addressLocality": "Frankfurt"
+      }
+     }
+    },
+    {
+     "location": "Paris",
+     "address": {
+      "postalAddress": {
+       "addressRegion": "France",
+       "addressCountry": "France",
+       "addressLocality": "Paris"
+      }
+     }
+    }
+   ],
+   "publishedAt": "2026-07-24T09:08:01.643+00:00",
+   "isListed": true,
+   "isRemote": true,
+   "workplaceType": "Remote",
+   "address": null,
+   "jobUrl": "https://jobs.ashbyhq.com/percona/99ee2a07-7925-4b8e-9b3c-fb5e43cacc50",
+   "applyUrl": "https://jobs.ashbyhq.com/percona/99ee2a07-7925-4b8e-9b3c-fb5e43cacc50/application",
+   "descriptionHtml": "<p style=\"min-height:1.5em\">Percona Support is a global, elite team of engineers who love getting to the bottom of weird and interesting database behaviour. We understand our customers’ business needs and the nuances of their technical environments. This allows us to help our customers see the big picture and identify opportunities to improve their overall database infrastructures. </p><p style=\"min-height:1.5em\"> </p><p style=\"min-height:1.5em\">What you’ll be doing…</p><p style=\"min-height:1.5em\"> </p><p style=\"min-height:1.5em\">You’ll be teaming with some of the most well-known database experts in the industry who are even better teammates, friends and mentors. You’ll have the opportunity to develop your own skills and become more powerful than you can possibly imagine…. with databases.<",
+   "descriptionPlain": "Percona Support is a global, elite team of engineers who love getting to the bottom of weird and interesting database behaviour. We understand our customers’ business needs and the nuances of their technical environments. This allows us to help our customers see the big picture and identify opportunities to improve their overall database infrastructures. \n\n \n\nWhat you’ll be doing…\n\n \n\nYou’ll be teaming with some of the most well-known database experts in the industry who are even better teammates, friends and mentors. You’ll have the opportunity to develop your own skills and become more powerful than you can possibly imagine…. with databases.\n\n \n\nThis is not a boring, entry-level role where you’ll just be triaging the boring and monotonous.\n\n \n\nYour main responsibility will be helping our",
+   "compensation": {
+    "compensationTierSummary": null,
+    "scrapeableCompensationSalarySummary": null,
+    "compensationTiers": [],
+    "summaryComponents": []
+   }
+  },
+  {
+   "id": "d49c11d8-3762-4c2b-8bc5-a7a84c74e6d6",
+   "title": "PostgreSQL Database Support Engineer - AMERICAS (Remote)",
+   "department": "GLOBAL SERVICES",
+   "team": "Support Services",
+   "employmentType": "FullTime",
+   "location": "Americas",
+   "shouldDisplayCompensationOnJobPostings": false,
+   "secondaryLocations": [
+    {
+     "location": "Vancouver",
+     "address": {
+      "postalAddress": {
+       "addressRegion": "British Columbia",
+       "addressCountry": "Canada",
+       "addressLocality": "Vancouver"
+      }
+     }
+    },
+    {
+     "location": "Sao Paulo",
+     "address": {
+      "postalAddress": {
+       "addressRegion": "Sao Paulo",
+       "addressCountry": "Brazil",
+       "addressLocality": "Sao Paulo"
+      }
+     }
+    },
+    {
+     "location": "Buenos Aires",
+     "address": {
+      "postalAddress": {
+       "addressRegion": "Buenos Aires",
+       "addressCountry": "Argentina",
+       "addressLocality": "Buenos Aires"
+      }
+     }
+    },
+    {
+     "location": "Mexico City",
+     "address": {
+      "postalAddress": {
+       "addressRegion": "Mexico",
+       "addressCountry": "Mexico",
+       "addressLocality": "Mexico City"
+      }
+     }
+    },
+    {
+     "location": "Toronto",
+     "address": {
+      "postalAddress": {
+       "addressRegion": "Ontario",
+       "addressCountry": "Canada",
+       "addressLocality": "Toronto"
+      }
+     }
+    },
+    {
+     "location": "Montevideo",
+     "address": {
+      "postalAddress": {
+       "addressRegion": "Montevideo",
+       "addressCountry": "Uruguay",
+       "addressLocality": "Montevideo"
+      }
+     }
+    }
+   ],
+   "publishedAt": "2025-05-07T09:08:37.098+00:00",
+   "isListed": true,
+   "isRemote": null,
+   "workplaceType": null,
+   "address": null,
+   "jobUrl": "https://jobs.ashbyhq.com/percona/d49c11d8-3762-4c2b-8bc5-a7a84c74e6d6",
+   "applyUrl": "https://jobs.ashbyhq.com/percona/d49c11d8-3762-4c2b-8bc5-a7a84c74e6d6/application",
+   "descriptionHtml": "<p style=\"min-height:1.5em\">Percona Support is a global, elite team of engineers who love getting to the bottom of weird and interesting database behaviour. We understand our customers’ business needs and the nuances of their technical environments. This allows us to help our customers see the big picture and identify opportunities to improve their overall database infrastructures. </p><p style=\"min-height:1.5em\"> </p><p style=\"min-height:1.5em\"><strong><u>*THIS ROLE IS BASED IN THE AMERICAS TIME ZONE</u></strong>*</p><p style=\"min-height:1.5em\"></p><p style=\"min-height:1.5em\">What you’ll be doing… </p><p style=\"min-height:1.5em\"> </p><p style=\"min-height:1.5em\">You’ll be teaming with some of the most well-known database experts in the industry who are even better teammates, friends and me",
+   "descriptionPlain": "Percona Support is a global, elite team of engineers who love getting to the bottom of weird and interesting database behaviour. We understand our customers’ business needs and the nuances of their technical environments. This allows us to help our customers see the big picture and identify opportunities to improve their overall database infrastructures. \n\n \n\n*THIS ROLE IS BASED IN THE AMERICAS TIME ZONE*\n\n\n\nWhat you’ll be doing… \n\n \n\nYou’ll be teaming with some of the most well-known database experts in the industry who are even better teammates, friends and mentors. You’ll have the opportunity to develop your own skills and become more powerful than you can possibly imagine…. with databases.\n\n \n\nThis is not a boring, entry-level role where you’ll just be triaging the boring and monotonou",
+   "compensation": {
+    "compensationTierSummary": null,
+    "scrapeableCompensationSalarySummary": null,
+    "compensationTiers": [],
+    "summaryComponents": []
+   }
+  }
+ ]
+}

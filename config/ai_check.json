@@ -1,0 +1,14 @@
+{
+  "_about": "AI web check for jobs the rules leave unclear (needs_review). Claude searches the web and must give an exact quote; the code checks the quote is really on the page before the job's status changes. Needs ANTHROPIC_API_KEY in .env; without it the check is skipped with a note. `enabled` controls the daily run only: `jobhunter check` works either way. See src/jobhunter/ai_check.py.",
+
+  "enabled": true,
+  "_model": "claude-opus-5-5 is the most careful (about $4 in / $20 out per million tokens). claude-sonnet-5 costs about half; claude-haiku-4-5 about a quarter.",
+  "model": "claude-opus-5-5",
+  "_max_jobs_per_run": "A cost cap. The rest wait for the next run or `jobhunter check`.",
+  "max_jobs_per_run": 25,
+  "max_searches_per_job": 4,
+  "max_fetches_per_job": 3,
+  "_max_page_tokens": "How much of each fetched page is read. Pages are the biggest part of the cost.",
+  "max_page_tokens": 12000,
+  "workers": 4
+}

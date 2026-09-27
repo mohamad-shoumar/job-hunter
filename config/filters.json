@@ -1,0 +1,59 @@
+{
+  "_about": "Deterministic job filters. Title keywords match whole words on a normalized title: lowercase, no accents, 'back-end'/'back end' -> 'backend', 'full-stack' -> 'fullstack', 'front-end' -> 'frontend', 'Sr.' -> 'senior', plurals of engineer/developer folded. After editing, run `jobhunter reclassify` to re-apply to stored jobs.",
+
+  "max_posting_age_days": 30,
+  "reject_if_required_yoe_at_least": 7,
+  "stretch_yoe_at_least": 5,
+  "dedupe_window_days": 60,
+
+  "_title_include": "A title must contain at least one of these.",
+  "title_include": [
+    "backend", "software engineer", "software developer", "software development engineer",
+    "python", "fastapi", "django", "flask",
+    "ai engineer", "applied ai", "ai ml engineer", "llm engineer", "genai engineer", "generative ai engineer",
+    "ai developer", "ai automation", "automation engineer", "ai application engineer", "ai agent engineer",
+    "agent engineer", "agents engineer", "ai platform engineer",
+    "forward deployed", "solutions engineer", "solution engineer",
+    "fullstack",
+    "api engineer", "api developer", "integration engineer", "integrations engineer",
+    "founding engineer", "product engineer",
+    "trading systems", "trading engineer", "trading developer", "algorithmic trading",
+    "quant developer", "quantitative developer"
+  ],
+
+  "_title_exclude": "Seniority and job-function words. Any of these rejects the title, with no exceptions.",
+  "title_exclude": [
+    "manager", "director", "vp", "vice president", "head of", "chief", "cto",
+    "intern", "internship", "working student", "apprentice", "trainee",
+    "staff", "principal", "distinguished", "architect",
+    "embedded", "firmware", "hardware", "fpga",
+    "sre", "site reliability", "security engineer", "network",
+    "salesforce", "sap", "servicenow", "wordpress", "shopify", "magento", "unity", "unreal",
+    "support", "sales", "recruiter", "marketing",
+    "trainer", "annotator", "annotation", "labeling", "tutor"
+  ],
+
+  "_title_exclude_single_role": "Specialties. Rejected, unless the title also names a target role: 'Frontend / Backend Engineer' passes.",
+  "title_exclude_single_role": [
+    "frontend", "ios", "android", "mobile", "designer", "ux",
+    "qa", "quality assurance", "quality engineer", "test", "tester", "sdet", "devops"
+  ],
+
+  "_title_exclude_unless_python": "A role built on another language. Rejected unless the title also says Python.",
+  "title_exclude_unless_python": [
+    "java", "dotnet", "csharp", "php", "laravel", "symfony", "ruby", "rails", "golang", "go",
+    "rust", "cpp", "scala", "kotlin", "elixir", "erlang", "clojure", "haskell", "swift",
+    "spring", "abap", "cobol", "perl", "delphi", "flutter", "react native", "angular", "vue"
+  ],
+
+  "_fit_weights": "Points per skill found in the posting, based on profile/master_profile.md. Only used to sort the report.",
+  "fit_weights": {
+    "python": 3, "fastapi": 3, "django": 2, "flask": 1, "sqlalchemy": 1, "celery": 1, "pydantic": 1, "asyncio": 1,
+    "postgresql": 2, "sql": 1, "mongodb": 1, "redis": 1, "kafka": 1,
+    "aws": 2, "serverless": 2, "docker": 1, "kubernetes": 1, "datadog": 1, "grafana": 1,
+    "rest api": 1, "microservices": 1, "distributed systems": 2,
+    "llm": 2, "rag": 1, "langchain": 1, "langgraph": 1, "ai agents": 2,
+    "trading": 2, "backtesting": 2, "crypto": 1,
+    "react": 1, "nodejs": 1, "typescript": 1, "javascript": 1
+  }
+}

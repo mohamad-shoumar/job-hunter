@@ -1,0 +1,97 @@
+{
+  "_about": "Where jobs come from. Each section maps to an adapter in src/jobhunter/sources/. Any entry or section can take \"enabled\": false. Keys starting with _ are comments.",
+
+  "_greenhouse_boards": "Removed 2026-09-27: these boards' remote roles were US/Canada or single-country only. The greenhouse adapter still exists; add a \"greenhouse_boards\" list back to use it for a company that hires internationally.",
+
+  "lever_boards": [
+    { "company": "Metabase", "board_token": "metabase" },
+    { "company": "Wintermute Trading", "board_token": "wintermute-trading" },
+    { "company": "Token Metrics", "board_token": "tokenmetrics", "enabled": false, "_note": "Lever returns 'Document not found' and no Greenhouse/Ashby board exists under this name (checked 2026-09-25). Find their current careers page to re-add." }
+  ],
+  "ashby_boards": [
+    { "company": "Percona", "board_token": "percona" },
+    { "company": "TradingHub", "board_token": "TRADINGHUB" },
+    { "company": "Wincent", "board_token": "wincent" },
+    { "company": "Circle.so", "board_token": "circle", "_note": "Moved from greenhouse 'circleso' (404). Verified: the Ashby 'circle' board is Circle.so." },
+    { "company": "Kraken", "board_token": "kraken.com", "_note": "Moved from lever 'kraken123' (empty board). Kraken's jobs are on Ashby now." }
+  ],
+  "custom_pages": [
+    {
+      "company": "MailerLite",
+      "url": "https://www.mailerlite.com/jobs",
+      "job_link_pattern": "https://www\\.mailerlite\\.com/jobs/[a-z0-9-]+$",
+      "default_location": "Remote",
+      "default_workplace_type": "remote"
+    }
+  ],
+  "serpapi": {
+    "_note": "Google Jobs (includes LinkedIn postings). Needs SERPAPI_API_KEY in .env; skipped without it. One credit per query page per run: 7 queries x 1 page = 7 credits/day.",
+    "engine": "google_jobs",
+    "queries": [
+      "python backend engineer remote",
+      "backend engineer python remote",
+      "software engineer python remote",
+      "fastapi engineer remote",
+      "backend developer python remote",
+      "trading systems engineer python",
+      "algorithmic trading engineer python"
+    ],
+    "pages_per_query": 1
+  },
+  "remote_api": {
+    "_note": "Remotive. Its API ignores search terms and returns its latest jobs; local filters decide.",
+    "provider": "remotive",
+    "limit": 100
+  },
+  "himalayas": {
+    "_note": "country=LB makes Himalayas return jobs that list Lebanon or list no countries. No countries is treated as unknown, not worldwide.",
+    "enabled": true,
+    "limit": 100,
+    "country": "LB",
+    "queries": ["python backend", "python engineer", "backend engineer", "fastapi", "django", "trading systems"]
+  },
+  "remoteok": {
+    "_note": "The API returns its latest ~100 jobs only. 'queries' is a local filter on title + tags.",
+    "enabled": true,
+    "limit": 250,
+    "queries": ["python", "backend", "fastapi", "django", "api"]
+  },
+  "weworkremotely": {
+    "enabled": true,
+    "limit": 200,
+    "feeds": [
+      "https://weworkremotely.com/categories/remote-back-end-programming-jobs.rss",
+      "https://weworkremotely.com/categories/remote-full-stack-programming-jobs.rss"
+    ]
+  },
+  "hackernews": {
+    "_note": "Latest 'Ask HN: Who is hiring?' thread.",
+    "enabled": true,
+    "limit": 400
+  },
+  "nodesk": {
+    "enabled": true,
+    "limit": 100,
+    "feeds": ["https://nodesk.co/remote-jobs/engineering/index.xml"]
+  },
+  "hiringcafe": {
+    "enabled": false,
+    "_note": "Not implemented: hiring.cafe blocks automated requests (HTTP 403).",
+    "limit": 400,
+    "pages_per_query": 3,
+    "queries": [
+      "python backend engineer",
+      "fastapi engineer",
+      "django backend developer",
+      "backend engineer api",
+      "algorithmic trading engineer python",
+      "python automation engineer"
+    ]
+  },
+  "remote100k": {
+    "enabled": false,
+    "_note": "Not implemented: HTML only, no feed. Categories are /remote-jobs/<slug> (engineering, software-engineer); 'python'/'fastapi' pages do not exist.",
+    "limit": 120,
+    "queries": ["python", "backend", "software-engineer", "fastapi", "django", "api"]
+  }
+}
