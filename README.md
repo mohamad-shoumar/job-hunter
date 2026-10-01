@@ -224,8 +224,9 @@ jobs still at New or Saved, and never on one that already has a CV you made for
 that company (the PDF the email would attach).
 
 **Fixing a CV by hand.** A model can still get a line wrong, and a CV made by
-hand or with a chat assistant has no check at all. **Edit CV text** in the CV
-box opens the text behind the job's CV (`versions/<name>.md`, tailored or made
+hand or with a chat assistant has no check at all. The CV box has **View**,
+**Download** (saves the PDF to your Downloads, ready to upload) and **Edit CV**,
+which opens the text behind the job's CV (`versions/<name>.md`, tailored or made
 by hand; not the general `resume.md`). Delete a line, or put `//` in front of it
 to hide it, then **Save & rebuild PDF**: `build.py` rebuilds the PDF with no AI,
 so what you save is what prints. The text before your edit is kept as

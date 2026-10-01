@@ -401,12 +401,14 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
         return _job_detail(store, store.get(job_id), config, services, profile(), now())
 
     @app.get("/api/cv/{name}")
-    def cv_pdf(name: str):
-        """A CV from cv_dir, shown in the browser. Only names listed there, so no other file can be read."""
+    def cv_pdf(name: str, download: bool = False):
+        """A CV from cv_dir, shown in the browser (or saved, with ?download=1). Only names listed there, so no
+        other file can be read."""
         if name not in cv_options(config):
             return JSONResponse({"error": f"no CV named {name} in {config.cv_dir}"}, status_code=404)
         return FileResponse(Path(config.cv_dir).expanduser() / name, media_type="application/pdf", filename=name,
-                            content_disposition_type="inline", headers={"Cache-Control": "no-store"})
+                            content_disposition_type="attachment" if download else "inline",
+                            headers={"Cache-Control": "no-store"})
 
     @app.post("/api/jobs/{job_id}/send")
     def send(job_id: int, body: dict | None = Body(default=None), store: JobStore = Depends(db)):

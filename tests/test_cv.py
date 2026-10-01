@@ -372,6 +372,9 @@ def test_tailor_attaches_the_cv_and_the_page_can_show_it(cv_client):
     pdf = cv_client.get("/api/cv/Shoumar_Backend_Acme_Sep2026.pdf")
     assert pdf.status_code == 200 and pdf.headers["content-type"] == "application/pdf"
     assert pdf.headers["content-disposition"].startswith("inline")
+    saved = cv_client.get("/api/cv/Shoumar_Backend_Acme_Sep2026.pdf?download=1")
+    assert saved.status_code == 200 and saved.headers["content-disposition"].startswith("attachment")
+    assert "Shoumar_Backend_Acme_Sep2026.pdf" in saved.headers["content-disposition"]
 
 
 def test_only_cvs_in_the_folder_can_be_read(cv_client):

@@ -279,6 +279,10 @@ function cvLink(file, label = "View ↗") {
   return `<a class="btn small" href="/api/cv/${encodeURIComponent(file)}" target="_blank" rel="noopener" title="Open the PDF">${esc(label)}</a>`;
 }
 
+function cvDownload(file) {
+  return `<a class="btn small" href="/api/cv/${encodeURIComponent(file)}?download=1" download="${esc(file)}" title="Save the PDF to your Downloads">Download ↓</a>`;
+}
+
 function cvSection(d) {
   const cv = d.cv, t = cv.tailored, s = state.status || {};
   const note = s.cv_tailor_note;
@@ -294,7 +298,8 @@ function cvSection(d) {
     <div class="section">
       <h3>CV</h3>
       <div class="row">
-        ${cv.file ? `<span>For this job: <b>${esc(cv.file)}</b></span> ${cvLink(cv.file)}` : `<span class="muted">No CV${cv.options.length ? "" : ` (no PDFs in ${esc(cv.folder)})`}</span>`}
+        ${cv.file ? `<span>For this job: <b>${esc(cv.file)}</b></span> ${cvLink(cv.file)} ${cvDownload(cv.file)}` : `<span class="muted">No CV${cv.options.length ? "" : ` (no PDFs in ${esc(cv.folder)})`}</span>`}
+        ${cv.source && !editing(d) ? `<button class="btn small" data-action="edit-cv" title="Fix or remove a line by hand, then rebuild the PDF (no AI)">Edit CV ✎</button>` : ""}
       </div>
       ${info}
       <div class="row small" style="margin-top:8px">
@@ -305,8 +310,6 @@ function cvSection(d) {
           ${cv.options.map((o) => `<option ${o === cv.chosen ? "selected" : ""}>${esc(o)}</option>`).join("")}
           <option value="none" ${cv.chosen === "none" ? "selected" : ""}>No CV</option>
         </select>
-      </div>
-        ${cv.source && !editing(d) ? `<button class="btn" data-action="edit-cv" title="Fix or remove a line by hand, then rebuild the PDF (no AI)">Edit CV text</button>` : ""}
       </div>
       ${note ? `<div class="small muted" style="margin-top:6px">${esc(note)}</div>` : ""}
       ${editing(d) ? cvEditor() : ""}
@@ -332,6 +335,7 @@ function cvEditor() {
         <textarea id="cv-edit" class="mono" rows="24" spellcheck="false" style="margin-top:8px">${esc(e.text)}</textarea>
         <div class="row small" style="margin-top:6px">
           <button class="btn primary" data-action="save-cv">Save &amp; rebuild PDF</button>
+          ${state.detail?.cv?.file ? cvDownload(state.detail.cv.file) : ""}
           <button class="btn" data-action="close-cv">${e.dirty ? "Discard changes" : "Close editor"}</button>
         </div>
       </div>`;
