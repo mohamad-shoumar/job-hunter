@@ -553,6 +553,9 @@ def cover_for_job(store: JobStore, job_id: int, writer: CoverWriter, profile_pat
     store.commit()  # no write lock held during the model call
 
     letter, usage, attempts = writer.write(job, company, facts, gaps)
+    if not letter.paragraphs:  # nothing worth sending: write no file, so the daily run tries again tomorrow
+        why = "; ".join(letter.missing + letter.removed[:3]) or "the answer was empty"
+        raise CoverError(f"No cover letter written: nothing in the answer passed the fact check ({why[:400]})")
     body = body_of(letter, company, job["title"] or "", config.cover_gap_text)
     text = render_letter(body, facts, company, job["title"] or "", now)
     folder = Path(config.cv_dir).expanduser()
@@ -563,9 +566,7 @@ def cover_for_job(store: JobStore, job_id: int, writer: CoverWriter, profile_pat
 
     words = _words_of(" ".join(body))
     notes = list(letter.notes)
-    if not letter.paragraphs:
-        notes.append("Every paragraph was removed by the fact check: write it again, or edit the file")
-    elif not MIN_WORDS <= words <= MAX_WORDS:
+    if not MIN_WORDS <= words <= MAX_WORDS:
         notes.append(f"It is {words} words; {MIN_WORDS}-{MAX_WORDS} reads best")
     meta = {
         "file": name, "path": str(path), "words": words, "tags": tags,

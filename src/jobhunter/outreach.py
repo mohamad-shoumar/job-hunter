@@ -10,7 +10,9 @@
 
 Steps 3 and 4 also catch up on shortlisted jobs from the last catch_up_days
 that still have no CV or letter (one that failed on a network error at
-wake-up is tried again the next day), within the same per-run caps.
+wake-up is tried again the next day), within the same per-run caps. Only
+jobs still at New or Saved, and not one that already has a CV you made for
+that company (the PDF the email would attach).
 
 Nothing is ever sent here. Each part catches its own errors, so a missing
 network at wake-up or a bad key becomes a line in the log and the reports are
@@ -23,13 +25,13 @@ import logging
 from datetime import datetime, timedelta
 
 from .config import OutreachConfig, Paths
-from .contacts import build_finder, find_contacts, run_budget
+from .contacts import build_finder, clean_company_name, find_contacts, run_budget
 from .cover import build_cover_writer, cover_for_job, cover_of
 from .cv import build_cv_writer, tailor_for_job, tailored_of
 from .llm import error_line
 from .mailer import check_inbox, mail_account
 from .models import SHORTLISTED
-from .pitch import build_writer, draft_for_job, load_profile
+from .pitch import build_writer, cv_for, draft_for_job, load_profile
 from .store import JobStore
 from . import tracking
 
@@ -84,12 +86,21 @@ def run_outreach(store: JobStore, paths: Paths, new_ids: list[int], now: datetim
     # Date-range runs skip these too: they can hold a month of jobs.
     if lookups and ai:
         waiting = to_prepare(store, new_shortlisted, config, now)
+        new_ids_set = {row["id"] for row in new_shortlisted}
+
+        def has_cv(row, app) -> bool:
+            if tailored_of(app):
+                return True
+            # An older job may already have a CV you made for the company: the one the email attaches.
+            chosen = cv_for(config, clean_company_name(row["company"])[0], app["cv_file"] if app else None)
+            return row["id"] not in new_ids_set and chosen is not None and chosen.name != config.default_cv
+
         if config.auto_tailor:
-            prepare(summary, "cvs", "cv", waiting, tailored_of, config.max_cvs_per_run, lambda: build_cv_writer(config),
+            prepare(summary, "cvs", "cv", waiting, has_cv, config.max_cvs_per_run, lambda: build_cv_writer(config),
                     lambda writer, job_id: tailor_for_job(store, job_id, writer, paths.profile_file, config, now,
                                                           pick=False)["file"], store)
         if config.auto_cover:
-            prepare(summary, "covers", "cover", waiting, cover_of, config.max_covers_per_run,
+            prepare(summary, "covers", "cover", waiting, lambda row, app: bool(cover_of(app)), config.max_covers_per_run,
                     lambda: build_cover_writer(config),
                     lambda writer, job_id: cover_for_job(store, job_id, writer, paths.profile_file, config, now)["file"],
                     store)
@@ -112,7 +123,7 @@ def run_outreach(store: JobStore, paths: Paths, new_ids: list[int], now: datetim
 def to_prepare(store: JobStore, new_shortlisted: list, config: OutreachConfig, now: datetime) -> list:
     """This run's new shortlisted jobs, best fit first, then older ones from the last catch_up_days.
 
-    Jobs you closed (skipped, rejected, ghosted) are left alone.
+    Older jobs only while they are New or Saved: one you reached out about, or closed, is left alone.
     """
     def best_first(rows):
         return sorted(rows, key=lambda row: -(row["fit_score"] or 0))
@@ -123,8 +134,8 @@ def to_prepare(store: JobStore, new_shortlisted: list, config: OutreachConfig, n
         seen = {row["id"] for row in rows}
         older = store.conn.execute(
             "SELECT jobs.* FROM jobs LEFT JOIN applications ON applications.job_id = jobs.id "
-            "WHERE jobs.status = ? AND jobs.report_date >= ? AND COALESCE(applications.stage, '') != ?",
-            (SHORTLISTED, since, tracking.CLOSED),
+            "WHERE jobs.status = ? AND jobs.report_date >= ? AND COALESCE(applications.stage, ?) IN (?, ?)",
+            (SHORTLISTED, since, tracking.NEW, tracking.NEW, tracking.SAVED),
         ).fetchall()
         rows += best_first(row for row in older if row["id"] not in seen)
     return rows
@@ -133,7 +144,7 @@ def to_prepare(store: JobStore, new_shortlisted: list, config: OutreachConfig, n
 def prepare(summary: dict, key: str, label: str, rows: list, done, limit: int, build, make, store: JobStore) -> None:
     """Make one thing (a CV, a cover letter) for each job in `rows` that has none yet, up to `limit`."""
     try:
-        todo = [row for row in rows if not done(tracking.get_application(store, row["id"]))]  # the button redoes one
+        todo = [row for row in rows if not done(row, tracking.get_application(store, row["id"]))]  # the button redoes one
         if not todo:
             return
         writer, note = build()

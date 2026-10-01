@@ -221,6 +221,17 @@ def test_the_letter_file_is_written_and_stored_with_the_job(tmp_path, filters):
     assert again["file"] == meta["file"] and len(list((tmp_path / "output").glob("*.md"))) == 1
 
 
+def test_an_answer_with_nothing_usable_writes_nothing_so_it_is_tried_again(tmp_path, filters):
+    from jobhunter.cover import CoverError
+
+    store = JobStore(":memory:")
+    job_id = store_job(store, filters, description=POSTING)
+    with pytest.raises(CoverError, match="No cover letter written"):
+        cover_for_job(store, job_id, writer({}, {}), PROFILE_FILE, config_for(tmp_path), NOW)
+    assert not list((tmp_path / "output").glob("*.md"))
+    assert tracking.get_application(store, job_id)["cover_letter_json"] is None
+
+
 def test_a_letter_made_by_hand_is_never_overwritten(tmp_path, filters):
     (tmp_path / "output").mkdir()
     (tmp_path / "output" / "Shoumar_CoverLetter_Acme_Sep2026.md").write_text("by hand")
@@ -276,8 +287,37 @@ def test_the_daily_run_catches_up_on_recent_jobs_that_have_none(home, filters, m
     store.set_report_date([recent, skipped], (day - timedelta(days=2)).isoformat())
     store.set_report_date([old], (day - timedelta(days=30)).isoformat())
     tracking.set_stage(store, skipped, tracking.CLOSED, NOW, reason="skipped")
+    contacted = store_job(store, filters, source_job_id="4", company="Contacted")
+    store.set_report_date([contacted], (day - timedelta(days=1)).isoformat())
+    tracking.set_stage(store, contacted, tracking.REACHED_OUT, NOW)
     summary = outreach.run_outreach(store, Paths(home), [], NOW)  # nothing new today
-    assert summary["covers"] == [f"#{recent}: Shoumar_CoverLetter_Recent_Sep2026.md"]
+    assert summary["covers"] == [f"#{recent}: Shoumar_CoverLetter_Recent_Sep2026.md"]  # not old, closed or contacted
+
+
+def test_catching_up_keeps_a_cv_you_made_for_the_company(home, filters, monkeypatch):
+    from jobhunter import cv, outreach
+
+    from .test_cv import GOOD as CV_GOOD
+    from .test_cv import FakeBuild
+    from .test_cv import writer as cv_writer
+
+    resume = home / "resume"
+    (resume / "output").mkdir(parents=True)
+    shutil.copy(FIXTURES / "resume.md", resume / "resume.md")
+    (resume / "build.py").write_text("# stands in for the real one\n")
+    (resume / "output" / "Shoumar_Backend_Clera_Sep2026.pdf").write_bytes(b"%PDF")  # made by hand
+    settings = json.loads((home / "config" / "outreach.json").read_text())
+    settings.update(auto_tailor=True, auto_cover=False, resume_dir="resume")
+    (home / "config" / "outreach.json").write_text(json.dumps(settings))
+    monkeypatch.setattr(outreach, "build_cv_writer", lambda config: (cv_writer(CV_GOOD), None))
+    monkeypatch.setattr(cv, "build_pdf", FakeBuild())
+    store = JobStore(":memory:")
+    clera = store_job(store, filters, company="Clera")
+    other = store_job(store, filters, source_job_id="2", company="Globex")
+    store.set_report_date([clera, other], (NOW.astimezone().date() - timedelta(days=1)).isoformat())
+    summary = outreach.run_outreach(store, Paths(home), [], NOW)
+    assert summary["cvs"] == [f"#{other}: Shoumar_Backend_Globex_Sep2026.pdf"] and summary["errors"] == []
+    assert tracking.get_application(store, clera) is None or not tracking.get_application(store, clera)["cv_tailored_json"]
 
 
 def test_the_report_links_the_job_s_cv_and_letter(tmp_path, filters):

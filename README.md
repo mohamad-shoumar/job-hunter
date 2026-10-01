@@ -218,7 +218,9 @@ what the posting asks for that is not in your profile. `jobhunter tailor <id>`
 does the same from the terminal. The daily run tailors its new shortlisted
 jobs (`auto_tailor`, `max_cvs_per_run`), and catches up on shortlisted jobs
 from the last `catch_up_days` (7) that still have none, so one that failed on a
-network error at wake-up is tried again the next day.
+network error at wake-up is tried again the next day. It only catches up on
+jobs still at New or Saved, and never on one that already has a CV you made for
+that company (the PDF the email would attach).
 
 **Cover letters** (`src/jobhunter/cover.py`). The Cover letter box under the CV
 has **Write cover letter** and **Copy**; `jobhunter cover <id>` does the same.
