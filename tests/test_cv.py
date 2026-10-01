@@ -4,6 +4,7 @@ import csv
 import json
 import re
 import shutil
+from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -11,11 +12,13 @@ from fastapi.testclient import TestClient
 from jobhunter import tracking
 from jobhunter.config import OutreachConfig, Paths
 from jobhunter.cv import (
-    MAX_BULLET_WORDS, TAG_RULES, CvWriter, check_bullet, check_headline, job_tags, load_facts, plan_from,
-    printed_title, render, role_label, scan, select, split_items, tailor_for_job,
+    MAX_BULLET_WORDS, TAG_RULES, CvWriter, TailorError, check_bullet, check_headline, check_version, job_tags,
+    load_facts, plan_from, printed_title, render, role_label, save_version, scan, select, split_items,
+    tailor_for_job, tailored_of, version_of,
 )
 from jobhunter.llm import JsonModel
 from jobhunter.store import JobStore
+from jobhunter.text import iso
 from jobhunter.web.app import create_app
 
 from .conftest import FIXTURES, NOW, ROOT, store_job
@@ -374,3 +377,88 @@ def test_tailor_attaches_the_cv_and_the_page_can_show_it(cv_client):
 def test_only_cvs_in_the_folder_can_be_read(cv_client):
     assert cv_client.get("/api/cv/resume.md").status_code == 404
     assert cv_client.get("/api/cv/..%2Fresume.md").status_code == 404
+
+
+# --- your edits ------------------------------------------------------------------------------
+
+
+def test_check_version_points_at_lines_that_say_more_than_the_profile():
+    text = "\n".join([
+        "## Professional Experience", "### CoinQuant, Abu Dhabi | Sept 2025 - Present", "Algorithmic Trader",
+        f"- {R1[1]}",
+        "- Architected a serverless platform on AWS Lambda and Kubernetes that runs 1000+ concurrent Python jobs.",
+        "- Mentored interns on quantum computing research.",
+        "// - Wrote the Rust matching engine.",  # hidden: never prints, so never checked
+        "## Skills", "Languages: Python, SQL, Rust",
+    ])
+    checks = check_version(text, PROFILE_FILE)
+    assert len(checks) == 3, checks
+    assert '"1000+ concurrent" is not in your profile' in checks[0] and '"kubernetes"' in checks[0]
+    assert checks[1].endswith("matches no bullet in your profile")
+    assert checks[2] == "Languages: Rust not in your profile's skills"
+
+
+def test_you_can_edit_a_tailored_cv_and_rebuild_it_without_the_model(resume, filters):
+    store = JobStore(":memory:")
+    job_id = store_job(store, filters)
+    config = config_for(resume)
+    meta = tailor_for_job(store, job_id, writer(GOOD), PROFILE_FILE, config, NOW, builder=FakeBuild())
+    source = resume / meta["source"]
+    original = source.read_text()
+    edited = original.replace("- Designed a slippage model", "// - Designed a slippage model")
+    assert edited != original
+    build, later = FakeBuild(), NOW + timedelta(hours=1)
+    result = save_version(store, job_id, config, PROFILE_FILE, later, edited, builder=build)
+    assert result["source"] == meta["source"] and result["file"] == meta["file"] and result["pages"] == 1
+    assert source.read_text() == edited == build.sources[0]  # what you saved is what was built
+    assert source.with_suffix(".md.bak").read_text() == original  # one step back
+    assert tailored_of(tracking.get_application(store, job_id))["edited_at"] == iso(later)
+    assert [e["detail"] for e in tracking.events_for(store, job_id)][-1] == f"CV edited by you: {meta['file']}"
+
+    with pytest.raises(TailorError, match="You edited this CV"):  # tailoring again asks first
+        tailor_for_job(store, job_id, writer(GOOD), PROFILE_FILE, config, NOW, builder=FakeBuild())
+    again = tailor_for_job(store, job_id, writer(GOOD), PROFILE_FILE, config, NOW, builder=FakeBuild(),
+                           replace_edits=True)
+    assert again["file"] == meta["file"] and "edited_at" not in again
+
+
+def test_a_cv_made_by_hand_can_be_edited_but_not_the_general_one(resume, filters):
+    store = JobStore(":memory:")
+    job_id = store_job(store, filters, company="Clera")
+    config = config_for(resume)
+    with pytest.raises(TailorError, match="general CV"):
+        save_version(store, job_id, config, PROFILE_FILE, NOW, "# Me\n", builder=FakeBuild())
+    (resume / "versions").mkdir()
+    (resume / "versions" / "Backend_Clera_Sep2026.md").write_text("# Me\n- a line you want gone\n")
+    (resume / "output" / "Shoumar_Backend_Clera_Sep2026.pdf").write_bytes(b"%PDF")  # build.py made it from that file
+    result = save_version(store, job_id, config, PROFILE_FILE, NOW, "# Me\n", builder=FakeBuild())
+    assert result["source"] == "versions/Backend_Clera_Sep2026.md" and result["file"] == "Shoumar_Backend_Clera_Sep2026.pdf"
+    assert (resume / "versions" / "Backend_Clera_Sep2026.md").read_text() == "# Me\n"
+    with pytest.raises(TailorError, match="empty"):
+        save_version(store, job_id, config, PROFILE_FILE, NOW, "  \n", builder=FakeBuild())
+
+
+def test_only_files_in_versions_can_be_edited(resume, filters):
+    store = JobStore(":memory:")
+    job_id = store_job(store, filters, company="Nobody")
+    tracking.ensure_application(store, job_id, NOW)
+    for source in ("../resume.md", "versions/../resume.md", "resume.md"):
+        store.conn.execute("UPDATE applications SET cv_tailored_json = ? WHERE job_id = ?",
+                           (json.dumps({"source": source}), job_id))
+        assert version_of(config_for(resume), "Nobody", tracking.get_application(store, job_id)) is None
+
+
+def test_the_cv_text_can_be_edited_in_the_app(cv_client):
+    assert cv_client.get("/api/jobs/1/cv-text").status_code == 404  # the general CV
+    cv_client.post("/api/jobs/1/tailor", json={}, headers=AUTH)
+    assert cv_client.get("/api/jobs/1").json()["cv"]["source"] == "Backend_Acme_Sep2026.md"
+    opened = cv_client.get("/api/jobs/1/cv-text").json()
+    assert opened["source"] == "versions/Backend_Acme_Sep2026.md" and isinstance(opened["checks"], list)
+    text = opened["text"].replace("- Designed a slippage model", "// - Designed a slippage model")
+    assert cv_client.put("/api/jobs/1/cv-text", json={"text": text}).status_code == 403  # needs the token
+    assert cv_client.put("/api/jobs/1/cv-text", json={}, headers=AUTH).status_code == 400
+    saved = cv_client.put("/api/jobs/1/cv-text", json={"text": text}, headers=AUTH).json()
+    assert saved["cv_saved"]["file"] == "Shoumar_Backend_Acme_Sep2026.pdf" and saved["cv"]["tailored"]["edited_at"]
+    assert cv_client.get("/api/jobs/1/cv-text").json()["text"] == text
+    assert cv_client.post("/api/jobs/1/tailor", json={}, headers=AUTH).status_code == 400  # asks before replacing
+    assert cv_client.post("/api/jobs/1/tailor", json={"replace_edits": True}, headers=AUTH).status_code == 200

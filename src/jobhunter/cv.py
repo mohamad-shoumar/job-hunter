@@ -49,8 +49,8 @@ from .contacts import clean_company_name
 from .extract import extract_skills
 from .llm import JsonModel, Usage, json_model, key_note
 from .pitch import (
-    _SENIORITY, Profile, _capitalized_words, _fact_has, _number_context, _strip_notes, load_profile, role_family,
-    split_tags,
+    _SENIORITY, Profile, _capitalized_words, _fact_has, _number_context, _strip_notes, cv_for, load_profile,
+    role_family, split_tags,
 )
 from .store import JobStore
 from .text import iso
@@ -661,11 +661,12 @@ def tailored_of(app) -> dict | None:
 
 
 def tailor_for_job(store: JobStore, job_id: int, writer: CvWriter, profile_path: Path, config: OutreachConfig,
-                   now: datetime, builder=None, pick: bool = True) -> dict:
+                   now: datetime, builder=None, pick: bool = True, replace_edits: bool = False) -> dict:
     """Write versions/<name>.md, build the PDF, and make it the job's attachment.
 
-    Tailoring the same job again rewrites its own file. The PDF becomes the attachment when
-    `pick` (your click), or when you had not picked another CV.
+    Tailoring the same job again rewrites its own file, but not one you edited (save_version)
+    unless `replace_edits`. The PDF becomes the attachment when `pick` (your click), or when
+    you had not picked another CV.
     """
     builder = builder or build_pdf
     job = store.get(job_id)
@@ -686,6 +687,9 @@ def tailor_for_job(store: JobStore, job_id: int, writer: CvWriter, profile_path:
     company, _ = clean_company_name(job["company"])
     app = tracking.ensure_application(store, job_id, now)
     old = tailored_of(app)
+    if old and old.get("edited_at") and not replace_edits:
+        raise TailorError(f"You edited this CV ({old['source']}) on {old['edited_at'][:10]}: tailoring again "
+                          "replaces your edits, so confirm it first")
     store.commit()  # no write lock held during the model call
 
     tags = job_tags(job["title"], job["description"] or "", {**TAG_RULES, **(config.cv_tags or {})})
@@ -740,3 +744,128 @@ def tailor_for_job(store: JobStore, job_id: int, writer: CvWriter, profile_path:
     tracking.add_event(store, job_id, "cv", f"CV tailored: {pdf.name}" + (" (again)" if old else ""), now)
     store.commit()
     return meta
+
+
+# --- your edits ----------------------------------------------------------------------------
+# The model can still get a line wrong, and a CV made by hand (or with a chat assistant) has no
+# check at all. So you can edit the text behind any job's CV and rebuild the PDF: no model, what
+# you save is what prints. check_version only points at lines to look at; it never changes them.
+
+MAX_EDIT_CHARS = 40_000
+
+
+def version_of(config: OutreachConfig, company: str, app) -> Path | None:
+    """The versions/<name>.md behind the job's CV, or None.
+
+    First the CV the job uses (build.py makes output/Shoumar_X.pdf from versions/X.md), then its
+    tailored one. The general CV (resume.md) is not editable here: change the profile and run
+    `build.py sync` for that. Only a file that already exists in versions/ is ever returned.
+    """
+    folder = Path(config.resume_dir).expanduser()
+    versions = (folder / "versions").resolve()
+    candidates = []
+    pdf = cv_for(config, company, app["cv_file"] if app is not None else None)
+    if pdf is not None and "_" in pdf.stem:
+        candidates.append(folder / "versions" / f"{pdf.stem.split('_', 1)[1]}.md")
+    meta = tailored_of(app)
+    if meta and meta.get("source"):
+        candidates.append(folder / str(meta["source"]))
+    for path in candidates:
+        path = path.resolve()
+        if path.parent == versions and path.suffix == ".md" and path.is_file():
+            return path
+    return None
+
+
+def _closest(line: str, bullets: list[str]) -> str | None:
+    """The profile bullet this CV line most likely rewords, or None when it shares too few words."""
+    mine = {_root(w) for w in _content_words(line)}
+    best, score = None, 0
+    for bullet in bullets:
+        shared = len(mine & {_root(w) for w in _content_words(bullet)})
+        if shared > score:
+            best, score = bullet, shared
+    return best if mine and (score >= 4 or score >= len(mine) / 2) else None
+
+
+def check_version(text: str, profile_path: Path) -> list[str]:
+    """Lines of a CV that say more than the profile, for you to look at.
+
+    An Experience bullet must keep the numbers, tools, names and seniority words of the profile
+    bullet closest to it (check_bullet, without its word-count limits), and a skills item may only
+    use words the profile has ("AWS (Lambda)" passes, "PostgreSQL (relational)" does not).
+    // lines never print, so they are skipped.
+    """
+    roles, _, _ = load_facts(profile_path)
+    bullets = [b for role in roles for b in role.bullets]
+    profile_words = {w for line in profile_path.read_text().splitlines() if "TODO" not in line
+                     for w in re.findall(r"[a-z0-9#+]+", line.lower())}
+    found, section = [], ""
+    for raw in text.splitlines():
+        s = raw.strip()
+        if not s or s.startswith("//"):
+            continue
+        if s.startswith("## "):
+            section = s[3:].strip().lower()
+        elif s.startswith("- ") and "experience" in section:
+            line = s[2:].replace("**", "").strip()
+            closest = _closest(line, bullets)
+            if closest is None:
+                found.append(f'"{_short(line)}": matches no bullet in your profile')
+                continue
+            why = [p for p in check_bullet(line, [closest]) if not p.startswith(("adds ", "is "))]
+            if why:
+                found.append(f'"{_short(line)}": ' + "; ".join(p.replace("the bullet it rewords", "your profile")
+                                                         for p in why))
+        elif "skill" in section and ":" in s and not s.startswith("- "):
+            label, _, items = s.partition(":")
+            extra = [x for x in split_items(items.replace("**", "")) if not _knows(x, profile_words)]
+            if extra:
+                found.append(f'{label.strip()}: {", ".join(extra)} not in your profile\'s skills')
+    return found
+
+
+def _short(text: str, size: int = 80) -> str:
+    return text if len(text) <= size else text[:size].rstrip() + "…"
+
+
+def save_version(store: JobStore, job_id: int, config: OutreachConfig, profile_path: Path, now: datetime,
+                 text: str | None = None, builder=None) -> dict:
+    """Save your edit of the job's CV text (None: use the file as you left it) and rebuild its PDF.
+
+    The text before the edit is kept as versions/<name>.md.bak (one step back). A tailored CV you
+    edit is marked edited, so Tailor again asks before replacing it and the daily run leaves it alone.
+    """
+    builder = builder or build_pdf
+    job = store.get(job_id)
+    if job is None:
+        raise TailorError(f"no job #{job_id}")
+    company, _ = clean_company_name(job["company"])
+    app = tracking.get_application(store, job_id)
+    source = version_of(config, company, app)
+    if source is None:
+        raise TailorError("This job uses the general CV (resume.md), which is not edited here: tailor a CV first, "
+                          "or edit profile/master_profile.md and run `python3 build.py sync` in the resume folder")
+    folder = Path(config.resume_dir).expanduser().resolve()
+    if text is not None:
+        text = str(text).replace("\r\n", "\n").rstrip() + "\n"
+        if not text.strip():
+            raise TailorError("The CV text is empty")
+        if len(text) > MAX_EDIT_CHARS:
+            raise TailorError(f"The CV text is over {MAX_EDIT_CHARS} characters")
+        before = source.read_text()
+        if text != before:
+            source.with_suffix(".md.bak").write_text(before)
+            source.write_text(text)
+    pdf, pages = builder(folder, source)
+    rel = str(source.relative_to(folder))
+    meta = tailored_of(app)
+    if meta and (folder / str(meta.get("source", ""))).resolve() == source:
+        meta.update(edited_at=iso(now), pages=pages, file=pdf.name, path=str(pdf))
+        store.conn.execute("UPDATE applications SET cv_tailored_json = ?, updated_at = ? WHERE job_id = ?",
+                           (json.dumps(meta), iso(now), job_id))
+    tracking.add_event(store, job_id, "cv", f"CV edited by you: {pdf.name}", now)
+    store.commit()
+    notes = [] if pages <= 1 else [f"It is {pages} pages even in the compact layout: cut a line"]
+    return {"source": rel, "file": pdf.name, "pages": pages, "notes": notes,
+            "checks": check_version(source.read_text(), profile_path)}

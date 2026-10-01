@@ -200,6 +200,8 @@ async function openJob(id, push = true) {
 }
 
 function closeDrawer(push = true) {
+  if (state.cvEdit?.dirty && !confirm("Discard your unsaved CV edits?")) return;
+  state.cvEdit = null;
   state.jobId = null;
   state.detail = null;
   $("#drawer").hidden = true;
@@ -283,6 +285,7 @@ function cvSection(d) {
   const info = t ? `
       <div class="small muted" style="margin-top:6px">Tailored ${esc(ago(t.written_at))} by ${esc(t.model)}${t.cost_usd ? `, $${t.cost_usd.toFixed(3)}` : ""}
         · headline “${esc(t.headline)}” · ${t.pages} page${t.pages === 1 ? "" : "s"} · <span class="mono">${esc(t.source)}</span>
+        ${t.edited_at ? ` · <b>edited by you ${esc(ago(t.edited_at))}</b>` : ""}
         ${t.file !== cv.file ? ` · ${cvLink(t.file, "View tailored ↗")}` : ""}</div>
       ${t.changes.length ? `<ul class="small">${t.changes.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` : ""}
       ${t.notes.length ? `<div class="warnings">Code changed these:<ul>${t.notes.map((n) => `<li>${esc(n)}</li>`).join("")}</ul></div>` : ""}
@@ -303,8 +306,35 @@ function cvSection(d) {
           <option value="none" ${cv.chosen === "none" ? "selected" : ""}>No CV</option>
         </select>
       </div>
+        ${cv.source && !editing(d) ? `<button class="btn" data-action="edit-cv" title="Fix or remove a line by hand, then rebuild the PDF (no AI)">Edit CV text</button>` : ""}
+      </div>
       ${note ? `<div class="small muted" style="margin-top:6px">${esc(note)}</div>` : ""}
+      ${editing(d) ? cvEditor() : ""}
     </div>`;
+}
+
+// The CV text editor: open for one job at a time, kept in state so a re-render keeps what you typed.
+function editing(d) {
+  return state.cvEdit && state.cvEdit.jobId === d.job.id;
+}
+
+function cvEditor() {
+  const e = state.cvEdit;
+  const checks = e.checks.length
+    ? `<div class="warnings">These lines say more than your profile. Look at them first:<ul>${e.checks.map((c) => `<li>${esc(c)}</li>`).join("")}</ul></div>`
+    : `<div class="small muted" style="margin-top:6px">The check found no line that says more than your profile.</div>`;
+  return `
+      <div style="margin-top:10px">
+        <div class="small muted">Editing <span class="mono">${esc(e.source)}</span>. Delete a line, or put <span class="mono">//</span> in front of it to hide it.
+          Saving rebuilds the PDF with build.py: no AI, what you save is what prints.
+          To fix a line for every future CV, change it in <span class="mono">profile/master_profile.md</span> instead.</div>
+        ${checks}
+        <textarea id="cv-edit" class="mono" rows="24" spellcheck="false" style="margin-top:8px">${esc(e.text)}</textarea>
+        <div class="row small" style="margin-top:6px">
+          <button class="btn primary" data-action="save-cv">Save &amp; rebuild PDF</button>
+          <button class="btn" data-action="close-cv">${e.dirty ? "Discard changes" : "Close editor"}</button>
+        </div>
+      </div>`;
 }
 
 function coverSection(d) {
@@ -501,7 +531,10 @@ async function drawerAction(action, el) {
     return setDetail(detail, detail.application?.draft_blocked ? "Drafted, but it needs an edit" : "Draft ready");
   }
   if (action === "tailor") {
-    const detail = await busy(el, "Tailoring… (up to a minute)", () => api(`/api/jobs/${id}/tailor`, { method: "POST" }));
+    const edited = Boolean(d.cv.tailored?.edited_at);
+    if (edited && !confirm("You edited this CV by hand. Tailoring again replaces your edits. Go ahead?")) return;
+    const detail = await busy(el, "Tailoring… (up to a minute)", () => api(`/api/jobs/${id}/tailor`, { method: "POST", body: { replace_edits: edited } }));
+    state.cvEdit = null;
     const t = detail.tailored || {};
     return setDetail(detail, `CV ready: ${t.file}${t.notes?.length ? " (see what code changed)" : ""}`);
   }
@@ -509,6 +542,24 @@ async function drawerAction(action, el) {
     if (d.cover && !confirm("Write a new cover letter? It replaces this one, including edits you made to the file.")) return;
     const detail = await busy(el, "Writing… (up to a minute)", () => api(`/api/jobs/${id}/cover`, { method: "POST" }));
     return setDetail(detail, `Cover letter ready: ${detail.cover?.file}${detail.cover?.removed.length ? " (the check left some sentences out)" : ""}`);
+  }
+  if (action === "edit-cv") {
+    const r = await busy(el, "Opening…", () => api(`/api/jobs/${id}/cv-text`));
+    state.cvEdit = { jobId: id, source: r.source, text: r.text, checks: r.checks, dirty: false };
+    renderDrawer();
+    return $("#cv-edit")?.focus();
+  }
+  if (action === "save-cv") {
+    const text = $("#cv-edit").value;
+    const detail = await busy(el, "Rebuilding the PDF…", () => api(`/api/jobs/${id}/cv-text`, { method: "PUT", body: { text } }));
+    const r = detail.cv_saved;
+    state.cvEdit = { jobId: id, source: r.source, text, checks: r.checks, dirty: false };
+    return setDetail(detail, `PDF rebuilt: ${r.file} (${r.pages} page${r.pages === 1 ? "" : "s"})${r.notes.length ? ". " + r.notes[0] : ""}`);
+  }
+  if (action === "close-cv") {
+    if (state.cvEdit?.dirty && !confirm("Discard your unsaved CV edits?")) return;
+    state.cvEdit = null;
+    return renderDrawer();
   }
   if (action === "copy-cover") {
     await navigator.clipboard.writeText($("#cover-text").value);
@@ -707,6 +758,14 @@ document.addEventListener("focusout", async (e) => {
 
 document.addEventListener("input", (e) => {
   if (e.target.id === "body" || e.target.id === "subject") updateWordCount();
+  if (e.target.id === "cv-edit" && state.cvEdit) {
+    state.cvEdit.text = e.target.value;
+    if (!state.cvEdit.dirty) {
+      state.cvEdit.dirty = true;
+      const close = $('[data-action="close-cv"]');
+      if (close) close.textContent = "Discard changes";
+    }
+  }
 });
 
 document.addEventListener("submit", async (e) => {

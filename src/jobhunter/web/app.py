@@ -28,7 +28,10 @@ from fastapi.staticfiles import StaticFiles
 from .. import tracking
 from ..config import OutreachConfig, Paths
 from ..cover import CoverError, build_cover_writer, cover_for_job, cover_model, cover_of, letter_text
-from ..cv import TailorError, build_cv_writer, build_pdf, tailor_for_job, tailor_note, tailored_of
+from ..cv import (
+    TailorError, build_cv_writer, build_pdf, check_version, save_version, tailor_for_job, tailor_note, tailored_of,
+    version_of,
+)
 from ..contacts import (
     ROLE_LABELS, ContactFinder, chosen_contact, clean_company_name, company_contacts, domain_from_links, job_company,
     rank_contacts, save_manual_contact, set_domain, set_job_board, skip_list_match, targets_for, verify_email,
@@ -343,13 +346,44 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
         if writer is None:
             raise tracking.TrackingError(note or "tailoring is off")
         try:
-            result = tailor_for_job(store, job_id, writer, paths.profile_file, config, now(), builder=services.build_pdf)
+            result = tailor_for_job(store, job_id, writer, paths.profile_file, config, now(), builder=services.build_pdf,
+                                    replace_edits=bool((body or {}).get("replace_edits")))
         except TailorError:
             raise
         except Exception as exc:  # the model or build.py failed: say so on the page
             raise TailorError(f"Tailoring failed: {error_line(exc)}") from exc
         detail = _job_detail(store, store.get(job_id), config, services, profile(), now())
         detail["tailored"] = result
+        return detail
+
+    @app.get("/api/jobs/{job_id}/cv-text")
+    def cv_text(job_id: int, store: JobStore = Depends(db)):
+        """The text behind the job's CV (versions/<name>.md), to edit, and the lines that say more than the profile."""
+        row = job_or_404(store, job_id)
+        company, _ = clean_company_name(row["company"])
+        source = version_of(config, company, tracking.get_application(store, job_id))
+        if source is None:
+            return JSONResponse({"error": "This job uses the general CV: tailor one first"}, status_code=404)
+        text = source.read_text()
+        folder = Path(config.resume_dir).expanduser().resolve()
+        return {"source": str(source.relative_to(folder)), "text": text,
+                "checks": check_version(text, paths.profile_file)}
+
+    @app.put("/api/jobs/{job_id}/cv-text")
+    def save_cv_text(job_id: int, body: dict | None = Body(default=None), store: JobStore = Depends(db)):
+        """Save your edit and rebuild the PDF with build.py. No model: what you save is what prints."""
+        job_or_404(store, job_id)
+        text = (body or {}).get("text")
+        if not isinstance(text, str):
+            raise TailorError("send the CV text as {\"text\": ...}")
+        try:
+            result = save_version(store, job_id, config, paths.profile_file, now(), text, builder=services.build_pdf)
+        except TailorError:
+            raise
+        except Exception as exc:  # build.py failed: say so on the page
+            raise TailorError(f"Rebuilding the PDF failed: {error_line(exc)}") from exc
+        detail = _job_detail(store, store.get(job_id), config, services, profile(), now())
+        detail["cv_saved"] = result
         return detail
 
     @app.post("/api/jobs/{job_id}/cover")
@@ -501,7 +535,8 @@ def _job_detail(store: JobStore, row: sqlite3.Row, config: OutreachConfig, servi
         "earlier_at_company": [dict(e) for e in earlier],
         "cv": {"options": cv_options(config), "chosen": app["cv_file"] if app else None,
                "file": (lambda f: f.name if f else None)(cv_for(config, company["name"], app["cv_file"] if app else None)),
-               "folder": config.cv_dir, "tailored": tailored_of(app)},
+               "folder": config.cv_dir, "tailored": tailored_of(app),
+               "source": (lambda s: s.name if s else None)(version_of(config, company["name"], app))},
         "cover": _cover_json(config, app),
         "sends_today": tracking.sends_today(store, now),
         "caps": {"total": config.daily_send_cap, "guessed": config.daily_guessed_cap},

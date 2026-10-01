@@ -35,6 +35,7 @@ open reports/$(date +%F).md
 | `jobhunter serve` | the web app: jobs, who to email, drafts, sending, tracking (`--port`, `--no-open`) |
 | `jobhunter contacts` | find who to email for shortlisted jobs without a contact, best fit first (`--limit N`, `--no-claude`, or job ids) |
 | `jobhunter tailor <id>` | a CV tailored to that job, in `resume/output/` (the daily run does new shortlisted jobs) |
+| `jobhunter rebuild-cv <id>` | after you edit a job's CV text in `resume/versions/`, rebuild its PDF (no AI) and list lines that say more than your profile |
 | `jobhunter cover <id>` | a cover letter for that job, next to its CV (the daily run does these too) |
 | `jobhunter inbox` | check Gmail for replies and bounces (the daily run does this too) |
 | `jobhunter check` | AI-check waiting "needs review" jobs, newest first (`--limit N`, `--recheck`, or job ids) |
@@ -221,6 +222,23 @@ from the last `catch_up_days` (7) that still have none, so one that failed on a
 network error at wake-up is tried again the next day. It only catches up on
 jobs still at New or Saved, and never on one that already has a CV you made for
 that company (the PDF the email would attach).
+
+**Fixing a CV by hand.** A model can still get a line wrong, and a CV made by
+hand or with a chat assistant has no check at all. **Edit CV text** in the CV
+box opens the text behind the job's CV (`versions/<name>.md`, tailored or made
+by hand; not the general `resume.md`). Delete a line, or put `//` in front of it
+to hide it, then **Save & rebuild PDF**: `build.py` rebuilds the PDF with no AI,
+so what you save is what prints. The text before your edit is kept as
+`<name>.md.bak`. Above the text, the box lists lines that say more than your
+profile, so you know where to look first: a bullet whose number, tool, name or
+"lead"/"senior"-type word is not in the profile bullet closest to it, and a
+skills item with a word your profile does not have (`PostgreSQL (relational)`).
+It only points; it never changes a line. Once you edit a tailored CV, **Tailor
+again** asks before replacing your edits, and the daily run leaves it alone.
+From the terminal: edit the file in any editor, then `jobhunter rebuild-cv <id>`.
+A wrong line that comes from `profile/master_profile.md` itself is better fixed
+there (then `python3 build.py sync` in `resume/`), so no future CV or cover
+letter repeats it.
 
 **Cover letters** (`src/jobhunter/cover.py`). The Cover letter box under the CV
 has **Write cover letter** and **Copy**; `jobhunter cover <id>` does the same.

@@ -292,7 +292,8 @@ def cmd_tailor(args) -> int:
     store = JobStore(paths.db_file)
     try:
         for job_id in args.job_ids:
-            meta = tailor_for_job(store, job_id, writer, paths.profile_file, config, utcnow())
+            meta = tailor_for_job(store, job_id, writer, paths.profile_file, config, utcnow(),
+                                  replace_edits=args.replace_edits)
             print(f"#{job_id}: {Path(config.cv_dir).expanduser() / meta['file']} ({meta['pages']} page"
                   f"{'s' if meta['pages'] != 1 else ''}, {meta['model']}, about ${meta['cost_usd']:.3f})")
             print(f"  headline: {meta['headline']}")
@@ -330,6 +331,35 @@ def cmd_cover(args) -> int:
                 print(f"  ? {line}")
             if meta["gaps_named"]:
                 print(f"  says you have not worked with: {', '.join(meta['gaps_named'])}")
+    finally:
+        store.close()
+    return 0
+
+
+def cmd_rebuild_cv(args) -> int:
+    """After you edit a job's CV text by hand: rebuild its PDF (no model) and list lines to look at."""
+    from .config import OutreachConfig
+    from .cv import TailorError, save_version
+
+    paths, _, _ = _load(args)
+    config = OutreachConfig.load(paths.outreach_file)
+    store = JobStore(paths.db_file)
+    try:
+        for job_id in args.job_ids:
+            try:
+                result = save_version(store, job_id, config, paths.profile_file, utcnow())
+            except TailorError as exc:
+                print(f"#{job_id}: {exc}")
+                continue
+            folder = Path(config.resume_dir).expanduser()
+            print(f"#{job_id}: {folder / result['source']} -> {Path(config.cv_dir).expanduser() / result['file']} "
+                  f"({result['pages']} page{'s' if result['pages'] != 1 else ''})")
+            for line in result["notes"]:
+                print(f"  ! {line}")
+            if result["checks"]:
+                print("  These lines say more than your profile; look at them:")
+            for line in result["checks"]:
+                print(f"  - {line}")
     finally:
         store.close()
     return 0
@@ -466,7 +496,18 @@ def main(argv: list[str] | None = None) -> int:
         "resume_dir (config/outreach.json), and makes the PDF the job's email attachment.",
     )
     p.add_argument("job_ids", type=int, nargs="+")
+    p.add_argument("--replace-edits", action="store_true", help="tailor again even if you edited the CV by hand")
     p.set_defaults(func=cmd_tailor)
+
+    p = sub.add_parser(
+        "rebuild-cv",
+        help="rebuild a job's CV PDF after you edited its text, and list lines that say more than your profile",
+        description="Edit resume/versions/<name>.md in any editor (delete a line, or put // in front of it), then "
+        "run this: build.py rebuilds the PDF with no model, so what you wrote is what prints. Works for tailored "
+        "CVs and ones you made by hand. The Edit CV text button in `jobhunter serve` does the same.",
+    )
+    p.add_argument("job_ids", type=int, nargs="+")
+    p.set_defaults(func=cmd_rebuild_cv)
 
     p = sub.add_parser(
         "cover",
