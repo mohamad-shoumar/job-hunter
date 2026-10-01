@@ -12,3 +12,9 @@ reports/
 
 # macOS folder metadata
 .DS_Store
+
+# The resume folder: build.py and resume.md are tracked; the CVs, cover letters and
+# the applications sheet it produces are personal output, like reports/.
+resume/versions/
+resume/output/
+resume/applications.csv

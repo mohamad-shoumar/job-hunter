@@ -34,6 +34,8 @@ open reports/$(date +%F).md
 | `jobhunter run --no-outreach` | skip contact lookups, drafts and the inbox check |
 | `jobhunter serve` | the web app: jobs, who to email, drafts, sending, tracking (`--port`, `--no-open`) |
 | `jobhunter contacts` | find who to email for shortlisted jobs without a contact, best fit first (`--limit N`, `--no-claude`, or job ids) |
+| `jobhunter tailor <id>` | a CV tailored to that job, in `resume/output/` (the daily run does new shortlisted jobs) |
+| `jobhunter cover <id>` | a cover letter for that job, next to its CV (the daily run does these too) |
 | `jobhunter inbox` | check Gmail for replies and bounces (the daily run does this too) |
 | `jobhunter check` | AI-check waiting "needs review" jobs, newest first (`--limit N`, `--recheck`, or job ids) |
 | `jobhunter show <id>` | everything stored about one job and why it got its status (`-d` adds the description) |
@@ -181,7 +183,7 @@ Beirut · +15550107788 · LinkedIn
 - Emails go out as plain text ("LinkedIn: https://…") plus an HTML copy, where
   "LinkedIn" is a link.
 - The CV is attached to the first email: a PDF from `cv_dir`
-  (`~/Documents/resume/output`). The job's tailored CV (below) wins, then a
+  (`resume/output`). The job's tailored CV (below) wins, then a
   file named after the company (`Shoumar_FullStack_LigaData_Sep2026.pdf`),
   else `default_cv`; you can pick another, or "No CV", per job. Follow-ups
   carry no attachment.
@@ -214,8 +216,47 @@ if it spills onto page 2), adds a row to `applications.csv`, and never
 overwrites a CV you made by hand (`_2` is added instead). The box also lists
 what the posting asks for that is not in your profile. `jobhunter tailor <id>`
 does the same from the terminal. The daily run tailors its new shortlisted
-jobs (`auto_tailor`, `max_cvs_per_run`), but only if it can read `resume_dir`:
-macOS keeps background jobs out of `~/Documents` (see "Run it daily").
+jobs (`auto_tailor`, `max_cvs_per_run`), and catches up on shortlisted jobs
+from the last `catch_up_days` (7) that still have none, so one that failed on a
+network error at wake-up is tried again the next day.
+
+**Cover letters** (`src/jobhunter/cover.py`). The Cover letter box under the CV
+has **Write cover letter** and **Copy**; `jobhunter cover <id>` does the same.
+`cover_model` (empty: the same model as `cv_model`; about $0.005 and 5 seconds
+a letter on DeepSeek) writes the opening, two paragraphs and the closing. Code
+writes the rest (your contact lines from the profile, the date, "Dear <Company>
+Hiring Team,", the sign-off) and checks every sentence:
+
+- the letter may only use the facts the job's CV prints: the summary, the
+  Experience bullets for the job's tags, skills, education, certifications and
+  where you live (never the salary line);
+- each paragraph names the facts it uses, and its numbers, tools and seniority
+  words must be in those facts ("800+ concurrent jobs" next to the same word);
+- the opening and closing may repeat what the posting says about the company
+  ("Novakid has 80,000 students"), but a sentence about you still names only
+  your tools; years are never above the profile's;
+- what the posting asks for that you lack is never claimed: the model picks up
+  to 3 (each word for word in the posting and sharing no word with your
+  facts), and code writes one sentence, `cover_gap_text`: "I have not worked
+  with Kafka or Kubernetes yet, and I would make learning them an early
+  priority."
+
+A letter that breaks a rule is sent back once with the reasons; a sentence
+that still breaks one is left out, and the box lists what was left out and
+why, plus names from the posting to check by eye. The letter is
+`resume/output/Shoumar_CoverLetter_<Company>_<MonYYYY>.md`, plain text to paste
+into a form or upload; a file you made by hand is never overwritten (`_2`).
+The box shows the file as it is now, so your edits stay. The daily run writes
+one for each new shortlisted job (`auto_cover`, `max_covers_per_run`, same
+catch-up), and each job in the daily report links its tailored CV and cover
+letter.
+
+**The resume folder** is `resume/` in this project: `build.py` and `resume.md`
+(both in git), and what they produce, `versions/`, `output/` and
+`applications.csv` (not in git, like `reports/`). It is inside the project, not
+in `~/Documents`, because macOS keeps background jobs (the daily run) out of
+Documents. `resume_dir` and `cv_dir` in `config/outreach.json` may be relative
+to the project.
 - `"pitch_mode": "ai"` switches the sentence after the opening to one written by
   `pitch_model` (DeepSeek or Claude). Plain code then checks it against
   `profile/master_profile.md`: a line with a number comes from one fact, with
@@ -312,11 +353,12 @@ Ashby (`kraken.com`), and Token Metrics' Lever board no longer exists (disabled)
 - `config/filters.json` — title keywords, experience cap, posting age, fit weights.
   Run `jobhunter reclassify` after changing it.
 - `config/outreach.json` — who to target by size, the job-board skip list,
-  lookup and send limits, follow-up days, the models.
+  lookup and send limits, follow-up days, the models, the resume folder, and the
+  CV and cover letter settings.
 - `.env` — `SERPAPI_API_KEY`, `ANTHROPIC_API_KEY`, `DEEPSEEK_API_KEY`, `HUNTER_API_KEY`,
   `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD`. Not in git; keep it that way.
-- `profile/master_profile.md` — the facts about you. **CV tailoring may reorder,
-  emphasize, rephrase and remove; it must never add anything that is not in this file.**
+- `profile/master_profile.md` — the facts about you. **CV tailoring and cover letters may
+  reorder, emphasize, rephrase and remove; they must never add anything that is not in this file.**
 
 ## Run it daily
 

@@ -5,7 +5,12 @@
   2. an email draft for each of them that has a contact;
   3. a tailored CV for each of them, best fit first (cv.py), which becomes the
      email attachment and what you upload when applying through the posting;
-  4. the inbox check (replies, bounces) and ghosting.
+  4. a cover letter for each of them (cover.py), next to the CV;
+  5. the inbox check (replies, bounces) and ghosting.
+
+Steps 3 and 4 also catch up on shortlisted jobs from the last catch_up_days
+that still have no CV or letter (one that failed on a network error at
+wake-up is tried again the next day), within the same per-run caps.
 
 Nothing is ever sent here. Each part catches its own errors, so a missing
 network at wake-up or a bad key becomes a line in the log and the reports are
@@ -15,10 +20,11 @@ still written.
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from .config import OutreachConfig, Paths
 from .contacts import build_finder, find_contacts, run_budget
+from .cover import build_cover_writer, cover_for_job, cover_of
 from .cv import build_cv_writer, tailor_for_job, tailored_of
 from .llm import error_line
 from .mailer import check_inbox, mail_account
@@ -35,7 +41,7 @@ MAX_DRAFTS_PER_RUN = 15
 def run_outreach(store: JobStore, paths: Paths, new_ids: list[int], now: datetime, ai: bool = True,
                  lookups: bool = True) -> dict:
     config = OutreachConfig.load(paths.outreach_file)
-    summary: dict = {"contacts": None, "drafts": [], "cvs": [], "inbox": None, "notes": [], "errors": []}
+    summary: dict = {"contacts": None, "drafts": [], "cvs": [], "covers": [], "inbox": None, "notes": [], "errors": []}
     new_shortlisted = [row for row in (store.get(i) for i in new_ids) if row and row["status"] == SHORTLISTED]
     ready: list[int] = []
 
@@ -75,24 +81,18 @@ def run_outreach(store: JobStore, paths: Paths, new_ids: list[int], now: datetim
             log.exception("drafting failed")
             summary["errors"].append(f"drafts: {error_line(exc)}")
 
-    # Date-range runs skip this too: they can hold a month of jobs.
-    if lookups and ai and config.auto_tailor and new_shortlisted:
-        try:
-            writer, note = build_cv_writer(config)
-            if note:
-                summary["notes"].append(note)
-            best_first = sorted(new_shortlisted, key=lambda row: -(row["fit_score"] or 0))
-            for row in best_first[:config.max_cvs_per_run] if writer else []:
-                if tailored_of(tracking.get_application(store, row["id"])):
-                    continue  # the button tailors it again
-                try:
-                    meta = tailor_for_job(store, row["id"], writer, paths.profile_file, config, now, pick=False)
-                    summary["cvs"].append(f"#{row['id']}: {meta['file']}")
-                except Exception as exc:  # noqa: BLE001
-                    summary["errors"].append(f"cv #{row['id']}: {error_line(exc)}")
-        except Exception as exc:  # noqa: BLE001
-            log.exception("tailoring failed")
-            summary["errors"].append(f"cvs: {error_line(exc)}")
+    # Date-range runs skip these too: they can hold a month of jobs.
+    if lookups and ai:
+        waiting = to_prepare(store, new_shortlisted, config, now)
+        if config.auto_tailor:
+            prepare(summary, "cvs", "cv", waiting, tailored_of, config.max_cvs_per_run, lambda: build_cv_writer(config),
+                    lambda writer, job_id: tailor_for_job(store, job_id, writer, paths.profile_file, config, now,
+                                                          pick=False)["file"], store)
+        if config.auto_cover:
+            prepare(summary, "covers", "cover", waiting, cover_of, config.max_covers_per_run,
+                    lambda: build_cover_writer(config),
+                    lambda writer, job_id: cover_for_job(store, job_id, writer, paths.profile_file, config, now)["file"],
+                    store)
 
     try:
         account = mail_account()
@@ -107,3 +107,45 @@ def run_outreach(store: JobStore, paths: Paths, new_ids: list[int], now: datetim
         log.exception("inbox check failed")
         summary["errors"].append(f"inbox: {error_line(exc)}")
     return summary
+
+
+def to_prepare(store: JobStore, new_shortlisted: list, config: OutreachConfig, now: datetime) -> list:
+    """This run's new shortlisted jobs, best fit first, then older ones from the last catch_up_days.
+
+    Jobs you closed (skipped, rejected, ghosted) are left alone.
+    """
+    def best_first(rows):
+        return sorted(rows, key=lambda row: -(row["fit_score"] or 0))
+
+    rows = best_first(new_shortlisted)
+    if config.catch_up_days > 0:
+        since = (now.astimezone().date() - timedelta(days=config.catch_up_days)).isoformat()
+        seen = {row["id"] for row in rows}
+        older = store.conn.execute(
+            "SELECT jobs.* FROM jobs LEFT JOIN applications ON applications.job_id = jobs.id "
+            "WHERE jobs.status = ? AND jobs.report_date >= ? AND COALESCE(applications.stage, '') != ?",
+            (SHORTLISTED, since, tracking.CLOSED),
+        ).fetchall()
+        rows += best_first(row for row in older if row["id"] not in seen)
+    return rows
+
+
+def prepare(summary: dict, key: str, label: str, rows: list, done, limit: int, build, make, store: JobStore) -> None:
+    """Make one thing (a CV, a cover letter) for each job in `rows` that has none yet, up to `limit`."""
+    try:
+        todo = [row for row in rows if not done(tracking.get_application(store, row["id"]))]  # the button redoes one
+        if not todo:
+            return
+        writer, note = build()
+        if note:
+            summary["notes"].append(note)
+        if writer is None:
+            return
+        for row in todo[:limit]:
+            try:
+                summary[key].append(f"#{row['id']}: {make(writer, row['id'])}")
+            except Exception as exc:  # noqa: BLE001
+                summary["errors"].append(f"{label} #{row['id']}: {error_line(exc)}")
+    except Exception as exc:  # noqa: BLE001
+        log.exception("%s step failed", label)
+        summary["errors"].append(f"{key}: {error_line(exc)}")

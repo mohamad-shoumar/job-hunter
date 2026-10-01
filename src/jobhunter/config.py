@@ -143,21 +143,35 @@ class OutreachConfig:
     daily_guessed_cap: int = 3
     # CVs to attach: PDFs in this folder. A file whose name contains the company (e.g.
     # Shoumar_FullStack_LigaData_Sep2026.pdf) is picked for that company, else default_cv.
-    cv_dir: str = "~/Documents/resume/output"
+    # A relative path is inside the project folder.
+    cv_dir: str = "resume/output"
     default_cv: str = "Shoumar_Resume_General.pdf"
     # Tailored CVs (cv.py): resume.md (the layout) and build.py live in resume_dir; build.py
     # writes the PDFs into its output/ folder, which is cv_dir.
-    resume_dir: str = "~/Documents/resume"
+    resume_dir: str = "resume"
     cv_model: str = "deepseek-v4-pro"
     auto_tailor: bool = True
     max_cvs_per_run: int = 5
     # Replaces cv.TAG_RULES for the tags it names: {"lead": {"title": [...], "posting": [...]}}.
     cv_tags: dict = field(default_factory=dict)
+    # Cover letters (cover.py): written next to the CVs in cv_dir. Empty cover_model means cv_model.
+    cover_model: str = ""
+    auto_cover: bool = True
+    max_covers_per_run: int = 5
+    # The one sentence about what the posting asks for and the profile does not have. Code writes it.
+    cover_gap_text: str = "I have not worked with {gaps} yet, and I would make learning {them} an early priority."
+    # The daily run also catches up on shortlisted jobs filed this many days back that still have no
+    # tailored CV or cover letter (one that failed, e.g. on a network error at wake-up).
+    catch_up_days: int = 7
 
     @classmethod
     def load(cls, path: Path) -> OutreachConfig:
-        if not path.exists():
-            return cls()
-        data = load_json(path)
+        data = load_json(path) if path.exists() else {}
         known = {f.name for f in fields(cls)}
-        return cls(**{k: v for k, v in data.items() if k in known})
+        config = cls(**{k: v for k, v in data.items() if k in known})
+        # config/outreach.json sits in <project>/config, so a relative folder is inside the project.
+        root = path.resolve().parent.parent
+        for name in ("cv_dir", "resume_dir"):
+            folder = Path(getattr(config, name)).expanduser()
+            setattr(config, name, str(folder if folder.is_absolute() else root / folder))
+        return config

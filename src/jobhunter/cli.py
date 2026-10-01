@@ -89,6 +89,8 @@ def cmd_run(args) -> int:
             print(f"Drafts: {len(o['drafts'])}")
         if o.get("cvs"):
             print(f"CVs tailored: {', '.join(o['cvs'])}")
+        if o.get("covers"):
+            print(f"Cover letters: {', '.join(o['covers'])}")
         if o["inbox"]:
             i = o["inbox"]
             print(f"Inbox: {i['replies']} replies, {i['probable']} probable, {i['bounces']} bounces")
@@ -305,6 +307,34 @@ def cmd_tailor(args) -> int:
     return 0
 
 
+def cmd_cover(args) -> int:
+    """A cover letter for each job: <cv_dir>/<Name>_CoverLetter_<Company>_<MonYYYY>.md, checked against the profile."""
+    from .config import OutreachConfig
+    from .cover import build_cover_writer, cover_for_job
+
+    paths, _, _ = _load(args)
+    config = OutreachConfig.load(paths.outreach_file)
+    writer, note = build_cover_writer(config)
+    if writer is None:
+        raise SystemExit(note)
+    store = JobStore(paths.db_file)
+    try:
+        for job_id in args.job_ids:
+            meta = cover_for_job(store, job_id, writer, paths.profile_file, config, utcnow())
+            print(f"#{job_id}: {meta['path']} ({meta['words']} words, {meta['model']}, about ${meta['cost_usd']:.3f})")
+            for line in meta["notes"]:
+                print(f"  - {line}")
+            for line in meta["removed"]:
+                print(f"  ! removed by the fact check: {line}")
+            for line in meta["warnings"]:
+                print(f"  ? {line}")
+            if meta["gaps_named"]:
+                print(f"  says you have not worked with: {', '.join(meta['gaps_named'])}")
+    finally:
+        store.close()
+    return 0
+
+
 def cmd_contacts(args) -> int:
     """Find who to email for given jobs, or for shortlisted jobs that have no contact yet (best fit first)."""
     from .config import OutreachConfig
@@ -437,6 +467,16 @@ def main(argv: list[str] | None = None) -> int:
     )
     p.add_argument("job_ids", type=int, nargs="+")
     p.set_defaults(func=cmd_tailor)
+
+    p = sub.add_parser(
+        "cover",
+        help="write a cover letter for jobs from your profile facts, next to the tailored CVs",
+        description="The model writes the opening, one or two paragraphs citing your profile facts, and the "
+        "closing; code checks every sentence against profile/master_profile.md and leaves out one that "
+        "adds anything. Writes <Name>_CoverLetter_<Company>_<MonYYYY>.md in cv_dir (config/outreach.json).",
+    )
+    p.add_argument("job_ids", type=int, nargs="+")
+    p.set_defaults(func=cmd_cover)
 
     p = sub.add_parser("inbox", help="check Gmail for replies and bounces (also runs in the daily run)")
     p.set_defaults(func=cmd_inbox)

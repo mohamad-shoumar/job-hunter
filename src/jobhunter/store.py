@@ -162,7 +162,8 @@ CREATE TABLE IF NOT EXISTS applications (
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     cv_file TEXT,
-    cv_tailored_json TEXT
+    cv_tailored_json TEXT,
+    cover_letter_json TEXT
 );
 
 CREATE TABLE IF NOT EXISTS events (
@@ -323,7 +324,7 @@ class JobStore:
             if column not in existing:
                 self.conn.execute(f"ALTER TABLE jobs ADD COLUMN {column} {kind}")
         app_columns = {row["name"] for row in self.conn.execute("PRAGMA table_info(applications)")}
-        for column in ("cv_file", "cv_tailored_json"):
+        for column in ("cv_file", "cv_tailored_json", "cover_letter_json"):
             if column not in app_columns:
                 self.conn.execute(f"ALTER TABLE applications ADD COLUMN {column} TEXT")
         self.conn.execute("CREATE INDEX IF NOT EXISTS jobs_report_date ON jobs (report_date)")
@@ -475,6 +476,17 @@ class JobStore:
 
     def jobs_for_report(self, day: str) -> list[sqlite3.Row]:
         return self.conn.execute("SELECT * FROM jobs WHERE report_date = ? ORDER BY id", (day,)).fetchall()
+
+    def applications_for(self, job_ids) -> dict[int, sqlite3.Row]:
+        """{job id: its applications row}, for the jobs that have one."""
+        ids = list(job_ids)
+        found: dict[int, sqlite3.Row] = {}
+        for start in range(0, len(ids), 500):
+            chunk = ids[start:start + 500]
+            marks = ", ".join("?" * len(chunk))
+            for row in self.conn.execute(f"SELECT * FROM applications WHERE job_id IN ({marks})", chunk):
+                found[row["job_id"]] = row
+        return found
 
     def jobs_by_ids(self, job_ids) -> list[sqlite3.Row]:
         ids = list(job_ids)

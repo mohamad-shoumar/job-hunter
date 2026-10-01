@@ -27,13 +27,14 @@ from fastapi.staticfiles import StaticFiles
 
 from .. import tracking
 from ..config import OutreachConfig, Paths
+from ..cover import CoverError, build_cover_writer, cover_for_job, cover_model, cover_of, letter_text
 from ..cv import TailorError, build_cv_writer, build_pdf, tailor_for_job, tailor_note, tailored_of
 from ..contacts import (
     ROLE_LABELS, ContactFinder, chosen_contact, clean_company_name, company_contacts, domain_from_links, job_company,
     rank_contacts, save_manual_contact, set_domain, set_job_board, skip_list_match, targets_for, verify_email,
 )
 from ..hunter import Hunter, HunterError
-from ..llm import anthropic_client, error_line
+from ..llm import anthropic_client, error_line, key_note
 from ..mailer import GmailInbox, MailAccount, SendError, SmtpSender, check_inbox, mail_account, outgoing, send_for_job
 from ..pitch import PitchWriter, build_writer, cv_for, cv_options, draft_for_job, edit_draft, load_profile, reassemble, word_count
 from ..report import _salary
@@ -78,6 +79,10 @@ class Services:
     def cv_writer(self):
         claude = None if self.config.cv_model.startswith("deepseek") else self._clients()[1]
         return build_cv_writer(self.config, claude=claude)
+
+    def cover_writer(self):
+        claude = None if cover_model(self.config).startswith("deepseek") else self._clients()[1]
+        return build_cover_writer(self.config, claude=claude)
 
     def build_pdf(self, folder: Path, source: Path) -> tuple[Path, int]:
         return build_pdf(folder, source)
@@ -173,6 +178,7 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
             "hunter_credits": account.__dict__ if account else None,
             "caps": {"total": config.daily_send_cap, "guessed": config.daily_guessed_cap},
             "cv_model": config.cv_model, "cv_tailor_note": tailor_note(config),
+            "cover_model": cover_model(config), "cover_note": key_note(cover_model(config), "Cover letters"),
             "sends_today": tracking.sends_today(store, now()),
             "stages": tracking.STAGES, "stage_labels": tracking.STAGE_LABELS,
             "closed_reasons": tracking.CLOSED_REASONS, "role_labels": ROLE_LABELS,
@@ -197,7 +203,8 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
         rows = store.conn.execute(
             f"""
             SELECT j.*, a.stage, a.closed_reason, a.body IS NOT NULL AS has_draft, a.draft_blocked,
-                   a.next_follow_up_at, a.emailed_at, a.applied_at, a.replied_at
+                   a.next_follow_up_at, a.emailed_at, a.applied_at, a.replied_at,
+                   a.cv_tailored_json IS NOT NULL AS has_cv, a.cover_letter_json IS NOT NULL AS has_cover
             FROM jobs j LEFT JOIN applications a ON a.job_id = j.id
             WHERE {where}
             ORDER BY COALESCE(j.report_date, substr(j.first_seen, 1, 10)) DESC,
@@ -345,6 +352,20 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
         detail["tailored"] = result
         return detail
 
+    @app.post("/api/jobs/{job_id}/cover")
+    def cover(job_id: int, body: dict | None = Body(default=None), store: JobStore = Depends(db)):
+        job_or_404(store, job_id)
+        writer, note = services.cover_writer()
+        if writer is None:
+            raise tracking.TrackingError(note or "cover letters are off")
+        try:
+            cover_for_job(store, job_id, writer, paths.profile_file, config, now())
+        except CoverError:
+            raise
+        except Exception as exc:  # the model failed, or the folder cannot be written: say so on the page
+            raise CoverError(f"Writing the cover letter failed: {error_line(exc)}") from exc
+        return _job_detail(store, store.get(job_id), config, services, profile(), now())
+
     @app.get("/api/cv/{name}")
     def cv_pdf(name: str):
         """A CV from cv_dir, shown in the browser. Only names listed there, so no other file can be read."""
@@ -416,11 +437,20 @@ def _job_summary(store: JobStore, row: sqlite3.Row, config: OutreachConfig) -> d
         "apply_url": row["application_url"] or row["source_url"],
         "stage": row["stage"] or "new", "closed_reason": row["closed_reason"], "has_draft": bool(row["has_draft"]),
         "draft_blocked": bool(row["draft_blocked"]), "emailed_at": row["emailed_at"], "applied_at": row["applied_at"],
+        "has_cv": bool(row["has_cv"]), "has_cover": bool(row["has_cover"]),
         "replied_at": row["replied_at"], "next_follow_up_at": row["next_follow_up_at"],
         "job_board": skip_list_match(row["company"], config),
         "contact": {"name": contact["full_name"], "role": ROLE_LABELS.get(contact["role"], contact["role"]),
                     "email_status": contact["email_status"] if contact["email"] else None} if contact else None,
     }
+
+
+def _cover_json(config: OutreachConfig, app) -> dict | None:
+    """The job's cover letter as it is on disk now (you may have edited the file), and what the check did."""
+    meta = cover_of(app)
+    if not meta:
+        return None
+    return {**{k: v for k, v in meta.items() if k != "text"}, "text": letter_text(config, meta)}
 
 
 def _job_detail(store: JobStore, row: sqlite3.Row, config: OutreachConfig, services: Services, profile, now) -> dict:
@@ -472,6 +502,7 @@ def _job_detail(store: JobStore, row: sqlite3.Row, config: OutreachConfig, servi
         "cv": {"options": cv_options(config), "chosen": app["cv_file"] if app else None,
                "file": (lambda f: f.name if f else None)(cv_for(config, company["name"], app["cv_file"] if app else None)),
                "folder": config.cv_dir, "tailored": tailored_of(app)},
+        "cover": _cover_json(config, app),
         "sends_today": tracking.sends_today(store, now),
         "caps": {"total": config.daily_send_cap, "guessed": config.daily_guessed_cap},
     }

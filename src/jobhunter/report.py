@@ -8,6 +8,7 @@ simply adds to it.
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 from datetime import date, datetime
 from pathlib import Path
@@ -52,7 +53,20 @@ def _salary(row: sqlite3.Row) -> str | None:
     return row["salary_raw"]
 
 
-def _job_block(n: int, row: sqlite3.Row, sightings: list[sqlite3.Row]) -> str:
+def _prepared_line(app: sqlite3.Row | None, reports_dir: Path | None) -> str | None:
+    """Links to the job's tailored CV and cover letter (cv.py, cover.py), from the report's folder."""
+    if app is None:
+        return None
+    links = []
+    for label, column in (("CV", "cv_tailored_json"), ("cover letter", "cover_letter_json")):
+        path = json.loads(app[column]).get("path") if app[column] else None
+        if path:
+            target = Path(os.path.relpath(path, reports_dir)) if reports_dir else Path(path)
+            links.append(f"[{label}]({target.as_posix()})")
+    return f"- **Tailored for this job:** {' · '.join(links)}" if links else None
+
+
+def _job_block(n: int, row: sqlite3.Row, sightings: list[sqlite3.Row], prepared: str | None = None) -> str:
     reasons = json.loads(row["eligibility_reasons_json"])
     relevance = json.loads(row["relevance_reasons_json"])
     skills = json.loads(row["skills_json"])
@@ -80,6 +94,8 @@ def _job_block(n: int, row: sqlite3.Row, sightings: list[sqlite3.Row]) -> str:
     if contract:
         lines.append(f"- **Hiring model hints:** {', '.join(contract)}")
     lines.append(f"- **Apply:** {row['application_url'] or row['source_url']}")
+    if prepared:
+        lines.append(prepared)
     lines.append(f"- **Seen on:** {seen_on or row['source']} · job #{row['id']}")
     return "\n".join(lines)
 
@@ -129,7 +145,14 @@ def _rejected_section(rows: list[sqlite3.Row], max_age: int | None) -> list[str]
 
 
 def render(day: str, rows: list[sqlite3.Row], sightings: dict[int, list[sqlite3.Row]], summary: dict | None,
-           generated_at: datetime, max_age: int | None = None) -> str:
+           generated_at: datetime, max_age: int | None = None, apps: dict[int, sqlite3.Row] | None = None,
+           reports_dir: Path | None = None) -> str:
+    """apps: each job's applications row, for the links to its tailored CV and cover letter."""
+    apps = apps or {}
+
+    def block(i: int, r: sqlite3.Row) -> str:
+        return _job_block(i, r, sightings.get(r["id"], []), _prepared_line(apps.get(r["id"]), reports_dir)) + "\n"
+
     shortlisted = sorted((r for r in rows if r["status"] == SHORTLISTED), key=_sort_key)
     review = sorted((r for r in rows if r["status"] == NEEDS_REVIEW), key=_sort_key)
     rejected = [r for r in rows if r["status"] == REJECTED]
@@ -143,11 +166,11 @@ def render(day: str, rows: list[sqlite3.Row], sightings: dict[int, list[sqlite3.
 
     out += [f"## Shortlisted ({len(shortlisted)})", ""]
     out += ["A target role, and the posting says (or strongly suggests) it can hire from Lebanon.", ""]
-    out += [_job_block(i, r, sightings.get(r["id"], [])) + "\n" for i, r in enumerate(shortlisted, 1)] or ["_None._", ""]
+    out += [block(i, r) for i, r in enumerate(shortlisted, 1)] or ["_None._", ""]
 
     out += [f"## Needs review ({len(review)})", ""]
     out += ["A target role, but the posting does not say clearly whether Lebanon is allowed, or has no posting date. Check before applying.", ""]
-    out += [_job_block(i, r, sightings.get(r["id"], [])) + "\n" for i, r in enumerate(review, 1)] or ["_None._", ""]
+    out += [block(i, r) for i, r in enumerate(review, 1)] or ["_None._", ""]
 
     out += _rejected_section(rejected, max_age)
 
@@ -173,6 +196,8 @@ def render(day: str, rows: list[sqlite3.Row], sightings: dict[int, list[sqlite3.
                 parts.append(f"{len(outreach['drafts'])} email drafts")
             if outreach.get("cvs"):
                 parts.append(f"{len(outreach['cvs'])} CVs tailored")
+            if outreach.get("covers"):
+                parts.append(f"{len(outreach['covers'])} cover letters")
             if outreach.get("inbox"):
                 i = outreach["inbox"]
                 parts.append(f"inbox: {i['replies'] + i['probable']} replies, {i['bounces']} bounces")
@@ -193,7 +218,8 @@ def write_report(store: JobStore, reports_dir: Path, day: str, summary: dict | N
                  max_age: int | None = 30) -> Path:
     """(Re)write reports/<day>.md and mark its relevant jobs as reported."""
     rows = store.jobs_for_report(day)
-    text = render(day, rows, store.sightings_for([r["id"] for r in rows]), summary, now, max_age)
+    ids = [r["id"] for r in rows]
+    text = render(day, rows, store.sightings_for(ids), summary, now, max_age, store.applications_for(ids), reports_dir)
     reports_dir.mkdir(parents=True, exist_ok=True)
     path = reports_dir / f"{day}.md"
     path.write_text(text)

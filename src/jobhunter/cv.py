@@ -5,7 +5,7 @@ every line against profile/master_profile.md, the only source of facts about
 you (see CLAUDE.md):
 
   - the name, contact lines, employers, job titles, dates and education are
-    copied from resume.md in resume_dir (~/Documents/resume), never written
+    copied from resume.md in resume_dir (resume/ in the project), never written
     by the model;
   - a role's bullets come from that role's bullets in the profile. Each
     bullet the model writes names the profile bullet(s) it rewords, from the
@@ -724,7 +724,7 @@ def tailor_for_job(store: JobStore, job_id: int, writer: CvWriter, profile_path:
 
     posting = f"{job['title']}\n{job['description'] or ''}"
     meta = {
-        "stem": stem, "file": pdf.name, "source": str(source.relative_to(folder)), "pages": pages,
+        "stem": stem, "file": pdf.name, "path": str(pdf), "source": str(source.relative_to(folder)), "pages": pages,
         "headline": plan.headline, "changes": plan.changes, "notes": plan.notes,
         "tags": tags, "titles": plan.titles,
         "gaps": sorted(set(extract_skills(posting)) - profile.skills),

@@ -178,10 +178,14 @@ def _fact_has(number: str, word: str | None, fact: str) -> bool:
 
 
 def _capitalized_words(text: str) -> list[str]:
-    """Capitalized words that do not start a sentence: likely names of tools or companies."""
+    """Capitalized words that do not start a sentence: likely names of tools or companies.
+
+    Only the sentence's first word is skipped, so in "I used Workato" the name still counts.
+    """
     words = []
     for sentence in re.split(r"(?<=[.!?])\s+", text):
-        words += re.findall(r"\b[A-Z][\w.#+-]*[\w#+]", sentence)[1:] if sentence else []
+        sentence = sentence.lstrip("\"'“‘(")
+        words += [m.group(0) for m in re.finditer(r"\b[A-Z][\w.#+-]*[\w#+]", sentence) if m.start() > 0]
     return words
 
 

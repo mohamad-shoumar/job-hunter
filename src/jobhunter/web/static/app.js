@@ -171,7 +171,8 @@ function jobRow(j) {
         <div class="job-title">${esc(j.title)}</div>
         <div class="muted">${esc(j.company)} · <span class="small">${esc(j.reason)}</span></div>
         <div class="job-meta" style="margin-top:4px">${statusChip(j.status, j.eligibility)} ${stageChip(j.stage, j.closed_reason)} ${contactChip(j)}
-          ${j.has_draft ? `<span class="chip ${j.draft_blocked ? "bad" : ""}">${j.draft_blocked ? "draft needs edit" : "draft ready"}</span>` : ""}</div>
+          ${j.has_draft ? `<span class="chip ${j.draft_blocked ? "bad" : ""}">${j.draft_blocked ? "draft needs edit" : "draft ready"}</span>` : ""}
+          ${j.has_cv ? `<span class="chip">CV tailored</span>` : ""}${j.has_cover ? ` <span class="chip">cover letter</span>` : ""}</div>
       </div>
       <div class="job-side">
         <span class="chip" title="Fit score from your skills">fit ${j.fit}</span>
@@ -242,6 +243,7 @@ function renderDrawer() {
       ${stage !== "closed" ? `<button class="btn danger" data-action="stage" data-stage="closed" data-reason="skipped">Skip</button>` : ""}
     </div>
     ${cvSection(d)}
+    ${coverSection(d)}
     ${contactSection(d)}
     ${emailSection(d)}
     ${trackingSection(d)}
@@ -300,6 +302,30 @@ function cvSection(d) {
           ${cv.options.map((o) => `<option ${o === cv.chosen ? "selected" : ""}>${esc(o)}</option>`).join("")}
           <option value="none" ${cv.chosen === "none" ? "selected" : ""}>No CV</option>
         </select>
+      </div>
+      ${note ? `<div class="small muted" style="margin-top:6px">${esc(note)}</div>` : ""}
+    </div>`;
+}
+
+function coverSection(d) {
+  const c = d.cover, s = state.status || {};
+  const note = s.cover_note;
+  const info = c ? `
+      <div class="small muted" style="margin-top:6px">Written ${esc(ago(c.written_at))} by ${esc(c.model)}${c.cost_usd ? `, $${c.cost_usd.toFixed(3)}` : ""}
+        · ${c.words} words · <span class="mono">${esc(c.file)}</span></div>
+      ${c.notes.length ? `<ul class="small">${c.notes.map((n) => `<li>${esc(n)}</li>`).join("")}</ul>` : ""}
+      ${c.removed.length ? `<div class="warnings">Left out by the fact check:<ul>${c.removed.map((r) => `<li>${esc(r)}</li>`).join("")}</ul></div>` : ""}
+      ${c.warnings.length ? `<div class="warnings">Check these by eye:<ul>${c.warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></div>` : ""}
+      ${c.gaps_named.length ? `<div class="small" style="margin-top:6px">It says you have not worked with <b>${esc(c.gaps_named.join(", "))}</b>.</div>` : ""}
+      <textarea id="cover-text" rows="14" readonly style="margin-top:8px">${esc(c.text || "")}</textarea>` : "";
+  return `
+    <div class="section">
+      <h3>Cover letter</h3>
+      ${c ? "" : `<div class="muted">None yet. It uses only the facts your CV prints for this job.</div>`}
+      ${info}
+      <div class="row small" style="margin-top:8px">
+        <button class="btn" data-action="cover" ${note ? `disabled title="${esc(note)}"` : `title="${esc(s.cover_model || "")} writes it from your profile facts; code checks every sentence"`}>${c ? "Write again" : "Write cover letter"}</button>
+        ${c ? `<button class="btn" data-action="copy-cover">Copy</button>` : ""}
       </div>
       ${note ? `<div class="small muted" style="margin-top:6px">${esc(note)}</div>` : ""}
     </div>`;
@@ -478,6 +504,15 @@ async function drawerAction(action, el) {
     const detail = await busy(el, "Tailoring… (up to a minute)", () => api(`/api/jobs/${id}/tailor`, { method: "POST" }));
     const t = detail.tailored || {};
     return setDetail(detail, `CV ready: ${t.file}${t.notes?.length ? " (see what code changed)" : ""}`);
+  }
+  if (action === "cover") {
+    if (d.cover && !confirm("Write a new cover letter? It replaces this one, including edits you made to the file.")) return;
+    const detail = await busy(el, "Writing… (up to a minute)", () => api(`/api/jobs/${id}/cover`, { method: "POST" }));
+    return setDetail(detail, `Cover letter ready: ${detail.cover?.file}${detail.cover?.removed.length ? " (the check left some sentences out)" : ""}`);
+  }
+  if (action === "copy-cover") {
+    await navigator.clipboard.writeText($("#cover-text").value);
+    return toast("Copied");
   }
   if (action === "save-draft") return saveDraft(el);
   if (action === "copy") {
