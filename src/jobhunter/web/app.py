@@ -156,6 +156,10 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
     @app.get("/", response_class=HTMLResponse)
     def index():
         html = (STATIC / "index.html").read_text().replace("__JH_TOKEN__", token)
+        # The browser keeps app.js and style.css for a while without asking (no cache header), so after an
+        # update it would run the old code. A version in the link makes a changed file a new URL.
+        for name in ("app.js", "style.css"):
+            html = html.replace(f"/static/{name}\"", f"/static/{name}?v={int((STATIC / name).stat().st_mtime)}\"")
         return HTMLResponse(html, headers={"Cache-Control": "no-store"})
 
     app.mount("/static", StaticFiles(directory=STATIC), name="static")

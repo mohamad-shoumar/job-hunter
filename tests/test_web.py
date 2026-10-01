@@ -1,5 +1,6 @@
 """The web app through FastAPI's TestClient, on a temp project folder, with fake outside services."""
 
+import re
 import shutil
 
 import pytest
@@ -60,6 +61,9 @@ def client(home):
 def test_the_page_carries_the_token(client):
     page = client.get("/")
     assert page.status_code == 200 and TOKEN in page.text and "no-store" in page.headers["cache-control"]
+    # After an update the browser must load the new code, not a copy it kept.
+    assert re.search(r'src="/static/app\.js\?v=\d+"', page.text) and re.search(r'href="/static/style\.css\?v=\d+"', page.text)
+    assert client.get(re.search(r'src="(/static/app\.js\?v=\d+)"', page.text).group(1)).status_code == 200
 
 
 def test_changes_need_the_token_json_and_the_right_host(client):
