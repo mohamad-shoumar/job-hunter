@@ -348,7 +348,7 @@ function coverSection(d) {
       <div class="small muted" style="margin-top:6px">Written ${esc(ago(c.written_at))} by ${esc(c.model)}${c.cost_usd ? `, $${c.cost_usd.toFixed(3)}` : ""}
         · ${c.words} words · <span class="mono">${esc(c.file)}</span></div>
       ${c.notes.length ? `<ul class="small">${c.notes.map((n) => `<li>${esc(n)}</li>`).join("")}</ul>` : ""}
-      ${c.removed.length ? `<div class="warnings">Left out by the fact check:<ul>${c.removed.map((r) => `<li>${esc(r)}</li>`).join("")}</ul></div>` : ""}
+      ${c.removed.length ? `<div class="warnings">Left out by the checks:<ul>${c.removed.map((r) => `<li>${esc(r)}</li>`).join("")}</ul></div>` : ""}
       ${c.warnings.length ? `<div class="warnings">Check these by eye:<ul>${c.warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></div>` : ""}
       ${c.gaps_named.length ? `<div class="small" style="margin-top:6px">It says you have not worked with <b>${esc(c.gaps_named.join(", "))}</b>.</div>` : ""}
       <textarea id="cover-text" rows="14" readonly style="margin-top:8px">${esc(c.text || "")}</textarea>` : "";

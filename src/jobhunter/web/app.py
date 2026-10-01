@@ -37,7 +37,7 @@ from ..contacts import (
     rank_contacts, save_manual_contact, set_domain, set_job_board, skip_list_match, targets_for, verify_email,
 )
 from ..hunter import Hunter, HunterError
-from ..llm import anthropic_client, error_line, key_note
+from ..llm import CLAUDE_CODE, anthropic_client, error_line, key_note
 from ..mailer import GmailInbox, MailAccount, SendError, SmtpSender, check_inbox, mail_account, outgoing, send_for_job
 from ..pitch import PitchWriter, build_writer, cv_for, cv_options, draft_for_job, edit_draft, load_profile, reassemble, word_count
 from ..report import _salary
@@ -84,7 +84,7 @@ class Services:
         return build_cv_writer(self.config, claude=claude)
 
     def cover_writer(self):
-        claude = None if cover_model(self.config).startswith("deepseek") else self._clients()[1]
+        claude = None if cover_model(self.config).startswith(("deepseek", CLAUDE_CODE)) else self._clients()[1]
         return build_cover_writer(self.config, claude=claude)
 
     def build_pdf(self, folder: Path, source: Path) -> tuple[Path, int]:

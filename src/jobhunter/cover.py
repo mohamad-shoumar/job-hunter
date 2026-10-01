@@ -20,13 +20,20 @@ CLAUDE.md):
   - years of experience are never above the profile's;
   - what the posting asks for that the profile lacks is never claimed: the
     model may name up to MAX_GAPS of those (each word for word in the
-    posting, and not in your facts), and code writes one plain sentence
-    saying you have not worked with them (cover_gap_text).
+    posting, central to it, and not in or close to your facts), and code
+    writes one plain sentence saying you have not worked with them
+    (cover_gap_text).
+
+How the letter reads (length, shape, voice, the words that sound like AI) is
+in config/cover_letter_guidelines.md, which the model gets as its
+instructions. Code checks its "Never use" list like a fact rule, and dashes,
+", -ing" add-ons, the "Use at most one" words and the length as style.
 
 A letter that breaks a rule is sent back once with the reasons. A sentence
-that still breaks one is left out, and the app says what was removed and
-why. The letter is plain text next to the CVs in cv_dir, named like
-Shoumar_CoverLetter_Acme_Oct2026.md, to paste into a form or upload.
+that still breaks a fact or "Never use" rule is left out, and the app says
+what was removed and why; a style issue that is left is only noted (a dash
+becomes a comma). The letter is plain text next to the CVs in cv_dir, named
+like Shoumar_CoverLetter_Acme_Oct2026.md, to paste into a form or upload.
 """
 
 from __future__ import annotations
@@ -50,10 +57,17 @@ from .store import JobStore
 from .text import iso
 
 MAX_POSTING_CHARS = 6000
-MAX_GAPS = 3
+MAX_GAPS = 1
 MAX_PARAGRAPHS = 3
-# A letter outside this range still prints, with a note.
-MIN_WORDS, MAX_WORDS = 180, 420
+# A letter outside this range still prints, with a note; a longer one is sent back once first.
+MIN_WORDS, MAX_WORDS = 120, 300
+GUIDELINES_FILE = Path(__file__).resolve().parents[2] / "config" / "cover_letter_guidelines.md"
+# A gap is not named when your facts have work this close to it ("CI/CD" next to "quality gates").
+_CLOSE_TO = {
+    ("ci/cd", "ci", "cd", "continuous integration", "continuous delivery", "continuous deployment", "ci pipelines",
+     "ci/cd pipelines"): ("quality gates", "deploy gates", "release qa"),
+    ("observability", "monitoring"): ("datadog", "grafana"),
+}
 # Logistics lines a letter may use. Never "Compensation expectations".
 _LOGISTICS = ("Lives in", "Time zone", "Notice period")
 _FIRST_PERSON = re.compile(r"\b(?:I|I'm|I've|I'd|I'll|my|me|mine|myself)\b", re.I)
@@ -198,12 +212,13 @@ class JobText:
     posting: str  # the title and description
     names: list[str]  # the job title and company as written: naming them claims nothing
     skills: set[str] = field(default_factory=set)
+    company: str = ""
 
     @classmethod
     def of(cls, title: str, description: str, company: str) -> JobText:
         posting = f"{title}\n{description}"
         names = sorted({title, short_title(title), role_family(title), company} - {""}, key=len, reverse=True)
-        return cls(posting, names, set(extract_skills(posting)))
+        return cls(posting, names, set(extract_skills(posting)), company)
 
     def without_names(self, text: str) -> str:
         for name in self.names:
@@ -271,14 +286,94 @@ def check_sentence(text: str, sources: list[str], facts: LetterFacts, job: JobTe
     return problems, warnings
 
 
+# --- the style check ---------------------------------------------------------------------------
+
+_WRITER_PART = re.compile(r"<!-- writer:start -->(.*?)<!-- writer:end -->", re.S)
+_DASH = re.compile(r"\s*—\s*|\s+–\s+")  # an em dash, or a spaced en dash ("2023–2026" is fine)
+DASH_ISSUE = "uses a dash (—); use a comma, a colon or a full stop"
+# A paragraph that opens by restating the posting: "The role calls for...", "You need...".
+_MIRROR = re.compile(
+    r"^(?:the|this|your) (?:role|position|posting|job(?: description)?)\b[^.]{0,30}?\b(?:calls? for|asks? for"
+    r"|requires?|emphasi[sz]es|mentions|needs|wants|is looking for|looks for|values)\b"
+    r"|^your team (?:needs|wants|values|is looking for)\b"
+    r"|^you(?:'re| are| will)? (?:need|want|ask for|are looking for|look for)\b", re.I)
+_ING_TAIL = re.compile(r",\s+([a-z]+ing)\b[^,]*$", re.I)
+# -ing words that are not an add-on clause after a comma.
+_NOT_ADD_ON = {"including", "during", "according", "regarding", "following", "nothing", "something", "anything",
+               "everything", "engineering", "testing", "backtesting", "trading", "pricing", "hiring", "onboarding",
+               "tooling", "logging", "monitoring", "string", "thing", "spring", "morning", "bring"}
+
+
+@dataclass
+class Style:
+    """How letters read: the writer's part of config/cover_letter_guidelines.md and its two word lists."""
+    text: str = ""
+    never: list[str] = field(default_factory=list)
+    at_most_one: list[str] = field(default_factory=list)
+
+    @classmethod
+    def load(cls, path) -> Style:
+        """An empty Style when the file is missing: letters are then written with the fact rules only."""
+        try:
+            whole = Path(path).read_text()
+        except (OSError, TypeError):
+            return cls()
+        m = _WRITER_PART.search(whole)
+        text = m.group(1).strip() if m else ""
+        return cls(text, _items_under(text, "Never use"), _items_under(text, "Use at most one"))
+
+
+def _items_under(text: str, heading: str) -> list[str]:
+    """The "- item" lines under the ### heading that starts with `heading`; the dash has its own check."""
+    m = re.search(rf"^### {re.escape(heading)}[^\n]*\n(.*?)(?=^#|\Z)", text, re.S | re.M)
+    items = [line[2:].strip() for line in (m.group(1) if m else "").splitlines() if line.startswith("- ")]
+    return [i for i in items if i and i not in {"—", "–"}]
+
+
+def check_style(text: str, sources: list[str], job: JobText, style: Style,
+                framing: bool) -> tuple[list[str], list[str], list[str]]:
+    """(problems, style issues, "Use at most one" words) for one sentence.
+
+    Problems are a "Never use" phrase and, in a paragraph, an opening that restates the posting: like a
+    fact problem, sent back once and then the sentence is left out. Style issues are sent back once and
+    then only noted. A phrase that is in the facts the sentence cites is allowed.
+    """
+    text = text.replace("’", "'")
+    low = job.without_names(text).lower()
+    cited = " ".join(sources).lower().replace("’", "'")
+
+    def uses(phrase: str) -> bool:
+        phrase = phrase.lower()
+        return bool(re.search(rf"(?<!\w){re.escape(phrase)}(?!\w)", low)) and phrase not in cited
+
+    problems = [f'uses "{p}", which is on the "Never use" list' for p in style.never if uses(p)]
+    company = re.escape(job.company) if job.company else None
+    if not framing and (_MIRROR.search(text) or (company and re.match(
+            rf"{company}(?:'s)? (?:values|needs|wants|is looking|asks|expects)\b", text, re.I))):
+        problems.append("opens by restating the posting; start with what the engineer did")
+    issues = [DASH_ISSUE] if _DASH.search(text) else []
+    tail = _ING_TAIL.search(text.rstrip(".!? "))
+    if tail and tail.group(1).lower() not in _NOT_ADD_ON and f", {tail.group(1).lower()}" not in cited:
+        issues.append(f'ends with a ", {tail.group(1)} ..." add-on; make it its own sentence or cut it')
+    if "!" in text or "?" in text:
+        issues.append("has an exclamation mark or a question")
+    return problems, issues, [w for w in style.at_most_one if uses(w)]
+
+
+def undash(text: str) -> str:
+    return re.sub(r",\s*,", ",", _DASH.sub(", ", text)).replace(", .", ".")
+
+
 # --- what the model wrote, after the checks -------------------------------------------------
 
 
 @dataclass
 class Checked:
     text: str
-    problems: list[str]
+    problems: list[str]  # facts or "Never use": sent back once, then the sentence is left out
     warnings: list[str]
+    style: list[str] = field(default_factory=list)  # sent back once, then only noted
+    at_most_one: list[str] = field(default_factory=list)  # the "Use at most one" words it uses
 
 
 @dataclass
@@ -288,32 +383,68 @@ class Letter:
     closing: list[Checked]
     gaps: list[str]  # the posting's spelling, chosen by the model from posting_gaps
     notes: list[str] = field(default_factory=list)  # the model's own notes to you
-    removed: list[str] = field(default_factory=list)  # sentences the fact check took out, with why
+    removed: list[str] = field(default_factory=list)  # sentences the checks took out, with why
     missing: list[str] = field(default_factory=list)  # what the answer lacks as a whole: sent back once
+    words: int = 0  # what the model wrote, before the gap sentence
 
     def parts(self) -> list[list[Checked]]:
         return [self.opening, *self.paragraphs, self.closing]
 
     @property
     def problems(self) -> list[str]:
-        return self.missing + [f'"{c.text[:90]}{"…" if len(c.text) > 90 else ""}": {"; ".join(c.problems)}'
+        return self.missing + [f'"{_short(c.text)}": {"; ".join(c.problems)}'
                                for part in self.parts() for c in part if c.problems]
 
     @property
+    def style_issues(self) -> list[str]:
+        """Sent back once with the problems; what is left after that is only noted."""
+        whole = []
+        once = list(dict.fromkeys(w for part in self.parts() for c in part if not c.problems for w in c.at_most_one))
+        if len(once) > 1:
+            listed = _join([f'"{w}"' for w in once], "and")
+            whole.append(f'uses {listed}; use at most one word from the "Use at most one" list')
+        return whole + [f'"{_short(c.text)}": {"; ".join(c.style)}'
+                        for part in self.parts() for c in part if c.style and not c.problems]
+
+    @property
+    def to_fix(self) -> list[str]:
+        """Everything the model is told when its answer is sent back."""
+        long = [f"the letter is {self.words} words; keep it to 150-250, never over {MAX_WORDS}"] \
+            if self.words > MAX_WORDS else []
+        return self.problems + long + self.style_issues
+
+    @property
     def warnings(self) -> list[str]:
-        return list(dict.fromkeys(w for part in self.parts() for c in part if not c.problems for w in c.warnings))
+        mine = (w for part in self.parts() for c in part if not c.problems for w in c.warnings)
+        return list(dict.fromkeys([*mine, *self.style_issues]))
 
     def drop_failed(self) -> None:
+        """After the last try: leave out what still breaks a rule, and turn a dash into a comma."""
         for part in self.parts():
             for c in [c for c in part if c.problems]:
                 self.removed.append(f'"{c.text}" ({"; ".join(c.problems)})')
                 part.remove(c)
+            for c in part:
+                if DASH_ISSUE in c.style:
+                    c.text = undash(c.text)
+                    c.style.remove(DASH_ISSUE)
         self.paragraphs = [p for p in self.paragraphs if p]
 
 
-def letter_from(answer: dict, facts: LetterFacts, job: JobText, gaps: list[str]) -> Letter:
+def _short(text: str) -> str:
+    return f'{text[:90]}{"…" if len(text) > 90 else ""}'
+
+
+def letter_from(answer: dict, facts: LetterFacts, job: JobText, gaps: list[str], style: Style | None = None) -> Letter:
+    style = style or Style()
+
     def check(text: str, sources: list[str], framing: bool) -> list[Checked]:
-        return [Checked(s, *check_sentence(s, sources, facts, job, framing)) for s in sentences(text)]
+        checked = []
+        for s in sentences(text):
+            problems, warnings = check_sentence(s, sources, facts, job, framing)
+            more, issues, once = check_style(s, sources, job, style, framing)
+            checked.append(Checked(s, problems + more, warnings, issues, once))
+        return checked
 
     paragraphs = []
     for item in (answer.get("paragraphs") or [])[:MAX_PARAGRAPHS]:
@@ -328,7 +459,7 @@ def letter_from(answer: dict, facts: LetterFacts, job: JobText, gaps: list[str])
     chosen = []
     for item in answer.get("gaps") or []:
         item = " ".join(str(item).split()).strip(" .,;")
-        if item.lower() in spelled or valid_gap(item, facts, job):
+        if (item.lower() in spelled or valid_gap(item, facts, job)) and gap_matters(item, facts, job):
             chosen.append(spelled.get(item.lower(), item))
     letter = Letter(
         opening=check(str(answer.get("opening") or ""), facts.facts, framing=True),
@@ -337,6 +468,7 @@ def letter_from(answer: dict, facts: LetterFacts, job: JobText, gaps: list[str])
         gaps=list(dict.fromkeys(chosen))[:MAX_GAPS],  # anything else is dropped: never claimed, never denied
         notes=[" ".join(str(n).split()) for n in answer.get("notes") or [] if str(n).strip()][:3],
     )
+    letter.words = _words_of(" ".join(c.text for part in letter.parts() for c in part))
     if not letter.paragraphs:
         letter.missing.append("the answer has no paragraphs")
     return letter
@@ -356,6 +488,17 @@ def valid_gap(item: str, facts: LetterFacts, job: JobText) -> bool:
     return bool(in_posting) and not shared and not set(extract_skills(item)) & facts.skills
 
 
+def gap_matters(item: str, facts: LetterFacts, job: JobText) -> bool:
+    """Worth saying you lack: it is in the job title or the posting names it twice, and your facts have no
+    work close to it (see _CLOSE_TO). A one-off "nice to have" is never named."""
+    pattern = rf"(?<![A-Za-z0-9]){re.escape(item)}(?![A-Za-z0-9])"
+    title = job.posting.split("\n", 1)[0]
+    central = bool(re.search(pattern, title, re.I)) or len(re.findall(pattern, job.posting, re.I)) >= 2
+    facts_text = facts.text.lower()
+    close = any(item.lower() in names and any(n in facts_text for n in near) for names, near in _CLOSE_TO.items())
+    return central and not close
+
+
 def _join(items: list[str], word: str) -> str:
     return items[0] if len(items) == 1 else f"{', '.join(items[:-1])} {word} {items[-1]}"
 
@@ -369,41 +512,45 @@ def gap_sentence(gaps: list[str], template: str) -> str:
 
 SYSTEM = f"""\
 You write the middle of a cover letter from a software engineer for one job \
-posting. Code adds the contact lines, the date, "Dear <Company> Hiring Team," and \
-the sign-off, and checks every sentence you write against the engineer's \
-numbered facts.
+posting. Code adds the contact lines, the date, the greeting and the sign-off, \
+and checks every sentence you write against the engineer's numbered facts.
 
 Return:
-- opening: 2 or 3 sentences. Start with something specific from the posting: \
-what the company does, a problem this role solves, or a number the posting gives \
-about the company. Name the role. Do not start with "I" or "I am writing".
-- paragraphs: 2 paragraphs of 3 or 4 sentences. Each connects one or two of \
-the posting's main requirements to what the engineer did, with the facts' own \
-numbers. Name every item of "Asked for and in the facts" that matters for the \
-role, with the posting's own word for it. facts: the numbers of the facts the \
-paragraph uses.
-- gaps: the 1 to {MAX_GAPS} most important tools or skills the posting asks for \
-that are not in the facts, each written exactly as the posting writes it ("Asked \
-for, not in the facts" lists some; read the requirements for others). Empty only \
-when the facts cover every requirement. Code adds one honest sentence saying the \
-engineer has not worked with them. Do not mention them yourself.
-- closing: 2 sentences: what the engineer would bring to this team and an \
-invitation to talk, then thanks. Nothing new about the engineer.
-- notes: 1 to 3 short lines telling the engineer what you led with and why.
+- opening: 1 or 2 sentences.
+- paragraphs: 1 or 2 body paragraphs. facts: the numbers of the facts each \
+paragraph uses. "Asked for and in the facts" helps you pick the main story; you \
+do not need to name every item.
+- gaps: 0 or {MAX_GAPS} tool or skill the posting requires that is not in the \
+facts, written exactly as the posting writes it ("Asked for, not in the facts" \
+lists some). Code adds one plain sentence saying the engineer has not worked \
+with it, and drops a gap that the posting names only once outside the title, or \
+that is close to work in the facts. Never mention a gap yourself.
+- closing: 1 or 2 sentences.
+- notes: 1 to 3 short lines for the engineer (see "Notes to the engineer").
 
 Hard rules. Code removes a sentence that breaks one:
 - About the engineer, use only the numbered facts. Never add a tool, language, \
-number, team size, employer, title, result, years or responsibility that is not \
-in them. The posting's requirements describe the job, not the engineer.
-- A number about the engineer appears exactly as in a fact, next to the same \
-words ("800+ concurrent Python jobs"). A number about the company only in the \
-opening or closing, exactly as the posting gives it.
+number, team size, employer, title, result, years, responsibility, feeling or \
+motive that is not in them. The posting's requirements describe the job, not the \
+engineer.
+- A number about the engineer appears exactly as in a fact, with the word that \
+follows it in the fact ("800+ concurrent jobs"). A number about the company only \
+in the opening or closing, exactly as the posting gives it.
 - Never call the engineer senior, staff, principal or an architect unless a fact does.
 - Never mention how many years of experience the posting asks for.
-- At least 250 and at most 350 words in all. Plain, specific, confident words. No buzzwords \
-("passionate", "leverage", "cutting-edge", "synergy"), no exclamation marks, no \
-questions.
+- No phrase from the "Never use" list below, and no body paragraph sentence that \
+restates the posting ("The role calls for...", "You need...").
+
+How the letter should read:
+
 """
+
+
+def system_prompt(style: Style) -> str:
+    """The rules code checks, then the guidelines file's part for the writer."""
+    if not style.text:
+        return SYSTEM + "Plain, specific, confident words. 150 to 250 words in all. No buzzwords, no dashes.\n"
+    return SYSTEM + style.text + "\n"
 
 SCHEMA = {
     "type": "object",
@@ -442,8 +589,9 @@ def _prompt(job, company: str, facts: LetterFacts, gaps: list[str]) -> str:
 
 
 class CoverWriter:
-    def __init__(self, model: JsonModel):
+    def __init__(self, model: JsonModel, style: Style | None = None):
         self.model = model
+        self.style = style if style is not None else Style.load(GUIDELINES_FILE)
 
     def write(self, job, company: str, facts: LetterFacts, gaps: list[str]) -> tuple[Letter, Usage, int]:
         job_text = JobText.of(job["title"] or "", job["description"] or "", company)
@@ -451,14 +599,14 @@ class CoverWriter:
         usage = Usage()
         letter, attempt = None, 0
         for attempt in (1, 2):
-            answer = self.model.ask(SYSTEM, messages, SCHEMA, usage, EXAMPLE)
-            letter = letter_from(answer, facts, job_text, gaps)
-            if not letter.problems:
+            answer = self.model.ask(system_prompt(self.style), messages, SCHEMA, usage, EXAMPLE)
+            letter = letter_from(answer, facts, job_text, gaps, self.style)
+            if not letter.to_fix:
                 break
             messages += [
                 {"role": "assistant", "content": json.dumps(answer)},
-                {"role": "user", "content": "Code will remove these sentences, because they break the rules: "
-                    + "; ".join(letter.problems) + ". Answer again with the whole JSON, fixing them."},
+                {"role": "user", "content": "Fix these and answer again with the whole JSON. Code removes a "
+                    "sentence that still breaks a fact or \"Never use\" rule: " + "; ".join(letter.to_fix) + "."},
             ]
         letter.drop_failed()
         return letter, usage, attempt
@@ -470,7 +618,7 @@ def cover_model(config: OutreachConfig) -> str:
 
 def build_cover_writer(config: OutreachConfig, claude=None) -> tuple[CoverWriter | None, str | None]:
     model, note = json_model(cover_model(config), "Cover letters", claude=claude)
-    return (CoverWriter(model), None) if model else (None, note)
+    return (CoverWriter(model, Style.load(config.cover_guidelines)), None) if model else (None, note)
 
 
 # --- the file ------------------------------------------------------------------------------
@@ -485,12 +633,12 @@ def letter_title(title: str) -> str:
 
 def body_of(letter: Letter, company: str, title: str, gap_text: str) -> list[str]:
     """The letter's paragraphs: what survived the check, the gap sentence, and a plain line where a part is empty."""
-    opening = " ".join(c.text for c in letter.opening) or f"I am applying for the {letter_title(title)} role at {company}."
+    opening = " ".join(c.text for c in letter.opening) or f"I'm applying for the {letter_title(title)} role at {company}."
     body = [" ".join(c.text for c in part) for part in letter.paragraphs]
     gap = gap_sentence(letter.gaps, gap_text)
     if gap:
         body = body[:-1] + [f"{body[-1]} {gap}"] if body else [gap]
-    closing = " ".join(c.text for c in letter.closing) or "Thank you for your time and consideration."
+    closing = " ".join(c.text for c in letter.closing) or "Thanks for reading."
     return [opening, *body, closing]
 
 
@@ -555,7 +703,7 @@ def cover_for_job(store: JobStore, job_id: int, writer: CoverWriter, profile_pat
     letter, usage, attempts = writer.write(job, company, facts, gaps)
     if not letter.paragraphs:  # nothing worth sending: write no file, so the daily run tries again tomorrow
         why = "; ".join(letter.missing + letter.removed[:3]) or "the answer was empty"
-        raise CoverError(f"No cover letter written: nothing in the answer passed the fact check ({why[:400]})")
+        raise CoverError(f"No cover letter written: nothing in the answer passed the checks ({why[:400]})")
     body = body_of(letter, company, job["title"] or "", config.cover_gap_text)
     text = render_letter(body, facts, company, job["title"] or "", now)
     folder = Path(config.cv_dir).expanduser()
@@ -567,7 +715,9 @@ def cover_for_job(store: JobStore, job_id: int, writer: CoverWriter, profile_pat
     words = _words_of(" ".join(body))
     notes = list(letter.notes)
     if not MIN_WORDS <= words <= MAX_WORDS:
-        notes.append(f"It is {words} words; {MIN_WORDS}-{MAX_WORDS} reads best")
+        notes.append(f"It is {words} words; 150-250 reads best")
+    if not writer.style.text:
+        notes.append("Written without config/cover_letter_guidelines.md (not found), so only the fact rules applied")
     meta = {
         "file": name, "path": str(path), "words": words, "tags": tags,
         "gaps": gaps, "gaps_named": letter.gaps, "notes": notes, "removed": letter.removed,

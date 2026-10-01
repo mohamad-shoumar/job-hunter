@@ -243,10 +243,13 @@ letter repeats it.
 
 **Cover letters** (`src/jobhunter/cover.py`). The Cover letter box under the CV
 has **Write cover letter** and **Copy**; `jobhunter cover <id>` does the same.
-`cover_model` (empty: the same model as `cv_model`; about $0.005 and 5 seconds
-a letter on DeepSeek) writes the opening, two paragraphs and the closing. Code
-writes the rest (your contact lines from the profile, the date, "Dear <Company>
-Hiring Team,", the sign-off) and checks every sentence:
+`cover_model` writes the opening, one or two paragraphs and the closing. It is
+`claude-code`: the Claude Code CLI (`claude -p`, about 25 seconds a letter),
+signed in with your Claude account, so no API key; it runs with no tools and
+none of your Claude settings, CLAUDE.md or memory. `claude-code:sonnet` picks
+its model; empty means the same model as `cv_model`. Code writes the rest (your
+contact lines from the profile, the date, "Dear <Company> Hiring Team,", the
+sign-off) and checks every sentence:
 
 - the letter may only use the facts the job's CV prints: the summary, the
   Experience bullets for the job's tags, skills, education, certifications and
@@ -256,11 +259,21 @@ Hiring Team,", the sign-off) and checks every sentence:
 - the opening and closing may repeat what the posting says about the company
   ("Novakid has 80,000 students"), but a sentence about you still names only
   your tools; years are never above the profile's;
-- what the posting asks for that you lack is never claimed: the model picks up
-  to 3 (each word for word in the posting and sharing no word with your
-  facts), and code writes one sentence, `cover_gap_text`: "I have not worked
-  with Kafka or Kubernetes yet, and I would make learning them an early
-  priority."
+- what the posting asks for that you lack is never claimed: the model picks at
+  most 1 (word for word in the posting, sharing no word with your facts, in
+  the job title or named twice, and not close to your work: no "CI/CD" gap
+  next to your test-suite quality gates), and code writes one sentence,
+  `cover_gap_text`: "I haven't worked with Kafka yet, and I'd make learning it
+  an early priority."
+
+How a letter reads is in `config/cover_letter_guidelines.md` (`cover_guidelines`):
+150-250 words, one main story told in plain words, no restating the posting,
+and lists of phrases that read as AI ("passionate", "proven track record",
+the em dash). Its `writer:start`/`writer:end` part is the model's
+instructions, so edit that file to change how letters read. Code checks its
+"Never use" list like a fact rule; dashes, ", ensuring ..." add-ons, two words
+from "Use at most one" and a letter over 300 words are sent back once and
+then only noted (a dash left over becomes a comma).
 
 A letter that breaks a rule is sent back once with the reasons; a sentence
 that still breaks one is left out, and the box lists what was left out and
@@ -377,7 +390,9 @@ Ashby (`kraken.com`), and Token Metrics' Lever board no longer exists (disabled)
   lookup and send limits, follow-up days, the models, the resume folder, and the
   CV and cover letter settings.
 - `.env` — `SERPAPI_API_KEY`, `ANTHROPIC_API_KEY`, `DEEPSEEK_API_KEY`, `HUNTER_API_KEY`,
-  `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD`. Not in git; keep it that way.
+  `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD`, and `CLAUDE_CODE_BIN` if `claude` is not in
+  `~/.local/bin` or on PATH. Not in git; keep it that way.
+- `config/cover_letter_guidelines.md` — how cover letters read (see Cover letters).
 - `profile/master_profile.md` — the facts about you. **CV tailoring and cover letters may
   reorder, emphasize, rephrase and remove; they must never add anything that is not in this file.**
 

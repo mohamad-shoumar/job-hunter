@@ -154,12 +154,15 @@ class OutreachConfig:
     max_cvs_per_run: int = 5
     # Replaces cv.TAG_RULES for the tags it names: {"lead": {"title": [...], "posting": [...]}}.
     cv_tags: dict = field(default_factory=dict)
-    # Cover letters (cover.py): written next to the CVs in cv_dir. Empty cover_model means cv_model.
+    # Cover letters (cover.py): written next to the CVs in cv_dir. Empty cover_model means cv_model;
+    # "claude-code" (or "claude-code:<model>") runs the Claude Code CLI, signed in with your account.
     cover_model: str = ""
+    # How letters read: its writer part is the model's instructions, its word lists are checked.
+    cover_guidelines: str = "config/cover_letter_guidelines.md"
     auto_cover: bool = True
     max_covers_per_run: int = 5
     # The one sentence about what the posting asks for and the profile does not have. Code writes it.
-    cover_gap_text: str = "I have not worked with {gaps} yet, and I would make learning {them} an early priority."
+    cover_gap_text: str = "I haven't worked with {gaps} yet, and I'd make learning {them} an early priority."
     # The daily run also catches up on shortlisted jobs filed this many days back that still have no
     # tailored CV or cover letter (one that failed, e.g. on a network error at wake-up).
     catch_up_days: int = 7
@@ -171,7 +174,7 @@ class OutreachConfig:
         config = cls(**{k: v for k, v in data.items() if k in known})
         # config/outreach.json sits in <project>/config, so a relative folder is inside the project.
         root = path.resolve().parent.parent
-        for name in ("cv_dir", "resume_dir"):
+        for name in ("cv_dir", "resume_dir", "cover_guidelines"):
             folder = Path(getattr(config, name)).expanduser()
             setattr(config, name, str(folder if folder.is_absolute() else root / folder))
         return config

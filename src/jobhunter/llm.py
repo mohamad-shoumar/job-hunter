@@ -112,16 +112,59 @@ def model_params(model: str) -> dict:
 DEEPSEEK_URL = "https://api.deepseek.com/chat/completions"
 
 
+# "claude-code" or "claude-code:<model>" ("claude-code:sonnet"): the Claude Code CLI (`claude -p`),
+# signed in with your Claude account, so no ANTHROPIC_API_KEY is needed.
+CLAUDE_CODE = "claude-code"
+CLAUDE_CODE_TIMEOUT = 300
+# Where the native installer puts it: launchd's PATH (the daily run) does not include it.
+_CLAUDE_CODE_PLACES = ("~/.local/bin/claude", "~/.claude/local/claude")
+
+
+def claude_code_bin() -> str | None:
+    """The `claude` program: CLAUDE_CODE_BIN in .env, else PATH, else where the installer puts it."""
+    import os
+    import shutil
+
+    for place in (os.environ.get("CLAUDE_CODE_BIN"), shutil.which("claude"), *_CLAUDE_CODE_PLACES):
+        if place and os.access(os.path.expanduser(place), os.X_OK):
+            return os.path.expanduser(place)
+    return None
+
+
+def run_claude_code(args: list[str], prompt: str, timeout: int) -> str:
+    """Runs `claude -p` in an empty folder and returns what it printed. Tests replace this (conftest).
+
+    Without ANTHROPIC_API_KEY in its environment, so it uses your Claude login and never bills the API key
+    that .env may have for the other steps."""
+    import os
+    import subprocess
+    import tempfile
+
+    env = {k: v for k, v in os.environ.items() if k not in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")}
+    with tempfile.TemporaryDirectory() as folder:
+        try:
+            done = subprocess.run(args, input=prompt, capture_output=True, text=True, timeout=timeout, cwd=folder,
+                                  env=env)
+        except subprocess.TimeoutExpired:
+            raise RuntimeError(f"claude -p took longer than {timeout} seconds") from None
+    if done.returncode and not done.stdout.strip():
+        raise RuntimeError(f"claude -p failed ({done.returncode}): {' '.join(done.stderr.split())[:300]}")
+    return done.stdout
+
+
 def key_note(model: str, what: str) -> str | None:
     """Why `model` cannot be used right now (its API key is not set), or None."""
     import os
 
+    if model.startswith(CLAUDE_CODE):
+        return None if claude_code_bin() else (f"{what} needs the Claude Code CLI (`claude`): install it, "
+                                               "or set CLAUDE_CODE_BIN in .env")
     name = "DEEPSEEK_API_KEY" if model.startswith("deepseek") else "ANTHROPIC_API_KEY"
     return None if os.environ.get(name) else f"{what} needs {name} in .env (the model is {model})"
 
 
 class JsonModel:
-    """One JSON object per call: Claude with the schema enforced, or DeepSeek in JSON mode.
+    """One JSON object per call: Claude with the schema enforced, DeepSeek in JSON mode, or Claude Code.
 
     DeepSeek only promises valid JSON, not the schema, so callers check every
     field anyway. `example` (a JSON object in words) is added to DeepSeek's
@@ -138,6 +181,8 @@ class JsonModel:
             max_tokens: int = 4096) -> dict:
         if self.model.startswith("deepseek"):
             return self._deepseek(system, messages, usage, example, max_tokens)
+        if self.model.startswith(CLAUDE_CODE):
+            return self._claude_code(system, messages, schema, usage)
         params = model_params(self.model)
         output_config = {**params.pop("output_config", {}), "format": {"type": "json_schema", "schema": schema}}
         response = self.claude.messages.create(model=self.model, max_tokens=max_tokens, system=system,
@@ -167,6 +212,37 @@ class JsonModel:
         except (KeyError, IndexError, TypeError):
             return {}
 
+    def _claude_code(self, system: str, messages: list[dict], schema: dict, usage: Usage) -> dict:
+        """One `claude -p` run with no tools and none of your settings, CLAUDE.md or memory.
+
+        `-p` takes one prompt, so a retry sends the earlier turns as text."""
+        import json
+
+        _, _, model = self.model.partition(":")
+        args = [claude_code_bin() or "claude", "-p", "--output-format", "json", "--json-schema", json.dumps(schema),
+                "--system-prompt", system, "--tools", "", "--setting-sources", "", "--strict-mcp-config",
+                "--disable-slash-commands", "--no-session-persistence", *(["--model", model] if model else [])]
+        out = run_claude_code(args, _as_one_prompt(messages), CLAUDE_CODE_TIMEOUT)
+        data = _json_object(out)
+        if data.get("is_error") or not data:
+            raise RuntimeError(f"claude -p: {' '.join(str(data.get('result') or out).split())[:300]}")
+        usage.add(data.get("usage"))
+        answer = data.get("structured_output")
+        return answer if isinstance(answer, dict) else _json_object(data.get("result"))
+
+
+def _as_one_prompt(messages: list[dict]) -> str:
+    """The conversation as one prompt: the first message, then each answer and what was said back."""
+    parts = []
+    for n, message in enumerate(messages):
+        if n == 0:
+            parts.append(message["content"])
+        elif message["role"] == "assistant":
+            parts.append(f"Your answer was:\n{message['content']}")
+        else:
+            parts.append(message["content"])
+    return "\n\n".join(parts)
+
 
 def _json_object(text: str | None) -> dict:
     import json
@@ -187,6 +263,8 @@ def json_model(model: str, what: str, claude=None) -> tuple[JsonModel | None, st
         return None, note
     if model.startswith("deepseek"):
         return JsonModel(model, deepseek_key=os.environ["DEEPSEEK_API_KEY"]), None
+    if model.startswith(CLAUDE_CODE):
+        return JsonModel(model), None
     return JsonModel(model, claude=claude or anthropic_client()), None
 
 

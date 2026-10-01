@@ -49,9 +49,17 @@ class FakeHttp:
 
 @pytest.fixture(autouse=True)
 def no_real_keys(monkeypatch):
-    """Tests never reach Hunter, Claude or Gmail, even when the shell has the keys set."""
-    for name in ("HUNTER_API_KEY", "ANTHROPIC_API_KEY", "DEEPSEEK_API_KEY", "GMAIL_ADDRESS", "GMAIL_APP_PASSWORD", "SERPAPI_API_KEY"):
+    """Tests never reach Hunter, Claude or Gmail, even when the shell has the keys set, and never run the
+    Claude Code CLI, even where it is installed."""
+    for name in ("HUNTER_API_KEY", "ANTHROPIC_API_KEY", "DEEPSEEK_API_KEY", "GMAIL_ADDRESS", "GMAIL_APP_PASSWORD",
+                 "SERPAPI_API_KEY", "CLAUDE_CODE_BIN"):
         monkeypatch.delenv(name, raising=False)
+
+    def no_claude_code(*args, **kwargs):
+        raise RuntimeError("tests never run Claude Code")
+
+    monkeypatch.setattr("jobhunter.llm.run_claude_code", no_claude_code)
+    monkeypatch.setattr("jobhunter.llm.claude_code_bin", lambda: None)
 
 
 @pytest.fixture

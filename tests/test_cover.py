@@ -10,8 +10,8 @@ from fastapi.testclient import TestClient
 from jobhunter import tracking
 from jobhunter.config import OutreachConfig, Paths
 from jobhunter.cover import (
-    CoverWriter, JobText, check_sentence, cover_for_job, gap_sentence, letter_from, load_letter_facts,
-    posting_gaps, posting_matches, valid_gap,
+    GUIDELINES_FILE, CoverWriter, JobText, Style, check_sentence, check_style, cover_for_job, gap_matters,
+    gap_sentence, letter_from, load_letter_facts, posting_gaps, posting_matches, system_prompt, valid_gap,
 )
 from jobhunter.llm import JsonModel
 from jobhunter.report import _prepared_line
@@ -26,7 +26,7 @@ from .test_web import AUTH, TOKEN, FakeServices
 PROFILE_FILE = FIXTURES / "profile" / "master_profile.md"
 FACTS = load_letter_facts(PROFILE_FILE, set())
 POSTING = ("Acme runs payments for 2,000 merchants. You will build Python services on AWS. "
-           "We use Kafka and Workato. 5+ years required.")
+           "We use Kafka and Workato. Kafka experience is required. 5+ years required.")
 JOB = JobText.of("Senior Backend Engineer (Python)", POSTING, "Acme")
 
 GOOD = {
@@ -144,17 +144,105 @@ def test_a_gap_must_be_in_the_posting_and_share_nothing_with_your_facts():
     assert not valid_gap("a very long list of five words", FACTS, JOB)
 
 
+def test_a_gap_is_named_only_when_central_and_not_close_to_your_work():
+    assert gap_matters("Kafka", FACTS, JOB)  # named twice
+    assert not gap_matters("Workato", FACTS, JOB)  # once: a "nice to have"
+    assert gap_matters("Kubernetes", FACTS, JobText.of("Kubernetes Engineer", "We run Python.", "Acme"))  # the title
+    devex = JobText.of("Developer Experience Engineer", "You own CI/CD. Our CI/CD runs on Jenkins.", "Dremio")
+    assert not gap_matters("CI/CD", FACTS, devex)  # your test suite's quality gates are close to it
+    letter = letter_from({**GOOD, "gaps": ["Workato", "Kafka"]}, FACTS, JOB, ["Kafka"])
+    assert letter.gaps == ["Kafka"]
+
+
 def test_the_gap_sentence_is_code_s():
     template = OutreachConfig().cover_gap_text
-    assert gap_sentence(["Kafka"], template) == ("I have not worked with Kafka yet, and I would make learning it an "
-                                                 "early priority.")
-    assert gap_sentence(["Kafka", "Go", "Rust"], template).startswith("I have not worked with Kafka, Go or Rust yet")
+    assert gap_sentence(["Kafka"], template) == "I haven't worked with Kafka yet, and I'd make learning it an early priority."
+    assert gap_sentence(["Kafka", "Go"], template).startswith("I haven't worked with Kafka or Go yet")
     assert gap_sentence([], template) == ""
 
 
 def test_gaps_the_model_names_wrongly_are_dropped():
     letter = letter_from({**GOOD, "gaps": ["Kafka", "Python", "Snowflake"]}, FACTS, JOB, ["Kafka"])
     assert letter.gaps == ["Kafka"]
+
+
+# --- the style check ------------------------------------------------------------------------------
+
+STYLE = Style.load(GUIDELINES_FILE)
+
+
+def test_the_guidelines_file_gives_the_writer_its_part_and_the_lists():
+    """The real config/cover_letter_guidelines.md, by shape, so editing its wording never breaks the tests."""
+    assert "passionate" in STYLE.never and "delve" in STYLE.at_most_one and "—" not in STYLE.never
+    assert "## 2. Length" in STYLE.text and "## Evidence" not in STYLE.text and "Changes this implies" not in STYLE.text
+    prompt = system_prompt(STYLE)
+    assert prompt.startswith("You write the middle of a cover letter") and STYLE.text in prompt
+    assert Style.load(GUIDELINES_FILE.parent / "missing.md") == Style()
+    assert "No buzzwords" in system_prompt(Style())
+
+
+def style(text, *ids, framing=False):
+    sources = FACTS.facts if framing else [FACTS.facts[i - 1] for i in ids]
+    return check_style(text, sources, JOB, STYLE, framing)
+
+
+def test_a_never_use_phrase_or_a_restated_posting_is_a_problem():
+    assert style("I am passionate about reliable systems.", 5)[0] == [
+        'uses "passionate", which is on the "Never use" list']
+    assert style("I'm excited to build this.", framing=True)[0]
+    assert "opens by restating the posting" in style("The role calls for Python services on AWS.", 4)[0][0]
+    assert style("You need someone who ships.", 4)[0] and style("Acme values reliability.", 4)[0]
+    assert style("Your posting asks for strong testing.", 4)[0] and style("Your team needs Python.", 4)[0]
+    assert style("The team I lead needs fast reviews.", 4)[0] == []
+    assert style("You want someone who ships, and I built the platform.", framing=True)[0] == []  # the opening may
+    assert style("I built a comprehensive test suite.", 6)[0] == []  # "comprehensive" is in the fact
+
+
+def test_dashes_add_ons_and_questions_are_style_issues():
+    assert style("I designed its failure handling — no job is silently lost.", 5)[1] == [
+        "uses a dash (—); use a comma, a colon or a full stop"]
+    assert style("I designed the API in 2023–2024.", 4)[1] == []  # a range, not a dash
+    assert "add-on" in style("I designed RESTful APIs in Python, ensuring data reached the frontend.", 4)[1][0]
+    assert style("I built tests, including integration tests.", 6)[1] == []
+    assert style("Shall we talk?", framing=True)[1] == ["has an exclamation mark or a question"]
+    assert style("It was robust and the deploys were seamless.", framing=True)[2] == ["robust", "seamless"]
+
+
+def test_a_style_problem_is_sent_back_once_then_the_sentence_is_left_out(filters):
+    store = JobStore(":memory:")
+    para = {"text": "I am passionate about reliable systems. I designed its failure handling so no job is "
+                    "silently lost.", "facts": [5]}
+    bad = {**GOOD, "paragraphs": [para] + GOOD["paragraphs"][1:]}
+    w = writer(bad, bad)
+    letter, _, attempts = w.write(job_row(store, filters), "Acme", FACTS, ["Kafka"])
+    assert attempts == 2 and 'uses "passionate"' in w.model.claude.calls[1]["messages"][-1]["content"]
+    assert len(letter.removed) == 1 and "passionate" in letter.removed[0]
+    assert [c.text for c in letter.paragraphs[0]] == ["I designed its failure handling so no job is silently lost."]
+
+
+def test_a_dash_left_after_the_retry_becomes_a_comma(filters):
+    store = JobStore(":memory:")
+    para = {"text": "I designed its failure handling — no job is silently lost.", "facts": [5]}
+    dashed = {**GOOD, "paragraphs": [para] + GOOD["paragraphs"][1:]}
+    w = writer(dashed, dashed)
+    letter, _, attempts = w.write(job_row(store, filters), "Acme", FACTS, ["Kafka"])
+    assert attempts == 2 and "dash" in w.model.claude.calls[1]["messages"][-1]["content"]
+    assert letter.paragraphs[0][0].text == "I designed its failure handling, no job is silently lost."
+    assert letter.removed == [] and not any("dash" in x for x in letter.warnings)
+
+
+def test_a_long_letter_or_two_overused_words_are_sent_back_then_noted(filters):
+    store = JobStore(":memory:")
+    long = {**GOOD, "paragraphs": [{"text": " ".join(["I designed its failure handling so no job is silently lost."] * 30),
+                                    "facts": [5]}]}
+    w = writer(long, GOOD)
+    _, _, attempts = w.write(job_row(store, filters), "Acme", FACTS, ["Kafka"])
+    assert attempts == 2 and "words; keep it to 150-250" in w.model.claude.calls[1]["messages"][-1]["content"]
+
+    worded = {**GOOD, "closing": "The platform was robust. Deploys were seamless."}
+    letter, _, attempts = writer(worded, worded).write(job_row(store, filters, source_job_id="2"), "Acme", FACTS, [])
+    assert attempts == 2 and any('"robust" and "seamless"' in x for x in letter.warnings)
+    assert letter.removed == []  # style only: noted, never taken out
 
 
 # --- the writer --------------------------------------------------------------------------------
@@ -207,12 +295,12 @@ def test_the_letter_file_is_written_and_stored_with_the_job(tmp_path, filters):
     job_id = store_job(store, filters, description=POSTING)
     meta = cover_for_job(store, job_id, writer(GOOD), PROFILE_FILE, config_for(tmp_path), NOW)
     path = tmp_path / "output" / "Shoumar_CoverLetter_Acme_Sep2026.md"
-    assert meta["file"] == path.name and meta["path"] == str(path) and meta["gaps_named"] == ["Kafka", "Workato"]
+    assert meta["file"] == path.name and meta["path"] == str(path) and meta["gaps_named"] == ["Kafka"]
     text = path.read_text()
     assert text.startswith("Mohamad Shoumar\nme@example.com | +1 555 010 7788 | ")
     assert "\nSeptember 25, 2026\n" in text and "\nAcme Hiring Team\nSenior Backend Engineer (Python)\n" in text
     assert "\nDear Acme Hiring Team,\n\nAcme runs payments for 2,000 merchants" in text
-    assert "I have not worked with Kafka or Workato yet" in text and text.endswith("Best regards,\nMohamad Shoumar\n")
+    assert "I haven't worked with Kafka yet" in text and text.endswith("Best regards,\nMohamad Shoumar\n")
     app = tracking.get_application(store, job_id)
     assert json.loads(app["cover_letter_json"])["text"] == text and app["stage"] == tracking.NEW
     assert [e["detail"] for e in tracking.events_for(store, job_id)][-1] == f"Cover letter written: {path.name}"
@@ -248,7 +336,8 @@ def test_relative_folders_are_inside_the_project(tmp_path):
     config = OutreachConfig.load(tmp_path / "config" / "outreach.json")
     assert config.resume_dir == str(tmp_path.resolve() / "resume")
     assert config.cv_dir == str(tmp_path.resolve() / "resume" / "output")
-    assert OutreachConfig.load(tmp_path / "config" / "outreach.json").cover_model == ""
+    assert config.cover_model == ""
+    assert config.cover_guidelines == str(tmp_path.resolve() / "config" / "cover_letter_guidelines.md")
 
 
 # --- the daily run and the report ---------------------------------------------------------------
@@ -360,7 +449,7 @@ def test_write_cover_letter_from_the_page(cover_client):
     detail = client.post("/api/jobs/1/cover", json={}, headers=AUTH).json()
     cover = detail["cover"]
     assert cover["file"] == "Shoumar_CoverLetter_Acme_Sep2026.md" and "Dear Acme Hiring Team," in cover["text"]
-    assert cover["gaps_named"] == ["Kafka", "Workato"]
+    assert cover["gaps_named"] == ["Kafka"]
     path = home / "resume" / "output" / cover["file"]  # cv_dir is relative: inside the project
     path.write_text(path.read_text().replace("Best regards", "Kind regards"))
     assert "Kind regards" in client.get("/api/jobs/1").json()["cover"]["text"]  # your edits show

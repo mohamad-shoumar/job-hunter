@@ -1,0 +1,8 @@
+{"type": "result", "subtype": "success", "is_error": false, "duration_ms": 6966, "num_turns": 2,
+ "result": "{\"opening\":\"Hi, good to see you.\"}",
+ "structured_output": {"opening": "Hi, good to see you."},
+ "stop_reason": "tool_use", "session_id": "4f2d5592-88e5-42da-a3f6-531b86a8c742", "total_cost_usd": 0.027448,
+ "usage": {"input_tokens": 2, "cache_creation_input_tokens": 3000, "cache_read_input_tokens": 0, "output_tokens": 172,
+           "server_tool_use": {"web_search_requests": 0, "web_fetch_requests": 0}, "service_tier": "standard"},
+ "modelUsage": {"claude-opus-5-5": {"inputTokens": 2, "outputTokens": 172, "costUSD": 0.027448}},
+ "permission_denials": [], "terminal_reason": "completed"}

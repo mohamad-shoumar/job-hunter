@@ -326,7 +326,7 @@ def cmd_cover(args) -> int:
             for line in meta["notes"]:
                 print(f"  - {line}")
             for line in meta["removed"]:
-                print(f"  ! removed by the fact check: {line}")
+                print(f"  ! removed by the checks: {line}")
             for line in meta["warnings"]:
                 print(f"  ? {line}")
             if meta["gaps_named"]:
