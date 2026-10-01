@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="jh-token" content="__JH_TOKEN__">
+  <title>Job hunter</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Job hunter</div>
+    <nav class="tabs" id="tabs">
+      <a href="#today" data-tab="today">Today</a>
+      <a href="#jobs" data-tab="jobs">Jobs</a>
+      <a href="#pipeline" data-tab="pipeline">Pipeline</a>
+      <a href="#stats" data-tab="stats">Stats</a>
+    </nav>
+    <div class="status" id="status"></div>
+    <button class="btn" data-action="check-inbox" title="Look for replies and bounces in Gmail">Check inbox</button>
+  </header>
+
+  <main id="main"></main>
+
+  <aside class="drawer" id="drawer" hidden>
+    <div class="drawer-inner" id="drawer-body"></div>
+  </aside>
+  <div class="scrim" id="scrim" hidden></div>
+
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

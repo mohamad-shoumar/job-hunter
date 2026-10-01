@@ -1,4 +1,4 @@
-"""Command line: `jobhunter run | check | report | reclassify | show | stats | sources`."""
+"""Command line: `jobhunter run | serve | contacts | inbox | check | report | reclassify | show | stats | sources`."""
 
 from __future__ import annotations
 
@@ -64,7 +64,8 @@ def cmd_run(args) -> int:
     only = {s.strip() for s in args.sources.split(",")} if args.sources else None
     date_range = _date_range(args)
     summary, report_paths = pipeline.run(
-        paths, sources_config, filters, only=only, report=not args.no_report, date_range=date_range, ai=not args.no_ai
+        paths, sources_config, filters, only=only, report=not args.no_report, date_range=date_range, ai=not args.no_ai,
+        outreach=not args.no_outreach,
     )
     for name, stats in sorted(summary.sources.items()):
         flag = f"  ({len(stats.errors)} errors)" if stats.errors else ""
@@ -78,6 +79,22 @@ def cmd_run(args) -> int:
         for line in ai["notes"] + ai["errors"]:
             print(f"  {line}")
         print()
+    if summary.outreach:
+        o = summary.outreach
+        if o["contacts"]:
+            c = o["contacts"]
+            print(f"Contacts: {c['found']} found for {c['looked_up']} companies, {c['credits']:g} Hunter credits, "
+                  f"about ${c['cost_usd']:.2f}")
+        if o["drafts"]:
+            print(f"Drafts: {len(o['drafts'])}")
+        if o.get("cvs"):
+            print(f"CVs tailored: {', '.join(o['cvs'])}")
+        if o["inbox"]:
+            i = o["inbox"]
+            print(f"Inbox: {i['replies']} replies, {i['probable']} probable, {i['bounces']} bounces")
+        for line in o["notes"] + o["errors"]:
+            print(f"  {line}")
+        print("Open `jobhunter serve` to see contacts and send emails.\n")
     store = JobStore(paths.db_file)
     try:
         _print_report_counts(store, report_paths)
@@ -166,8 +183,10 @@ def cmd_reclassify(args) -> int:
     now = utcnow()
     try:
         for row in store.all_jobs():
-            job = enrich(row_to_job(row))  # re-extract too, so extraction changes apply
-            store.update_skills(row["id"], job.skills)
+            job = row_to_job(row)
+            job.required_yoe = None  # no source sets it: it is always read from the text
+            job = enrich(job)  # re-extract too, so extraction changes apply
+            store.update_extracted(row["id"], job)
             # Age only decides whether a job is taken at all. Once it sits in a
             # report (fresh when found, or asked for by a date range) it is not
             # re-judged on age - unless age is what rejected it.
@@ -234,6 +253,124 @@ def cmd_show(args) -> int:
     return 0
 
 
+def cmd_serve(args) -> int:
+    """The local web app: jobs, contacts, email drafts, sending, tracking."""
+    import secrets
+    import threading
+    import webbrowser
+
+    paths, _, _ = _load(args)
+    try:
+        import uvicorn
+
+        from .web.app import create_app
+    except ImportError:
+        raise SystemExit("the web app needs FastAPI: .venv/bin/pip install -e '.[web]'") from None
+    port = args.port
+    token = secrets.token_urlsafe(24)
+    app = create_app(paths, token, allowed_hosts=[f"127.0.0.1:{port}", f"localhost:{port}"])
+    url = f"http://127.0.0.1:{port}/"
+    print(f"jobhunter on {url}  (Ctrl+C to stop)")
+    if not args.no_open:
+        threading.Timer(1.0, webbrowser.open, [url]).start()
+    uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")
+    return 0
+
+
+def cmd_tailor(args) -> int:
+    """A CV tailored to each job: versions/<name>.md and its PDF in the resume folder, attached to the job."""
+    from .config import OutreachConfig
+    from .cv import build_cv_writer, tailor_for_job
+
+    paths, _, _ = _load(args)
+    config = OutreachConfig.load(paths.outreach_file)
+    writer, note = build_cv_writer(config)
+    if writer is None:
+        raise SystemExit(note)
+    store = JobStore(paths.db_file)
+    try:
+        for job_id in args.job_ids:
+            meta = tailor_for_job(store, job_id, writer, paths.profile_file, config, utcnow())
+            print(f"#{job_id}: {Path(config.cv_dir).expanduser() / meta['file']} ({meta['pages']} page"
+                  f"{'s' if meta['pages'] != 1 else ''}, {meta['model']}, about ${meta['cost_usd']:.3f})")
+            print(f"  headline: {meta['headline']}")
+            for line in meta["changes"]:
+                print(f"  - {line}")
+            for line in meta["notes"]:
+                print(f"  ! {line}")
+            if meta["gaps"]:
+                print(f"  the posting asks for, not in your profile: {', '.join(meta['gaps'])}")
+    finally:
+        store.close()
+    return 0
+
+
+def cmd_contacts(args) -> int:
+    """Find who to email for given jobs, or for shortlisted jobs that have no contact yet (best fit first)."""
+    from .config import OutreachConfig
+    from .contacts import build_finder, find_contacts
+
+    paths, _, _ = _load(args)
+    config = OutreachConfig.load(paths.outreach_file)
+    finder, note = build_finder(config)
+    if finder is None:
+        raise SystemExit(note)
+    if note:
+        print(note)
+    now = utcnow()
+    store = JobStore(paths.db_file)
+    try:
+        if args.job_ids:
+            rows = [r for r in (store.get(i) for i in args.job_ids) if r]
+        else:
+            rows = store.conn.execute(
+                "SELECT * FROM jobs WHERE status = 'shortlisted' AND report_date IS NOT NULL ORDER BY id DESC"
+            ).fetchall()
+        account = finder.account()
+        if account and account.remaining is not None:
+            print(f"Hunter: {account.remaining:g} credits left, reset {account.reset_date}")
+
+        def show(job, lookup):
+            from .contacts import chosen_contact
+
+            contact = chosen_contact(store, job, config)
+            who = (f"{contact['full_name']} ({contact['position'] or contact['role']}) "
+                   f"<{contact['email'] or '?'}> [{contact['email_status'] or 'no email'}]") if contact else "-"
+            print(f"#{job['id']:<5} {lookup.company[:28]:28} {lookup.status:9} {who}")
+            if lookup.note:
+                print(f"       {lookup.note}")
+
+        run = find_contacts(store, finder, rows, now, args.limit, use_claude=not args.no_claude, on_result=show)
+    finally:
+        store.close()
+    print(f"\n{run.looked_up} looked up, {run.found} found, {run.skipped} job boards, "
+          f"{run.credits:g} credits, about ${run.cost_usd:.2f}")
+    for line in run.notes + run.errors:
+        print(f"  {line}")
+    return 0
+
+
+def cmd_inbox(args) -> int:
+    """Check Gmail for replies and bounces to the emails sent from the app."""
+    from .config import OutreachConfig
+    from .mailer import check_inbox, mail_account
+
+    paths, _, _ = _load(args)
+    account = mail_account()
+    if account is None:
+        raise SystemExit("set GMAIL_ADDRESS and GMAIL_APP_PASSWORD in .env")
+    store = JobStore(paths.db_file)
+    try:
+        result = check_inbox(store, account, OutreachConfig.load(paths.outreach_file), utcnow())
+    finally:
+        store.close()
+    print(f"{result.scanned} new messages: {result.replies} replies, {result.probable} probable, "
+          f"{result.auto_replies} auto-replies, {result.bounces} bounces")
+    for line in result.resolved + result.notes:
+        print(f"  {line}")
+    return 0
+
+
 def cmd_stats(args) -> int:
     paths, _, _ = _load(args)
     store = JobStore(paths.db_file)
@@ -272,8 +409,37 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--to", dest="to_date", type=_date, metavar="YYYY-MM-DD", help="last day of the range (default: today)")
     p.add_argument("--days", type=int, metavar="N", help="the last N days, today included (--days 7 = this week)")
     p.add_argument("--no-report", action="store_true", help="store and classify only")
-    p.add_argument("--no-ai", action="store_true", help="skip the AI web check even if config/ai_check.json enables it")
+    p.add_argument("--no-ai", action="store_true", help="no Claude calls: skip the AI web check and email drafts")
+    p.add_argument("--no-outreach", action="store_true", help="skip contact lookups, drafts and the inbox check")
     p.set_defaults(func=cmd_run)
+
+    p = sub.add_parser("serve", help="the local web app: jobs, who to contact, email drafts, sending, tracking")
+    p.add_argument("--port", type=int, default=8765)
+    p.add_argument("--no-open", action="store_true", help="do not open the browser")
+    p.set_defaults(func=cmd_serve)
+
+    p = sub.add_parser(
+        "contacts",
+        help="find who to email (Hunter, then Claude) for jobs, or for shortlisted jobs without a contact",
+        description="Per company, once. Without ids: shortlisted jobs that are in a report, best fit first.",
+    )
+    p.add_argument("job_ids", type=int, nargs="*")
+    p.add_argument("--limit", type=int, metavar="N", help="look up at most N new companies")
+    p.add_argument("--no-claude", action="store_true", help="Hunter only, no Claude web search")
+    p.set_defaults(func=cmd_contacts)
+
+    p = sub.add_parser(
+        "tailor",
+        help="tailor your CV to jobs (resume.md layout, profile facts) and attach it to them",
+        description="The model picks, orders and rewords your profile's bullets and skills for the posting; code "
+        "checks every line against profile/master_profile.md. Writes versions/<name>.md and its PDF in "
+        "resume_dir (config/outreach.json), and makes the PDF the job's email attachment.",
+    )
+    p.add_argument("job_ids", type=int, nargs="+")
+    p.set_defaults(func=cmd_tailor)
+
+    p = sub.add_parser("inbox", help="check Gmail for replies and bounces (also runs in the daily run)")
+    p.set_defaults(func=cmd_inbox)
 
     p = sub.add_parser(
         "check",

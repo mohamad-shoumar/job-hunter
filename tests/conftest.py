@@ -47,6 +47,13 @@ class FakeHttp:
         return self._get(url, params)
 
 
+@pytest.fixture(autouse=True)
+def no_real_keys(monkeypatch):
+    """Tests never reach Hunter, Claude or Gmail, even when the shell has the keys set."""
+    for name in ("HUNTER_API_KEY", "ANTHROPIC_API_KEY", "DEEPSEEK_API_KEY", "GMAIL_ADDRESS", "GMAIL_APP_PASSWORD", "SERPAPI_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+
+
 @pytest.fixture
 def filters() -> Filters:
     """The real config/filters.json, so tests fail if the shipped config breaks."""
@@ -66,3 +73,13 @@ def make_job(**overrides) -> Job:
     )
     values.update(overrides)
     return Job(**values)
+
+
+def store_job(store, filters, **overrides) -> int:
+    """Classify and insert a job; returns its id. Defaults to one that is shortlisted (open worldwide)."""
+    from jobhunter.classify import classify
+
+    overrides.setdefault("allowed_locations", ["Worldwide"])
+    job = make_job(**overrides)
+    job.first_seen = NOW
+    return store.insert(job, classify(job, filters, NOW), None, NOW)

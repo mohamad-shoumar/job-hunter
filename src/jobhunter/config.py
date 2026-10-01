@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field, fields
 from pathlib import Path
 
 from .text import normalize_words
@@ -25,6 +25,14 @@ class Paths:
     @property
     def ai_check_file(self) -> Path:
         return self.root / "config" / "ai_check.json"
+
+    @property
+    def outreach_file(self) -> Path:
+        return self.root / "config" / "outreach.json"
+
+    @property
+    def profile_file(self) -> Path:
+        return self.root / "profile" / "master_profile.md"
 
     @property
     def db_file(self) -> Path:
@@ -104,3 +112,52 @@ class Filters:
     @classmethod
     def load(cls, path: Path) -> Filters:
         return cls.from_dict(load_json(path))
+
+
+@dataclass
+class OutreachConfig:
+    """config/outreach.json: who to contact, the email, sending limits. See contacts.py, pitch.py, mailer.py."""
+
+    # Companies with at most this many people: email the CEO/founder directly.
+    small_company_max_employees: int = 50
+    small_company_targets: list[str] = field(default_factory=lambda: ["ceo", "founder", "cto"])
+    large_company_targets: list[str] = field(default_factory=lambda: ["eng_lead", "eng_manager", "recruiter", "hr"])
+    # Job boards and staffing agencies: there is no one there to pitch.
+    skip_companies: list[str] = field(default_factory=list)
+    auto_lookup: bool = True
+    max_companies_per_run: int = 10
+    hunter_reserve_credits: float = 5.0
+    claude_fallback_in_daily_run: bool = False
+    fallback_model: str = "claude-haiku-4-5"
+    fallback_max_searches: int = 2
+    pitch_model: str = "claude-sonnet-5"
+    # "fixed": the email is your own text below, no AI. "ai": the model writes the proof line instead of pitch_text.
+    pitch_mode: str = "fixed"
+    subject_template: str = "{title} - {name}"
+    pitch_text: str = ""
+    ask_text: str = ""
+    auto_draft: bool = True
+    follow_up_business_days: list[int] = field(default_factory=lambda: [4, 7])
+    ghost_after_business_days: int = 7
+    daily_send_cap: int = 15
+    daily_guessed_cap: int = 3
+    # CVs to attach: PDFs in this folder. A file whose name contains the company (e.g.
+    # Shoumar_FullStack_LigaData_Sep2026.pdf) is picked for that company, else default_cv.
+    cv_dir: str = "~/Documents/resume/output"
+    default_cv: str = "Shoumar_Resume_General.pdf"
+    # Tailored CVs (cv.py): resume.md (the layout) and build.py live in resume_dir; build.py
+    # writes the PDFs into its output/ folder, which is cv_dir.
+    resume_dir: str = "~/Documents/resume"
+    cv_model: str = "deepseek-v4-pro"
+    auto_tailor: bool = True
+    max_cvs_per_run: int = 5
+    # Replaces cv.TAG_RULES for the tags it names: {"lead": {"title": [...], "posting": [...]}}.
+    cv_tags: dict = field(default_factory=dict)
+
+    @classmethod
+    def load(cls, path: Path) -> OutreachConfig:
+        if not path.exists():
+            return cls()
+        data = load_json(path)
+        known = {f.name for f in fields(cls)}
+        return cls(**{k: v for k, v in data.items() if k in known})

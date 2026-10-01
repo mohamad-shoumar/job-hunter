@@ -1,0 +1,24 @@
+{
+  "_source": "Example response from hunter.io/api-documentation/v2 (2026-09-28), trimmed. Replace with a trimmed real response once HUNTER_API_KEY is set.",
+  "data": {
+    "id": "95ca56a8-a019-5c41-881e-293d9ca4741a",
+    "name": "Hunter",
+    "legalName": "Hunter",
+    "domain": "hunter.io",
+    "linkedin": {
+      "handle": "company/hunterio"
+    },
+    "metrics": {
+      "alexaUsRank": null,
+      "alexaGlobalRank": null,
+      "trafficRank": "very_high",
+      "employees": "11-50",
+      "employeesCount": 42,
+      "marketCap": null,
+      "raised": null,
+      "annualRevenue": null,
+      "estimatedAnnualRevenue": null,
+      "fiscalYearEnd": null
+    }
+  }
+}

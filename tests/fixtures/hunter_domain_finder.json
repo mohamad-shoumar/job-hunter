@@ -1,0 +1,19 @@
+{
+  "data": [
+    {
+      "domain": "stripe.com",
+      "company_name": "Stripe",
+      "logo": "https://logos.hunter.io/stripe.com",
+      "email_count": 281
+    }
+  ],
+  "meta": {
+    "results": 1,
+    "params": {
+      "company": "stripe",
+      "limit": 5,
+      "perfect_match": false
+    }
+  },
+  "_source": "Example response from hunter.io/api-documentation/v2 (2026-09-28), trimmed. Replace with a trimmed real response once HUNTER_API_KEY is set."
+}

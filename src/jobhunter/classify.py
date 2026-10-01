@@ -69,4 +69,9 @@ def classify(job: Job, filters: Filters, now: datetime, check_age: bool = True) 
     if eligibility.verdict == NOT_ELIGIBLE:
         return Classification(REJECTED, eligibility, relevance, score, eligibility.reasons[0], eligibility.code)
     status = SHORTLISTED if eligibility.verdict in (ELIGIBLE, LIKELY) else NEEDS_REVIEW
+    if status == SHORTLISTED and not job.posted_at:
+        # An unknown age is not a fresh one: some sources re-list months-old jobs undated.
+        status = NEEDS_REVIEW
+        relevance = Assessment(relevance.verdict, [*relevance.reasons, "No posting date, so its age is unknown"],
+                               relevance.code)
     return Classification(status, eligibility, relevance, score)

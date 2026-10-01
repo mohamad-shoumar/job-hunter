@@ -95,6 +95,123 @@ CREATE TABLE IF NOT EXISTS sightings (
     UNIQUE (source, source_job_id)
 );
 CREATE INDEX IF NOT EXISTS sightings_job ON sightings (job_id);
+""" + """
+-- Outreach and tracking (contacts.py, pitch.py, mailer.py, tracking.py).
+-- Separate from `jobs`, so `reclassify` never touches them.
+
+CREATE TABLE IF NOT EXISTS companies (
+    key TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    domain TEXT,
+    domain_source TEXT,
+    size_range TEXT,
+    size_count INTEGER,
+    is_job_board INTEGER NOT NULL DEFAULT 0,
+    email_pattern TEXT,
+    accept_all INTEGER,
+    lookup_state TEXT,
+    lookup_started_at TEXT,
+    looked_up_at TEXT,
+    note TEXT,
+    credits REAL NOT NULL DEFAULT 0,
+    cost_usd REAL NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS contacts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    company_key TEXT NOT NULL REFERENCES companies(key),
+    full_name TEXT NOT NULL,
+    first_name TEXT,
+    last_name TEXT,
+    position TEXT,
+    role TEXT NOT NULL,
+    email TEXT,
+    email_status TEXT,
+    confidence INTEGER,
+    linkedin_url TEXT,
+    source TEXT NOT NULL,
+    evidence_url TEXT,
+    evidence_quote TEXT,
+    verified INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS contacts_company ON contacts (company_key);
+
+CREATE TABLE IF NOT EXISTS applications (
+    job_id INTEGER PRIMARY KEY REFERENCES jobs(id),
+    stage TEXT NOT NULL,
+    closed_reason TEXT,
+    contact_id INTEGER REFERENCES contacts(id),
+    subject TEXT,
+    hook TEXT,
+    pitch TEXT,
+    body TEXT,
+    draft_version INTEGER NOT NULL DEFAULT 0,
+    draft_edited INTEGER NOT NULL DEFAULT 0,
+    draft_blocked INTEGER NOT NULL DEFAULT 0,
+    draft_warnings_json TEXT NOT NULL DEFAULT '[]',
+    draft_meta_json TEXT,
+    applied_at TEXT,
+    emailed_at TEXT,
+    follow_ups INTEGER NOT NULL DEFAULT 0,
+    next_follow_up_at TEXT,
+    replied_at TEXT,
+    reply_from TEXT,
+    reply_snippet TEXT,
+    notes TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    cv_file TEXT,
+    cv_tailored_json TEXT
+);
+
+CREATE TABLE IF NOT EXISTS events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id INTEGER NOT NULL REFERENCES jobs(id),
+    at TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    detail TEXT NOT NULL DEFAULT '',
+    ref TEXT
+);
+CREATE INDEX IF NOT EXISTS events_job ON events (job_id);
+CREATE UNIQUE INDEX IF NOT EXISTS events_ref ON events (kind, ref) WHERE ref IS NOT NULL;
+
+-- Every email sent. seq 0 is the first email, 1 and 2 the follow-ups. The
+-- unique index is the check-and-set that stops a double send: a second
+-- 'sending' row for the same step cannot be inserted.
+CREATE TABLE IF NOT EXISTS sent_mail (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id INTEGER REFERENCES jobs(id),
+    contact_id INTEGER REFERENCES contacts(id),
+    kind TEXT NOT NULL,
+    seq INTEGER NOT NULL DEFAULT 0,
+    message_id TEXT NOT NULL UNIQUE,
+    in_reply_to TEXT,
+    to_addr TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    body TEXT NOT NULL,
+    guessed INTEGER NOT NULL DEFAULT 0,
+    state TEXT NOT NULL,
+    error TEXT,
+    thread_id TEXT,
+    created_at TEXT NOT NULL,
+    sent_at TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS sent_mail_once ON sent_mail (job_id, seq)
+    WHERE kind != 'test' AND state != 'failed';
+
+-- Inbox messages already handled, so two scans never count one twice.
+CREATE TABLE IF NOT EXISTS mail_seen (
+    message_key TEXT PRIMARY KEY,
+    job_id INTEGER,
+    kind TEXT NOT NULL,
+    seen_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS kv (
+    key TEXT PRIMARY KEY,
+    value TEXT
+);
 """
 
 # Columns added after the first release, for databases created before them.
@@ -179,17 +296,36 @@ def row_to_job(row: sqlite3.Row) -> Job:
 
 
 class JobStore:
-    def __init__(self, path: Path | str):
-        if str(path) != ":memory:":
+    """migrate=False skips the schema work (the web app migrates once at start).
+
+    check_same_thread=False lets one request's connection be used from the
+    different threads FastAPI runs a request's parts on; a connection is still
+    only ever used by one request.
+    """
+
+    def __init__(self, path: Path | str, migrate: bool = True, check_same_thread: bool = True):
+        on_disk = str(path) != ":memory:"
+        if on_disk:
             Path(path).parent.mkdir(parents=True, exist_ok=True)
-        self.conn = sqlite3.connect(str(path))
+        self.conn = sqlite3.connect(str(path), timeout=15, check_same_thread=check_same_thread)
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA foreign_keys = ON")
+        # The daily run and the web app can write at the same time: WAL lets
+        # readers go on during a write, and the timeout waits out short locks.
+        self.conn.execute("PRAGMA busy_timeout = 15000")
+        if not migrate:
+            return
+        if on_disk:
+            self.conn.execute("PRAGMA journal_mode = WAL")
         self.conn.executescript(SCHEMA)
         existing = {row["name"] for row in self.conn.execute("PRAGMA table_info(jobs)")}
         for column, kind in _ADDED_COLUMNS.items():
             if column not in existing:
                 self.conn.execute(f"ALTER TABLE jobs ADD COLUMN {column} {kind}")
+        app_columns = {row["name"] for row in self.conn.execute("PRAGMA table_info(applications)")}
+        for column in ("cv_file", "cv_tailored_json"):
+            if column not in app_columns:
+                self.conn.execute(f"ALTER TABLE applications ADD COLUMN {column} TEXT")
         self.conn.execute("CREATE INDEX IF NOT EXISTS jobs_report_date ON jobs (report_date)")
         self.conn.commit()
 
@@ -295,8 +431,10 @@ class JobStore:
             (job_id, job.source, job.source_job_id, job.source_url, job.location_raw, iso(now), iso(now)),
         )
 
-    def update_skills(self, job_id: int, skills: list[str]) -> None:
-        self.conn.execute("UPDATE jobs SET skills_json = ? WHERE id = ?", (json.dumps(skills), job_id))
+    def update_extracted(self, job_id: int, job: Job) -> None:
+        """Save what `enrich` reads from the text, after the extraction rules change."""
+        self.conn.execute("UPDATE jobs SET skills_json = ?, required_yoe = ? WHERE id = ?",
+                          (json.dumps(job.skills), job.required_yoe, job_id))
 
     def save_ai_check(self, job_id: int, check: AiCheck) -> None:
         self.conn.execute("UPDATE jobs SET ai_check_json = ? WHERE id = ?", (json.dumps(asdict(check)), job_id))
@@ -315,10 +453,11 @@ class JobStore:
         return self.conn.execute("SELECT * FROM jobs ORDER BY id").fetchall()
 
     def needs_ai_check(self, recheck: bool = False) -> list[sqlite3.Row]:
-        """Jobs waiting for review, newest first. `recheck` includes ones already checked."""
+        """Jobs waiting for review because the rules could not tell about Lebanon, newest
+        first. `recheck` includes ones already checked."""
         unchecked = "" if recheck else " AND ai_check_json IS NULL"
         return self.conn.execute(
-            f"SELECT * FROM jobs WHERE status = 'needs_review'{unchecked} "
+            f"SELECT * FROM jobs WHERE status = 'needs_review' AND eligibility = 'unclear'{unchecked} "
             "ORDER BY COALESCE(posted_at, first_seen) DESC, id DESC"
         ).fetchall()
 
@@ -356,6 +495,16 @@ class JobStore:
             ):
                 found[row["job_id"]].append(row)
         return found
+
+    def get_kv(self, key: str) -> str | None:
+        row = self.conn.execute("SELECT value FROM kv WHERE key = ?", (key,)).fetchone()
+        return row["value"] if row else None
+
+    def set_kv(self, key: str, value: str | None) -> None:
+        self.conn.execute(
+            "INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+            (key, value),
+        )
 
     def counts(self) -> dict:
         by_status = dict(self.conn.execute("SELECT status, COUNT(*) FROM jobs GROUP BY status").fetchall())

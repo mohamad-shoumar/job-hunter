@@ -146,7 +146,7 @@ def render(day: str, rows: list[sqlite3.Row], sightings: dict[int, list[sqlite3.
     out += [_job_block(i, r, sightings.get(r["id"], [])) + "\n" for i, r in enumerate(shortlisted, 1)] or ["_None._", ""]
 
     out += [f"## Needs review ({len(review)})", ""]
-    out += ["A target role, but the posting does not say clearly whether Lebanon is allowed. Check before applying.", ""]
+    out += ["A target role, but the posting does not say clearly whether Lebanon is allowed, or has no posting date. Check before applying.", ""]
     out += [_job_block(i, r, sightings.get(r["id"], [])) + "\n" for i, r in enumerate(review, 1)] or ["_None._", ""]
 
     out += _rejected_section(rejected, max_age)
@@ -162,6 +162,23 @@ def render(day: str, rows: list[sqlite3.Row], sightings: dict[int, list[sqlite3.
             out += [f"**AI check** ({ai['model']}): {ai['checked']} checked ({verdicts}), about ${ai['cost_usd']:.2f}", ""]
             out += [f"- {_cell(line)}" for line in ai["notes"] + ai["errors"]]
             out += [""] if ai["notes"] or ai["errors"] else []
+        outreach = summary.get("outreach")
+        if outreach:
+            parts = []
+            if outreach.get("contacts"):
+                c = outreach["contacts"]
+                parts.append(f"{c['found']} contacts found for {c['looked_up']} companies "
+                             f"({c['credits']:g} Hunter credits, about ${c['cost_usd']:.2f})")
+            if outreach.get("drafts"):
+                parts.append(f"{len(outreach['drafts'])} email drafts")
+            if outreach.get("cvs"):
+                parts.append(f"{len(outreach['cvs'])} CVs tailored")
+            if outreach.get("inbox"):
+                i = outreach["inbox"]
+                parts.append(f"inbox: {i['replies'] + i['probable']} replies, {i['bounces']} bounces")
+            out += [f"**Outreach** (open `jobhunter serve`): {'; '.join(parts) or 'nothing new'}", ""]
+            lines = outreach.get("notes", []) + outreach.get("errors", [])
+            out += [f"- {_cell(line)}" for line in lines] + ([""] if lines else [])
         problems = [(name, e) for name, s in summary["sources"].items() for e in s["errors"]]
         notes = [(name, n) for name, s in summary["sources"].items() for n in s["notes"]]
         if problems:

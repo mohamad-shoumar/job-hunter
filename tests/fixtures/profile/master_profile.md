@@ -1,3 +1,5 @@
+<!-- A frozen copy of profile/master_profile.md (2026-09-30) for the tests, which cite its bullets by
+     position. Edit the real profile freely; change this file only together with the tests. -->
 # Master profile
 
 > **This file is the only source of facts about me.** Every CV, cover letter and
@@ -62,7 +64,7 @@ Printed title: Algorithmic Trader [default] · Team Lead [lead]
 - [fullstack, lead] Built the interactive backtest chart in Next.js and TypeScript on TradingView Lightweight Charts: trade entry/exit markers, indicator panes and win/loss filters, with candle and indicator data lazy-loaded as the user pans. (Confirmed by me 2026-09-30: my commits in an internal repo, Apr-Aug 2026. The divergence pivots and the "Why this trade?" panel are a teammate's work, never claim them.)
 - [automation] Built and own an internal LLM automation flow that uses AI agents for extraction, classification, and triage, with validation gates that check every output before it ships - 115+ version-controlled workflows covering code review, release QA, and deploy gates.
 - [automation] Own third-party API integrations end to end, including an event-driven Slack gateway that routes authenticated events, enforces scoped permissions, and reliably handles bot-to-bot messages in production. (Confirmed by me 2026-09-27; from the spare bullets in `~/Documents/resume/resume.md`.)
-- TODO: where should this print? Answered from git, it was me: "Ms/lambda save db" (#494, 2025-12-24) made the Lambda write backtest results straight to PostgreSQL with batch inserts instead of saving to S3 and sending a message through an SQS response queue; #499 removed the backtest engine's SQS response listener. Draft bullet: Simplified the pipeline by replacing the S3 + SQS response-queue handoff with direct PostgreSQL batch writes from the Lambda, retiring the response queue and its listener.
+- TODO: did I do the switch from the SQS response queue (job status) to direct PostgreSQL writes? The current code calls the response queue legacy.
 
 ### Backend Developer — CoinQuant (Abu Dhabi)        Aug 2024 – Aug 2025
 

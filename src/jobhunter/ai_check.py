@@ -20,7 +20,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import re
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field, fields
@@ -30,6 +29,7 @@ from pathlib import Path
 from .classify import classify
 from .config import Filters
 from .eligibility import assess_eligibility
+from .llm import Usage, error_line, find_quote, forced_tool_choice, pages_read, plain
 from .models import CAN_HIRE, CANNOT_HIRE, UNKNOWN_HIRE, AiCheck, Classification, Job
 from .store import JobStore, row_to_job
 from .text import iso
@@ -40,10 +40,6 @@ JOB_DESCRIPTION = "job description"
 MAX_REQUESTS = 6  # per job: pause_turn continuations, plus one nudge to record the verdict
 DESCRIPTION_CHARS = 8000
 
-# USD per million tokens (input, output), platform.claude.com/docs/en/models/overview,
-# checked 2026-09-27. Only used for the cost estimate that runs print.
-PRICES = {"claude-opus-5-5": (4.0, 20.0), "claude-sonnet-5": (2.0, 10.0), "claude-haiku-4-5": (1.0, 5.0)}
-SEARCH_PRICE = 10.0 / 1000
 
 SYSTEM = """\
 You check whether a company can hire a software engineer who lives in Lebanon \
@@ -123,71 +119,6 @@ class AiCheckConfig:
         return cls(**{k: v for k, v in data.items() if k in known})
 
 
-def _plain(obj) -> dict:
-    """SDK objects and test dicts alike, so new block types never break parsing."""
-    if obj is None:
-        return {}
-    return obj if isinstance(obj, dict) else obj.model_dump()
-
-
-def _words(text: str) -> str:
-    return " ".join(re.findall(r"\w+", text.lower()))
-
-
-def find_quote(quote: str, pages: list[tuple[str, str]], stated_url: str = "") -> str | None:
-    """Where the quote appears word for word (case and punctuation ignored), or None.
-
-    Fewer than three words proves nothing ("Remote" is on every page).
-    """
-    wanted = _words(quote)
-    if wanted.count(" ") < 2:
-        return None
-    for url, text in sorted(pages, key=lambda page: page[0] != stated_url):
-        if f" {wanted} " in f" {_words(text)} ":
-            return url
-    return None
-
-
-def _pages_read(blocks: list[dict]):
-    """(url, text) for everything the API itself returned from the web."""
-    for block in blocks:
-        if block.get("type") == "web_fetch_tool_result":
-            result = block.get("content") or {}
-            source = (result.get("content") or {}).get("source") or {}
-            if result.get("type") == "web_fetch_result" and source.get("type") == "text" and source.get("data"):
-                yield result.get("url") or "", source["data"]
-        elif block.get("type") == "text":
-            # cited_text is extracted by the API from the page, not written by the model.
-            for citation in block.get("citations") or []:
-                if citation.get("cited_text") and citation.get("url"):
-                    yield citation["url"], citation["cited_text"]
-
-
-@dataclass
-class _Usage:
-    input: int = 0
-    output: int = 0
-    cache_write: int = 0
-    cache_read: int = 0
-    searches: int = 0
-
-    def add(self, usage) -> None:
-        u = _plain(usage)
-        self.input += u.get("input_tokens") or 0
-        self.output += u.get("output_tokens") or 0
-        self.cache_write += u.get("cache_creation_input_tokens") or 0
-        self.cache_read += u.get("cache_read_input_tokens") or 0
-        self.searches += (u.get("server_tool_use") or {}).get("web_search_requests") or 0
-
-    def cost(self, model: str) -> float | None:
-        price = next((p for name, p in PRICES.items() if model.startswith(name)), None)
-        if price is None:
-            return None
-        per_in, per_out = price
-        tokens = self.input * per_in + self.cache_write * per_in * 1.25 + self.cache_read * per_in * 0.1
-        return round((tokens + self.output * per_out) / 1e6 + self.searches * SEARCH_PRICE, 4)
-
-
 def _job_message(job: Job, rule_reason: str) -> str:
     links = dict.fromkeys(u for u in (job.application_url, job.source_url) if u)
     return "\n".join([
@@ -220,7 +151,7 @@ class AiChecker:
         rule_reason = (assess_eligibility(job).reasons or [""])[0]
         messages: list[dict] = [{"role": "user", "content": _job_message(job, rule_reason)}]
         pages = [(JOB_DESCRIPTION, job.description or "")]
-        usage = _Usage()
+        usage = Usage()
         tool_choice = {"type": "auto"}
         answer = None
         for _ in range(MAX_REQUESTS):
@@ -229,8 +160,8 @@ class AiChecker:
                 tool_choice=tool_choice, messages=messages,
             )
             usage.add(response.usage)
-            blocks = [_plain(b) for b in response.content]
-            pages += list(_pages_read(blocks))
+            blocks = [plain(b) for b in response.content]
+            pages += list(pages_read(blocks))
             answer = next((b.get("input") for b in blocks
                            if b.get("type") == "tool_use" and b.get("name") == "record_verdict"), None)
             if answer is not None:
@@ -238,7 +169,7 @@ class AiChecker:
             messages.append({"role": "assistant", "content": response.content})
             if response.stop_reason != "pause_turn":  # pause_turn: send it back as-is and the search goes on
                 messages.append({"role": "user", "content": "Call record_verdict now with what you found."})
-                tool_choice = {"type": "tool", "name": "record_verdict"}
+                tool_choice = forced_tool_choice(self.config.model, "record_verdict")
         if answer is None:
             raise RuntimeError(f"no verdict after {MAX_REQUESTS} requests")
 
@@ -297,11 +228,6 @@ class CheckRun:
         }
 
 
-def _error_line(exc: Exception) -> str:
-    # The key travels in a header, so it is never part of these messages.
-    return " ".join(f"{type(exc).__name__}: {exc}".split())[:300]
-
-
 def _fatal(exc: Exception) -> bool:
     """Errors every other job would hit too: bad key, no credit, unknown model or tool."""
     return getattr(exc, "status_code", None) in (400, 401, 403, 404)
@@ -327,7 +253,7 @@ def check_jobs(store: JobStore, checker: AiChecker, rows, filters: Filters, now:
             try:
                 check = future.result()
             except Exception as exc:
-                run.errors.append(f"#{row['id']} {row['company']}: {_error_line(exc)}")
+                run.errors.append(f"#{row['id']} {row['company']}: {error_line(exc)}")
                 if _fatal(exc) and not stopped:
                     stopped = True
                     run.notes.append("stopped early: the same error would hit every job")

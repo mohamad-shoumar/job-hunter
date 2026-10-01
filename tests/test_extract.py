@@ -21,6 +21,11 @@ from jobhunter.text import fix_mojibake, html_to_text, normalize_words, parse_da
         ("Nice to have: 8+ years of experience with Kafka", None),
         ("our 15 years of experience serving clients", None),
         ("Competitive salary", None),
+        # Real postings the rules once missed (Enveritas #869, Splitero #912).
+        ("- A minimum of seven years of full-time professional experience as a backend software engineer.", 7),
+        ("- 6+ years in software engineering with at least 2 years of focused experience building production AI", 6),
+        ("Seven (7) years of experience with Python", 7),
+        ("Someone years ahead", None),
     ],
 )
 def test_required_yoe(text, years):

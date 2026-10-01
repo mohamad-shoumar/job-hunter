@@ -149,7 +149,14 @@ def test_pause_turn_is_continued_and_a_missing_verdict_is_asked_for(filters):
     assert client.calls[1]["messages"][-1] == {"role": "assistant", "content": [search]}  # sent back as-is
     assert client.calls[1]["tool_choice"] == {"type": "auto"}
     assert client.calls[2]["messages"][-1]["content"].startswith("Call record_verdict now")
-    assert client.calls[2]["tool_choice"] == {"type": "tool", "name": "record_verdict"}
+    # Opus 5.5 answers a forced tool_choice with a 400, so the nudge is the prompt alone.
+    assert client.calls[2]["tool_choice"] == {"type": "auto"}
+
+
+def test_models_that_allow_it_get_a_forced_record_verdict(filters):
+    client = FakeClient(response({"type": "text", "text": "Found nothing."}, stop_reason="end_turn"), response(verdict()))
+    checker(client, model="claude-sonnet-5").check(make_job(), NOW)
+    assert client.calls[1]["tool_choice"] == {"type": "tool", "name": "record_verdict"}
 
 
 def test_a_bad_key_stops_the_rest_and_saves_nothing(filters):

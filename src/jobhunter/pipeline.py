@@ -25,7 +25,8 @@ from .classify import classify
 from .config import Filters
 from .extract import enrich
 from .http import Http
-from .models import NEEDS_REVIEW, Job
+from .models import NEEDS_REVIEW, UNCLEAR, Job
+from .outreach import run_outreach
 from .report import write_report
 from .sources import Source, SourceResult, build_sources
 from .sources.base import describe_error
@@ -52,6 +53,7 @@ class RunSummary:
     reject_codes: Counter = field(default_factory=Counter)
     config_notes: list[str] = field(default_factory=list)
     ai_check: dict | None = None
+    outreach: dict | None = None
     # Job ids this run touched (new or seen again), and the new ones. Not saved.
     seen_ids: set[int] = field(default_factory=set)
     new_ids: list[int] = field(default_factory=list)
@@ -73,6 +75,7 @@ class RunSummary:
             "reject_codes": dict(self.reject_codes),
             "config_notes": self.config_notes,
             "ai_check": self.ai_check,
+            "outreach": self.outreach,
         }
 
 
@@ -177,7 +180,7 @@ def ai_check_days(store: JobStore, checker: AiChecker, days: list[str], filters:
                   now: datetime, summary: RunSummary) -> None:
     """AI-check the unchecked needs_review jobs filed under `days`, newest first, up to the per-run cap."""
     waiting = [row for day in days for row in store.jobs_for_report(day)
-               if row["status"] == NEEDS_REVIEW and not row["ai_check_json"]]
+               if row["status"] == NEEDS_REVIEW and row["eligibility"] == UNCLEAR and not row["ai_check_json"]]
     waiting.sort(key=lambda r: (r["posted_at"] or r["first_seen"], r["id"]), reverse=True)
     limit = checker.config.max_jobs_per_run
     result = check_jobs(store, checker, waiting[:limit], filters, now)
@@ -189,8 +192,11 @@ def ai_check_days(store: JobStore, checker: AiChecker, days: list[str], filters:
 def run(root_paths, sources_config: dict, filters: Filters, only: set[str] | None = None,
         report: bool = True, http: Http | None = None, now: datetime | None = None,
         date_range: tuple[date, date] | None = None, ai: bool = True,
-        ai_checker: AiChecker | None = None) -> tuple[RunSummary, list[Path]]:
-    """ai=False skips the AI check. ai_checker overrides the one built from config/ai_check.json."""
+        ai_checker: AiChecker | None = None, outreach: bool = True) -> tuple[RunSummary, list[Path]]:
+    """ai=False skips every Claude call. ai_checker overrides the one built from config/ai_check.json.
+
+    outreach=False skips contacts, drafts and the inbox check (outreach.py).
+    """
     now = now or utcnow()
     sources, config_notes = build_sources(sources_config)
     if ai and ai_checker is None:
@@ -222,6 +228,15 @@ def run(root_paths, sources_config: dict, filters: Filters, only: set[str] | Non
             days = assign_daily(store, summary, now)
         if ai and ai_checker:
             ai_check_days(store, ai_checker, days, filters, now, summary)
+        if outreach:
+            # Date-range runs never spend lookup credits: they would use up the month.
+            try:
+                summary.outreach = run_outreach(store, root_paths, summary.new_ids, now, ai=ai,
+                                                lookups=date_range is None)
+            except Exception as exc:  # e.g. a broken config/outreach.json: the reports still get written
+                log.exception("outreach step failed")
+                summary.outreach = {"contacts": None, "drafts": [], "inbox": None, "notes": [],
+                                    "errors": [f"outreach: {describe_error(exc)}"]}
         store.finish_run(run_id, summary.to_dict(), utcnow())
         paths = [
             write_report(store, root_paths.reports_dir, day, summary.to_dict(), now, filters.max_posting_age_days)

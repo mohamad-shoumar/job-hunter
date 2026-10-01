@@ -76,9 +76,19 @@ def employment_type_from_text(text: str) -> str | None:
 
 # --- years of experience ----------------------------------------------------
 
+_NUMBER_WORDS = {
+    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8,
+    "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14, "fifteen": 15,
+}
+_COUNT = r"(\d{1,2}|" + "|".join(_NUMBER_WORDS) + r")"
+# Field words that make "6+ years in software engineering" a requirement
+# without the word "experience".
+_FIELD = r"(?:software|engineering|development|developer|engineer|programming|backend|coding|professional|industry)"
 _YOE = re.compile(
-    r"(?<![\d.$€£])(\d{1,2})\s*(?:\+|plus)?\s*(?:(?:-|–|—|to)\s*(\d{1,2})\s*\+?\s*)?"
-    r"(?:years?|yrs?)(?:'|’)?\s+(?:of\s+)?(?:[\w/+#.-]+\s+){0,4}?(?:experience|exp)\b",
+    rf"(?<![\d.$€£\w]){_COUNT}\s*(?:\+|plus)?\s*(?:(?:-|–|—|to)\s*{_COUNT}\s*\+?\s*)?(?:\(\d{{1,2}}\+?\)\s*)?"
+    r"(?:years?|yrs?)(?:'|’)?\s+"
+    r"(?:(?:of\s+)?(?:[\w/+#.-]+\s+){0,4}?(?:experience|exp)\b"
+    rf"|(?:in|as|of)\s+(?:an?\s+|the\s+)?(?:[\w/+#.-]+\s+){{0,2}}?{_FIELD}\b)",
     re.I,
 )
 _OPTIONAL_CONTEXT = re.compile(r"\b(?:preferred|nice to have|nice-to-have|bonus|ideally|a plus|is a plus)\b", re.I)
@@ -88,8 +98,10 @@ _BRAG_CONTEXT = re.compile(r"\b(?:we have|our|company has|with over|for over)\s*
 def extract_required_yoe(text: str) -> int | None:
     """The strictest 'N+ years of experience' stated as a requirement.
 
-    Lines marked preferred/nice-to-have are ignored, as are company boasts
-    ('our 15 years of experience').
+    Counts may be words ('seven years of experience') and the field may stand
+    in for 'experience' ('6+ years in software engineering'). Lines marked
+    preferred/nice-to-have are ignored, as are company boasts ('our 15 years
+    of experience').
     """
     best = None
     for line in (text or "").split("\n"):
@@ -98,7 +110,8 @@ def extract_required_yoe(text: str) -> int | None:
         for m in _YOE.finditer(line):
             if _BRAG_CONTEXT.search(line[max(0, m.start() - 20):m.start()]):
                 continue
-            years = int(m.group(1))
+            count = m.group(1).lower()
+            years = int(count) if count.isdigit() else _NUMBER_WORDS[count]
             if 1 <= years <= 15:
                 best = years if best is None else max(best, years)
     return best

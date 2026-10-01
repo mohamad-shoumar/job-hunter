@@ -1,0 +1,42 @@
+{
+  "data": {
+    "total": 81,
+    "personal_emails": 65,
+    "generic_emails": 16,
+    "department": {
+      "executive": 10,
+      "it": 0,
+      "finance & accounting": 8,
+      "management": 0,
+      "sales": 0,
+      "legal": 0,
+      "support": 6,
+      "hr": 0,
+      "marketing": 0,
+      "communication": 2,
+      "education": 0,
+      "design": 0,
+      "health": 0,
+      "operations": 0,
+      "operation": 0,
+      "product": 0,
+      "research": 0,
+      "consulting": 0,
+      "administrative": 0,
+      "procurement": 0
+    },
+    "seniority": {
+      "junior": 13,
+      "senior": 5,
+      "executive": 2
+    }
+  },
+  "meta": {
+    "params": {
+      "domain": "stripe.com",
+      "company": null,
+      "type": null
+    }
+  },
+  "_source": "Example response from hunter.io/api-documentation/v2 (2026-09-28), trimmed. Replace with a trimmed real response once HUNTER_API_KEY is set."
+}

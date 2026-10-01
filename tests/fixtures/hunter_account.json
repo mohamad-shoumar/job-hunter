@@ -1,0 +1,34 @@
+{
+  "data": {
+    "first_name": "Antoine",
+    "last_name": "Finkelstein",
+    "email": "antoine@hunter.io",
+    "plan_name": "Growth",
+    "plan_level": 2,
+    "reset_date": "2026-10-05",
+    "team_id": 1,
+    "requests": {
+      "credits": {
+        "used": 550.0,
+        "available": 10000.0,
+        "remaining": 9450.0
+      },
+      "searches": {
+        "used": 500,
+        "available": 10000,
+        "remaining": 9500
+      },
+      "verifications": {
+        "used": 100,
+        "available": 20000,
+        "remaining": 19900
+      }
+    },
+    "calls": {
+      "_deprecation_notice": "Sums the searches and the verifications, giving an unprecise look of the requests available",
+      "used": 18526,
+      "available": 20000
+    }
+  },
+  "_source": "Example response from hunter.io/api-documentation/v2 (2026-09-28), trimmed. Replace with a trimmed real response once HUNTER_API_KEY is set."
+}

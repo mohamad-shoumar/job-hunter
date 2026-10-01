@@ -253,3 +253,76 @@ def test_needs_review_status_for_unclear_eligibility(filters):
     store = JobStore(":memory:")
     ingest(store, filters, SourceResult("test", [make_job(location_raw="Remote")]))
     assert store.get(1)["status"] == NEEDS_REVIEW
+
+
+def test_job_with_no_posting_date_is_not_shortlisted(filters):
+    # Proxify #1495 came from Google Jobs with no date and was months old.
+    store = JobStore(":memory:")
+    ingest(store, filters, SourceResult("test", [make_job(posted_at=None, allowed_locations=["Worldwide"])]))
+    row = store.get(1)
+    assert row["status"] == NEEDS_REVIEW and row["eligibility"] != "unclear"
+    assert "No posting date, so its age is unknown" in json.loads(row["relevance_reasons_json"])
+    assert store.needs_ai_check() == []  # the AI Lebanon check has nothing to answer here
+
+
+def test_six_years_is_too_senior(filters):
+    store = JobStore(":memory:")
+    ingest(store, filters, SourceResult("test", [make_job(required_yoe=6, allowed_locations=["Worldwide"])]))
+    assert store.get(1)["reject_code"] == "too_senior"
+
+
+def test_old_database_gets_the_outreach_tables(tmp_path):
+    import sqlite3
+
+    db = tmp_path / "old.sqlite"
+    old_schema = SCHEMA.split("-- Outreach and tracking")[0]
+    sqlite3.connect(db).executescript(old_schema)
+    store = JobStore(db)
+    tables = {r["name"] for r in store.conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+    assert {"companies", "contacts", "applications", "events", "sent_mail", "mail_seen", "kv"} <= tables
+    assert store.conn.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
+
+
+def test_reclassify_leaves_tracking_alone(tmp_path, filters):
+    import shutil
+
+    from jobhunter import cli, tracking
+
+    from .conftest import ROOT, store_job
+
+    shutil.copytree(ROOT / "config", tmp_path / "config")
+    store = JobStore(tmp_path / "data" / "jobs.sqlite")
+    job_id = store_job(store, filters)
+    tracking.set_stage(store, job_id, tracking.SAVED, NOW)
+    tracking.update_notes(store, job_id, "keep me", NOW)
+    store.commit()
+    store.close()
+    assert cli.main(["--home", str(tmp_path), "reclassify"]) == 0
+    row = tracking.get_application(JobStore(tmp_path / "data" / "jobs.sqlite"), job_id)
+    assert (row["stage"], row["notes"]) == (tracking.SAVED, "keep me")
+
+
+def test_a_failing_outreach_step_still_writes_the_reports(tmp_path, filters, monkeypatch):
+    def broken(*args, **kwargs):
+        raise ValueError("bad config/outreach.json")
+
+    monkeypatch.setattr(pipeline, "run_outreach", broken)
+    (tmp_path / "config").mkdir()
+    http = FakeHttp({greenhouse.API.format(token="gitlab"): fixture_json("greenhouse_gitlab.json")})
+    summary, reports = pipeline.run(Paths(tmp_path), {"greenhouse_boards": [{"company": "GitLab", "board_token": "gitlab"}]},
+                                    filters, http=http, now=NOW)
+    assert reports and reports[0].exists()
+    assert summary.outreach["errors"] == ["outreach: ValueError: bad config/outreach.json"]
+    assert "outreach: ValueError" in reports[0].read_text()
+
+
+def test_the_outreach_step_runs_without_any_keys(tmp_path, filters):
+    from jobhunter.outreach import run_outreach
+
+    from .conftest import store_job
+
+    store = JobStore(":memory:")
+    job_id = store_job(store, filters)
+    summary = run_outreach(store, Paths(tmp_path), [job_id], NOW)
+    assert summary["errors"] == [] and summary["contacts"] is None
+    assert any("HUNTER_API_KEY" in n for n in summary["notes"])

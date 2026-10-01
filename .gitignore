@@ -9,3 +9,6 @@ __pycache__/
 # generated from it. Neither belongs in git.
 data/
 reports/
+
+# macOS folder metadata
+.DS_Store

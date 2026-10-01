@@ -1,0 +1,60 @@
+{
+  "_about": "Cold outreach: who to email, the email, and sending limits. See src/jobhunter/contacts.py, pitch.py, mailer.py and tracking.py. Emails are only ever sent when you click Send in `jobhunter serve`.",
+
+  "_small_company_max_employees": "At or under this size, email the CEO/founder directly (then the CTO). Above it, the head of engineering, then HR/recruiting.",
+  "small_company_max_employees": 50,
+  "_targets": "Roles in the order they are tried. Roles: ceo, founder, cto, eng_lead (head/VP/director of engineering), eng_manager, recruiter, hr.",
+  "small_company_targets": ["ceo", "founder", "cto"],
+  "large_company_targets": ["eng_lead", "eng_manager", "recruiter", "hr"],
+
+  "_skip_companies": "Job boards, staffing agencies and talent marketplaces: there is no hiring manager there to pitch, so these jobs show 'apply through the link'. Matched on the normalized company name.",
+  "skip_companies": [
+    "Proxify", "Jobs for Humanity", "Jobgether", "remote quest jobs", "RemoteHub",
+    "IT Recruiters for Tech Jobs - itrecruiters.technology", "Talentuch", "Workana",
+    "Turing", "Alignerr", "Embedded Shishya", "SynergisticIT", "Crossover", "Toptal",
+    "Braintrust", "Andela", "Lemon.io", "Remotebase", "Ampcus Inc", "Micro1", "Mercor"
+  ],
+
+  "_auto_lookup": "The daily run finds contacts for that run's new shortlisted jobs, best fit first, up to the cap. Date-range runs never do (they would spend the month's credits).",
+  "auto_lookup": true,
+  "max_companies_per_run": 10,
+  "_hunter_reserve_credits": "Hunter lookups stop when fewer credits than this are left, so the Find contact button still works.",
+  "hunter_reserve_credits": 5,
+
+  "_claude_fallback": "When Hunter knows nobody at a company, Claude (small model, 2 web searches, about $0.03-0.05) can look for the person. On click it always works; in the daily run only when this is true.",
+  "claude_fallback_in_daily_run": false,
+  "fallback_model": "claude-haiku-4-5",
+  "fallback_max_searches": 2,
+
+  "_email": "Your email, word for word. {title} is the job title (noise like '- Remote' removed), {name} your name, {company} the company. The body is: Hi <first name>, / Saw you are looking for a {title}. <pitch_text> / <ask_text> / signature (city, phone, LinkedIn link). pitch_mode \"fixed\" uses this text with no AI; \"ai\" lets pitch_model write the second sentence instead.",
+  "pitch_mode": "fixed",
+  "subject_template": "{title} - {name}",
+  "pitch_text": "In three years at a trading firm I went from full-stack developer to leading a team of 5, building the platforms the firm runs on: 800+ concurrent jobs and 115+ AI workflows in production.",
+  "ask_text": "What's the best next step — a screening call or a technical task? I can turn either around this week.",
+
+  "_pitch": "The model writing the 1-2 sentence pitch. deepseek-* models use DEEPSEEK_API_KEY (well under $0.01 per email); claude-* models use ANTHROPIC_API_KEY. The fact guard checks both the same way. Drafts are written in the daily run once a contact is known.",
+  "pitch_model": "deepseek-flash",
+  "auto_draft": true,
+
+  "_follow_up_business_days": "Follow-up 1 after 4 business days (Mon-Fri), follow-up 2 after 7 more. They are due in the Today view; you click to send them.",
+  "follow_up_business_days": [4, 7],
+  "_ghost_after_business_days": "No reply this long after the last follow-up was due: the job moves to Closed (ghosted). A later reply moves it back.",
+  "ghost_after_business_days": 7,
+
+  "_caps": "Emails per day (test sends to yourself do not count). Guessed addresses have their own lower cap, because bounces hurt your Gmail's reputation.",
+  "daily_send_cap": 15,
+  "daily_guessed_cap": 3,
+
+  "_cv": "The CV attached to first emails: a PDF in cv_dir. A file whose name contains the company (Shoumar_FullStack_LigaData_Sep2026.pdf) is used for that company, else default_cv. You can pick another per job in the app.",
+  "cv_dir": "~/Documents/resume/output",
+  "default_cv": "Shoumar_Resume_General.pdf",
+
+  "_tailor": "A CV tailored to one job: the model picks, orders and rewords your profile's bullets and skills for the posting; code checks every line against profile/master_profile.md and keeps your own wording where a rewrite adds anything. The layout comes from resume.md in resume_dir, and its build.py makes the PDF in cv_dir, which then becomes that job's attachment. Click Tailor CV in the app, or let the daily run do its new shortlisted jobs (best fit first, up to max_cvs_per_run). deepseek-* models use DEEPSEEK_API_KEY (about $0.01 a CV), claude-* use ANTHROPIC_API_KEY.",
+  "resume_dir": "~/Documents/resume",
+  "cv_model": "deepseek-v4-pro",
+  "auto_tailor": true,
+  "max_cvs_per_run": 5,
+
+  "_cv_tags": "Which optional profile bullets a tailored CV prints. Each bullet in profile/master_profile.md is tagged: [core] always prints, [lead]/[fullstack]/[automation]/[mobile] only when the job matches that tag - a phrase below in its title, or in the posting (whole words, any case - except a phrase with a capital letter, which must match that case: \"React\" but not \"react to incidents\"). The same tag also picks the role's printed title (Team Lead for lead jobs). Empty means the defaults in cv.py TAG_RULES; a tag you list here replaces that tag's default lists. Example: {\"lead\": {\"title\": [\"lead\", \"manager\"], \"posting\": [\"team lead\", \"mentoring\"]}}",
+  "cv_tags": {}
+}
