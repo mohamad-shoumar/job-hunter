@@ -36,7 +36,10 @@ from .models import ELIGIBLE, HYBRID, LIKELY, NOT_ELIGIBLE, ONSITE, UNCLEAR, Ass
 # --- description scanning ---------------------------------------------------
 
 _PREFIX = r"(?:the\s+|one\s+of\s+the\s+following\s+(?:countries|locations|states|regions)\s*:?\s*)?"
-_PLACE = r"(?P<place>[A-Za-z][A-Za-z .,&/()'\u2019-]{1,60}?)"
+# Long enough for a list of countries ("the United States, Canada (Ontario or
+# British Columbia), Netherlands, Poland, or Czech Republic"). Lazy, so it
+# still stops at the first sentence end.
+_PLACE = r"(?P<place>[A-Za-z][A-Za-z .,&/()'\u2019-]{1,200}?)"
 _END = (
     r"(?=\s*(?:[.;:!?\n]|$)|\s+(?:to|with|who|where|without|at|for|as|is|are|if|during|in order|"
     r"and\s+(?:have|be|are|possess|hold|able|eligible|can|will|must)))"
@@ -86,6 +89,19 @@ _WORLDWIDE_PROSE = re.compile(
     r"|\blocation[- ]independent\b",
     re.I,
 )
+# "Work From Anywhere: work from anywhere in the world 4-weeks each year" is a
+# perk for staff who live in the allowed places, not a hiring rule.
+_TIME_LIMITED = re.compile(
+    r"\b(?:\d+|one|two|three|four|five|six|eight|ten)[- ]?(?:weeks?|days?|months?)\s+(?:each|per|a|every)\s+year\b", re.I
+)
+# About this role, not the company: "Location: this is a Globally remote role".
+# Strong enough to doubt a location field ("Dubai" from Google Jobs).
+_ROLE_WORLDWIDE = re.compile(
+    r"\b(?:this|the)\s+(?:role|position|job|opening)\s+is\s+(?:a\s+)?(?:fully\s+|100%\s+)?"
+    r"(?:globally\s+remote|remote\s+(?:worldwide|globally)|open\s+(?:worldwide|globally))\b"
+    r"|\bthis\s+is\s+a\s+(?:fully\s+|100%\s+)?(?:globally|worldwide)[ -]remote\s+(?:role|position|job)\b",
+    re.I,
+)
 _LEBANON_PROSE = re.compile(r"\b(?:lebanon|beirut)\b", re.I)
 
 
@@ -114,9 +130,11 @@ class DescriptionSignals:
                     self.place_positives.append(_snippet(text, m.start(), m.end()))
         for m in _US_ONLY_BLOCKERS.finditer(text):
             self.restrictions.append(_snippet(text, m.start(), m.end()))
+        for m in _ROLE_WORLDWIDE.finditer(text):
+            self.place_positives.append(_snippet(text, m.start(), m.end()))
         # "we hire around the world": often company boilerplate, not about this role.
-        m = _WORLDWIDE_PROSE.search(text)
-        self.worldwide_prose = _snippet(text, m.start(), m.end()) if m else None
+        prose = (_snippet(text, m.start(), m.end()) for m in _WORLDWIDE_PROSE.finditer(text))
+        self.worldwide_prose = next((s for s in prose if not _TIME_LIMITED.search(s)), None)
         m = _LEBANON_PROSE.search(text)
         self.lebanon = _snippet(text, m.start(), m.end()) if m else None
         self.eor = extract_eor_mentions(text)

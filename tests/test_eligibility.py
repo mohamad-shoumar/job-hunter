@@ -114,3 +114,29 @@ def test_himalayas_timezone_window_without_lebanon():
 
 def test_unknown_remote_status_is_not_treated_as_onsite():
     assert verdict(remote_status=UNKNOWN, allowed_locations=["Worldwide"]).verdict == ELIGIBLE
+
+
+def test_long_country_list_in_description_is_read():
+    # Lithic on We Work Remotely: region "Anywhere in the World", but the text names the countries.
+    rule = (
+        "This is a remote position. However, candidates must be located in the United States, "
+        "Canada (Ontario or British Columbia), Netherlands, Poland, or Czech Republic."
+    )
+    a = verdict(allowed_locations=["Anywhere in the World"], description=rule)
+    assert (a.verdict, a.code) == (UNCLEAR, "conflict")
+    assert "Czech Republic" in a.reasons[0]
+    silent = verdict(location_raw="Remote", description=rule)
+    assert (silent.verdict, silent.code) == (NOT_ELIGIBLE, "residency_required")
+
+
+def test_work_from_anywhere_perk_is_not_worldwide_hiring():
+    perk = "Benefits for Full-Time US Employees:\n- Work From Anywhere: work from anywhere in the world 4-weeks each year"
+    assert verdict(location_raw="Remote", description=perk).code == "no_location_info"
+    hiring = verdict(location_raw="Remote", description="We hire globally and offer 30 days of paid leave.")
+    assert hiring.code == "description_positive"
+
+
+def test_globally_remote_role_questions_a_city_location():
+    # Canonical through Google Jobs: location "Dubai", text says the role is global.
+    a = verdict(location_raw="Dubai", description="Location: this is a Globally remote role")
+    assert (a.verdict, a.code) == (UNCLEAR, "conflict")
