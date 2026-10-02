@@ -138,7 +138,7 @@ def test_the_file_keeps_the_layout_and_prints_only_checked_lines():
     ]
     plan.skipped, plan.titles = skipped, {"R1": "Algorithmic Trader"}
     text = render(lines, matched, rows, plan, "TAILORED for Acme", compact=True)
-    assert text.startswith("// TAILORED for Acme\n# Mohamad Shoumar\ntitle: Backend Engineer - Python & AWS\n")
+    assert text.startswith("// TAILORED for Acme\n# Mohamad Shoumar\ntitle: Backend Engineer\n")  # no tech after it
     assert "location: Beirut, Lebanon\ncompact: yes\n\n## Professional Experience" in text
     assert "Present\nAlgorithmic Trader\n- Architected a serverless platform" in text  # the printed title
     assert f"- {R1[3]}\n- {R1[5]}\n// [lead] - {R1[6]}" in text  # core bullets always print; lead ones not here
@@ -168,11 +168,14 @@ def test_a_faithful_rewrite_passes():
     assert check_bullet("Built REST APIs in Python for the backtesting platform.", [ROLES[2].bullets[0]]) == []
 
 
-def test_the_headline_is_a_target_role():
-    assert check_headline("Backend Engineer - Python & AWS", HEADLINES, PROFILE) == ("Backend Engineer - Python & AWS", None)
-    assert check_headline("Staff Backend Engineer", HEADLINES, PROFILE)[0] == "Backend Engineer"
-    headline, why = check_headline("Python Engineer - Kubernetes & Go", HEADLINES, PROFILE)
-    assert headline == "Python Engineer" and "kubernetes" in why
+def test_the_headline_is_a_target_role_and_nothing_else():
+    assert check_headline("Backend Engineer", HEADLINES) == ("Backend Engineer", None)
+    for asked in ("Backend Engineer - Python & AWS", "Backend Engineer (AWS)", "backend engineer, Python",
+                  "Backend Engineer | Python"):
+        assert check_headline(asked, HEADLINES) == ("Backend Engineer", None), asked  # no tech next to the title
+    assert check_headline("Full Stack Engineer – React", HEADLINES) == ("Full Stack Engineer", None)
+    headline, why = check_headline("Staff Backend Engineer", HEADLINES)
+    assert headline == "Backend Engineer" and "not one of your target roles" in why
 
 
 def test_role_label_names_the_file_like_build_py():
@@ -221,7 +224,7 @@ def test_deepseek_answers_through_the_same_check(filters):
     store = JobStore(":memory:")
     model = JsonModel("deepseek-v4-pro", deepseek_key="ds", http=httpx.Client(transport=httpx.MockTransport(handler)))
     plan, usage, _ = CvWriter(model).plan(job_row(store, filters), "Acme", ROLES, SKILLS, HEADLINES, PROFILE)
-    assert plan.headline == "Backend Engineer - Python & AWS" and usage.cost("deepseek-v4-pro") > 0
+    assert plan.headline == "Backend Engineer" and usage.cost("deepseek-v4-pro") > 0
     assert seen[0]["response_format"] == {"type": "json_object"} and '"headline"' in seen[0]["messages"][0]["content"]
 
 
@@ -268,7 +271,7 @@ def test_tailoring_writes_the_version_builds_it_and_attaches_it(resume, filters)
     meta = tailor_for_job(store, job_id, writer(GOOD), PROFILE_FILE, config_for(resume), NOW, builder=build)
     assert meta["file"] == "Shoumar_Backend_Acme_Sep2026.pdf" and meta["source"] == "versions/Backend_Acme_Sep2026.md"
     assert meta["pages"] == 1 and "compact: yes" in build.sources[1] and "compact: yes" not in build.sources[0]
-    assert meta["gaps"] == ["kafka"] and meta["headline"] == "Backend Engineer - Python & AWS"
+    assert meta["gaps"] == ["kafka"] and meta["headline"] == "Backend Engineer"
     assert meta["tags"] == {} and meta["titles"] == {"R1": "Algorithmic Trader"}
     assert meta["changes"][0].startswith("Core bullets only") and meta["changes"][1:] == GOOD["changes"]
     assert "Present\nAlgorithmic Trader\n- " in build.sources[1] and f"// [lead] - {R1[6]}" in build.sources[1]

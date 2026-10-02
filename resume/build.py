@@ -175,7 +175,7 @@ def build_html(lines, force_compact=False):
 
     contact = []
     if "email" in info:
-        contact.append(f'<a href="mailto:{html.escape(info["email"])}">{html.escape(info["email"])}</a>')
+        contact.append(html.escape(info["email"]))  # plain text, not a link
     if "phone" in info:
         contact.append(html.escape(info["phone"]))
     # Profile links print as a short label; the URL lives in the link.

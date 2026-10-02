@@ -22,7 +22,8 @@ you (see CLAUDE.md):
     until it fits;
   - a skills row only holds skills from the profile row with the same label;
   - the headline is one of your target roles (or the profile's headline),
-    optionally "<role> - <focus>" where the focus uses profile words only;
+    word for word, with nothing next to it ("Backend Engineer", never
+    "Backend Engineer - Python & AWS");
   - there is never a Summary section.
 
 Rewrites that break a rule are sent back once with the reasons, like the
@@ -315,29 +316,15 @@ def check_bullet(text: str, sources: list[str]) -> list[str]:
     return problems
 
 
-def check_headline(text: str, headlines: list[str], profile: Profile) -> tuple[str, str | None]:
-    """(the headline to print, why the asked one was changed or None)."""
+def check_headline(text: str, headlines: list[str]) -> tuple[str, str | None]:
+    """(the headline to print, why the asked one was changed or None). Only the role: anything after it
+    (" - Python & AWS", " (AWS)", ", Python") is dropped, so no technologies print next to the title."""
     text = " ".join(text.split())
-    role, _, focus = text.partition(" - ")
+    role = re.split(r"\s+[-–—|]\s+|\s*[(,:]", text, maxsplit=1)[0].strip()
     allowed = {h.lower(): h for h in headlines}
-    if role.strip().lower() not in allowed:
+    if role.lower() not in allowed:
         return headlines[0], f'the headline "{text}" is not one of your target roles'
-    role, focus = allowed[role.strip().lower()], focus.strip()
-    if not focus:
-        return role, None
-    known = {_root(w) for w in re.findall(r"[a-z0-9]+", profile.facts_text.lower())}
-    problems = [f'"{s}" is not in your profile' for s in extract_skills(focus) if s not in profile.skills]
-    added = [w for w in re.findall(r"[a-z0-9]+", focus.lower()) if w not in ("and", "with") and _root(w) not in known]
-    if added:
-        problems.append(f"{', '.join(added)} not in your profile")
-    for word in _SENIORITY:
-        if re.search(rf"\b{word}\b", focus, re.I) and not re.search(rf"\b{word}\b", profile.facts_text, re.I):
-            problems.append(f'"{word}" is not in your profile')
-    if len(focus.split()) > 5:
-        problems.append("longer than 5 words")
-    if problems:
-        return role, f'the headline focus "{focus}": ' + "; ".join(problems)
-    return f"{role} - {focus}", None
+    return allowed[role.lower()], None
 
 
 # --- what the model asked for, after the checks ---------------------------------------
@@ -361,7 +348,7 @@ def plan_from(answer: dict, roles: list[Role], skills: dict[str, list[str]], hea
               profile: Profile) -> Plan:
     problems: list[str] = []
     notes: list[str] = []
-    headline, why = check_headline(str(answer.get("headline") or ""), headlines, profile)
+    headline, why = check_headline(str(answer.get("headline") or ""), headlines)
     if why:
         problems.append(why)
     asked = {}
@@ -448,8 +435,8 @@ reword. There is no summary section.
 
 Return:
 - headline: one of the allowed headlines, word for word, the closest to the \
-posting's title. You may add " - " and a focus of 2 to 4 words taken from the \
-bullets or skills, e.g. "Backend Engineer - Python & AWS".
+posting's title, and nothing else: no technologies or focus after it ("Backend \
+Engineer", not "Backend Engineer - Python & AWS").
 - roles: for each role (R1, R2, ...), every one of its bullets, the most relevant \
 to this posting first. All of them print: one you leave out is added at the end in \
 its original words. Each bullet has sources (the id of the one bullet it rewords) \
@@ -501,7 +488,7 @@ SCHEMA = {
 }
 
 EXAMPLE = json.dumps({
-    "headline": "Backend Engineer - Python & AWS",
+    "headline": "Backend Engineer",
     "roles": [{"role": "R1", "bullets": [{"sources": ["R1.2"], "text": "..."},
                                          {"sources": ["R1.1"], "text": "..."}]},
               {"role": "R2", "bullets": [{"sources": ["R2.1"], "text": "..."}]}],
