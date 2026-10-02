@@ -33,7 +33,7 @@ A letter that breaks a rule is sent back once with the reasons. A sentence
 that still breaks a fact or "Never use" rule is left out, and the app says
 what was removed and why; a style issue that is left is only noted (a dash
 becomes a comma). The letter is plain text next to the CVs in cv_dir, named
-like Shoumar_CoverLetter_Acme_Oct2026.md, to paste into a form or upload.
+like Doe_CoverLetter_Acme_Oct2026.md, to paste into a form or upload.
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ from datetime import datetime
 from pathlib import Path
 
 from . import tracking
-from .config import OutreachConfig
+from .config import OutreachConfig, my_details
 from .contacts import clean_company_name
 from .cv import TAG_RULES, Role, _camel, _sections, job_tags, parse_titles, printed_title, split_items
 from .extract import _SKILL_RES, extract_skills
@@ -156,8 +156,7 @@ def load_letter_facts(profile_path: Path, tags) -> LetterFacts:
         facts += _bullets(sections.get(name, ""))
     facts += [b for b in _bullets(sections.get("Work authorization and logistics", "")) if b.startswith(_LOGISTICS)]
 
-    basics = {k: v.strip() for k, v in re.findall(r"^- (Name|Email|Phone|LinkedIn|GitHub|Location): (.+)$", text, re.M)
-              if "TODO" not in v}
+    basics = my_details(text)
     joined = "\n".join(facts)
     years = re.search(r"\bAbout (\d+(?:\.\d+)?) years\b", joined)
     return LetterFacts(
@@ -660,7 +659,7 @@ def _words_of(text: str) -> int:
 
 
 def _new_name(folder: Path, last_name: str, company: str, now: datetime) -> str:
-    """Shoumar_CoverLetter_Acme_Oct2026.md, with _2, _3... when that name is taken (never overwrite one by hand)."""
+    """Doe_CoverLetter_Acme_Oct2026.md, with _2, _3... when that name is taken (never overwrite one by hand)."""
     base = f"{last_name or 'Me'}_CoverLetter_{_camel(company)[:30] or 'Company'}_{now:%b%Y}"
     name, n = f"{base}.md", 1
     while (folder / name).exists():

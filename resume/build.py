@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 """Build resume PDFs from text files.
 
-  python3 build.py                     master (resume.md) -> output/Shoumar_Resume_General.pdf
+  python3 build.py                     master (resume.md) -> output/<Last>_Resume_General.pdf
   python3 build.py sync                copy the bullets and titles from the profile into resume.md
   python3 build.py new Backend Stripe [lead fullstack ...]
                                        copy the master to versions/Backend_Stripe_<MonYYYY>.md,
                                        print the optional bullets with those tags and the title
                                        for them, and add a row to applications.csv
-  python3 build.py versions/X.md       that version -> output/Shoumar_X.pdf
+  python3 build.py versions/X.md       that version -> output/<Last>_X.pdf
 
 Lines starting with // are notes: they are kept in the text file but never printed.
+
+Your name and contact lines come from MY_NAME, MY_EMAIL, MY_PHONE, MY_LINKEDIN, MY_GITHUB
+and MY_LOCATION in the project's .env (they win over "# Name" and "email: ..." lines here),
+so resume.md needs none of them. <Last> is the last word of your name.
 
 The bullets live in the profile (PROFILE), each tagged: [core] is always printed,
 anything else only for jobs with that tag (see "Tailoring rules" there). `sync`
@@ -19,6 +23,7 @@ Edit bullets in the profile, then run sync; never edit them here.
 """
 import csv
 import html
+import os
 import re
 import shutil
 import subprocess
@@ -33,6 +38,10 @@ OUTPUT = HERE / "output"
 TRACKER = HERE / "applications.csv"
 # This folder lives inside the job-hunter project, next to profile/.
 PROFILE = HERE.parent / "profile" / "master_profile.md"
+ENV_FILE = HERE.parent / ".env"
+# The header lines filled from .env: "# Name", then "email: ..." and the rest.
+MY_DETAILS = {"name": "MY_NAME", "email": "MY_EMAIL", "phone": "MY_PHONE", "linkedin": "MY_LINKEDIN",
+              "github": "MY_GITHUB", "location": "MY_LOCATION"}
 TRACKER_COLUMNS = ["Company", "Role", "Resume file", "Created", "Applied", "Status", "Notes"]
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
@@ -68,6 +77,32 @@ li { margin-bottom: 1.5pt; }
 .job, p, .skills { margin-bottom: 5pt; }
 .skill { padding: 1pt 0; }
 """
+
+
+def my_details():
+    """{"name": ..., "email": ...} from the environment, else the project's .env (the same rule as the app)."""
+    values = {}
+    if ENV_FILE.is_file():
+        for line in ENV_FILE.read_text().splitlines():
+            key, eq, value = line.strip().removeprefix("export ").partition("=")
+            if eq and not key.startswith("#"):
+                values[key.strip()] = value.strip().strip('"').strip("'")
+    found = {}
+    for field, env in MY_DETAILS.items():
+        value = os.environ.get(env) or values.get(env, "")
+        if value.strip():
+            found[field] = value.strip()
+    return found
+
+
+def link(url):
+    return url if url.startswith(("http://", "https://")) else "https://" + url
+
+
+def owner_last_name(lines):
+    """The last word of MY_NAME, else of the file's "# Name" line: the start of each PDF's name."""
+    name = my_details().get("name") or next((l.strip()[2:] for l in lines if l.strip().startswith("# ")), "")
+    return re.sub(r"[^A-Za-z0-9-]", "", (name.split() or [""])[-1]) or "Resume"
 
 
 def esc(text):
@@ -134,6 +169,9 @@ def build_html(lines, force_compact=False):
             close_list()
             body.append(f"<p>{esc(line)}</p>")
     close_block()
+    details = my_details()
+    name = details.pop("name", name)
+    info.update(details)
 
     contact = []
     if "email" in info:
@@ -143,7 +181,7 @@ def build_html(lines, force_compact=False):
     # Profile links print as a short label; the URL lives in the link.
     for key, label in (("linkedin", "LinkedIn"), ("github", "GitHub")):
         if key in info:
-            contact.append(f'<a href="{html.escape(info[key])}">{label}</a>')
+            contact.append(f'<a href="{html.escape(link(info[key]))}">{label}</a>')
     if "location" in info:
         contact.append(html.escape(info["location"]))
 
@@ -162,9 +200,9 @@ def build_html(lines, force_compact=False):
 def build(src):
     OUTPUT.mkdir(exist_ok=True)
     name = "Resume_General" if src.resolve() == MASTER else src.stem
-    out_pdf = OUTPUT / f"Shoumar_{name}.pdf"
-    out_html = OUTPUT / f"Shoumar_{name}.html"
     lines = src.read_text().splitlines()
+    out_pdf = OUTPUT / f"{owner_last_name(lines)}_{name}.pdf"
+    out_html = OUTPUT / f"{owner_last_name(lines)}_{name}.html"
     # A CV that spills onto a second page is printed again in the compact layout.
     for compact in (False, True):
         out_html.write_text(build_html(lines, force_compact=compact))
@@ -349,7 +387,8 @@ def new_version(role, company, tags=()):
         writer = csv.writer(f)
         if is_new:
             writer.writerow(TRACKER_COLUMNS)
-        writer.writerow([company, role, f"output/Shoumar_{dest.stem}.pdf", today.isoformat(), "", "Draft", ""])
+        writer.writerow([company, role, f"output/{owner_last_name(lines)}_{dest.stem}.pdf", today.isoformat(), "",
+                         "Draft", ""])
 
     rel = dest.relative_to(HERE)
     print(f"Created {rel} (the master{' with ' + ', '.join(tags) if tags else ''}) and added it to applications.csv")

@@ -1,5 +1,6 @@
 <!-- A frozen copy of profile/master_profile.md (2026-09-30) for the tests, which cite its bullets by
-     position. Edit the real profile freely; change this file only together with the tests. -->
+     position, with made-up contact details and salary. Edit the real profile freely; change this file
+     only together with the tests. -->
 # Master profile
 
 > **This file is the only source of facts about me.** Every CV, cover letter and
@@ -25,11 +26,11 @@
 - Headline: Backend Engineer
 - Email: me@example.com
 - Phone: +1 555 010 7788
-- LinkedIn: linkedin.com/in/mohamad-shoumar
+- LinkedIn: linkedin.com/in/example
 - Location: Beirut, Lebanon
 - Open to: remote work as an international contractor, through an employer of record (EOR), or as a direct international employee
 - Open to relocation: TODO
-- GitHub: github.com/mohamad-shoumar
+- GitHub: github.com/example
 - Portfolio: TODO
 - Spoken languages and levels: TODO
 
@@ -56,12 +57,12 @@ real title.
 Printed title: Algorithmic Trader [default] · Team Lead [lead]
 
 - [core] Architected a serverless, event-driven backtesting platform on AWS Lambda and SQS that runs 800+ concurrent Python jobs over historical market datasets with zero production failures. (Confirmed by me 2026-09-30: each backtest's data manifest goes through an SQS request queue with a dead-letter queue.)
-- [core] Designed its failure handling so no job is silently lost: SQS dead-letter queue with redrive, idempotent PostgreSQL result writes with retry and backoff, and idempotent credit refunds for failed or timed-out jobs. (Confirmed by me 2026-09-30: I built the Lambda system and its SQS + DLQ; details from an internal repo.)
+- [core] Designed its failure handling so no job is silently lost: SQS dead-letter queue with redrive, idempotent PostgreSQL result writes with retry and backoff, and idempotent credit refunds for failed or timed-out jobs. (Confirmed by me 2026-09-30: I built the Lambda system and its SQS + DLQ.)
 - [core] Built a comprehensive test suite covering the full testing pyramid, creating quality gates that let the team move toward agentic engineering loops while preserving code quality and maintainability. (Confirmed by me 2026-09-30.)
 - [core] Designed and implemented a slippage model that improves backtest realism and trading cost accuracy.
 - [core] Led development of a multi-position scaling feature, enabling advanced position sizing strategies.
 - [lead] Lead a team of 5 engineers through sprint planning, code reviews, and a strict unit and integration testing culture.
-- [fullstack, lead] Built the interactive backtest chart in Next.js and TypeScript on TradingView Lightweight Charts: trade entry/exit markers, indicator panes and win/loss filters, with candle and indicator data lazy-loaded as the user pans. (Confirmed by me 2026-09-30: my commits in an internal repo, Apr-Aug 2026. The divergence pivots and the "Why this trade?" panel are a teammate's work, never claim them.)
+- [fullstack, lead] Built the interactive backtest chart in Next.js and TypeScript on TradingView Lightweight Charts: trade entry/exit markers, indicator panes and win/loss filters, with candle and indicator data lazy-loaded as the user pans. (Confirmed by me 2026-09-30: my commits, Apr-Aug 2026. Two of its panels are a teammate's work, never claim them.)
 - [automation] Built and own an internal LLM automation flow that uses AI agents for extraction, classification, and triage, with validation gates that check every output before it ships - 115+ version-controlled workflows covering code review, release QA, and deploy gates.
 - [automation] Own third-party API integrations end to end, including an event-driven Slack gateway that routes authenticated events, enforces scoped permissions, and reliably handles bot-to-bot messages in production. (Confirmed by me 2026-09-27; from the spare bullets in `~/Documents/resume/resume.md`.)
 - TODO: did I do the switch from the SQS response queue (job status) to direct PostgreSQL writes? The current code calls the response queue legacy.

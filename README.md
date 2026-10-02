@@ -18,7 +18,9 @@ see "Run it daily" for why it is not on the Desktop itself).
 ```sh
 cd ~/job-hunter
 python3 -m venv .venv && .venv/bin/pip install -e ".[dev,web]"
-cp .env.example .env          # optional keys: see "Outreach and tracking" and "Config"
+cp .env.example .env          # your name and contact (MY_*), optional keys: see "Config"
+cp profile/master_profile.example.md profile/master_profile.md   # your facts (not in git)
+cp resume/resume.example.md resume/resume.md                     # your base CV (not in git)
 .venv/bin/jobhunter run       # about a minute
 open reports/$(date +%F).md
 .venv/bin/jobhunter serve     # the web app, http://127.0.0.1:8765
@@ -165,7 +167,7 @@ looks up in a date-range run (that would spend the month).
 AI and no cost:
 
 ```
-Subject: Full Stack Engineer - Mohamad Shoumar
+Subject: Full Stack Engineer - Jane Doe
 
 Hi Rima,
 
@@ -176,17 +178,20 @@ the firm runs on: 800+ concurrent jobs and 115+ AI workflows in production.
 What's the best next step — a screening call or a technical task? I can turn
 either around this week.
 
-Mohamad Shoumar
+Jane Doe
 Beirut · +15550107788 · LinkedIn
 ```
+
+The name, city, phone and LinkedIn come from `MY_NAME`, `MY_LOCATION`,
+`MY_PHONE` and `MY_LINKEDIN` in `.env`.
 
 - The title has noise like "- Remote" or "(m/f/d)" removed.
 - Emails go out as plain text ("LinkedIn: https://…") plus an HTML copy, where
   "LinkedIn" is a link.
 - The CV is attached to the first email: a PDF from `cv_dir`
   (`resume/output`). The job's tailored CV (below) wins, then a
-  file named after the company (`Shoumar_FullStack_LigaData_Sep2026.pdf`),
-  else `default_cv`; you can pick another, or "No CV", per job. Follow-ups
+  file named after the company (`Doe_FullStack_LigaData_Sep2026.pdf`),
+  else `default_cv` (empty: `<Last name>_Resume_General.pdf`, the master CV); you can pick another, or "No CV", per job. Follow-ups
   carry no attachment.
 
 **Tailored CVs** (`src/jobhunter/cv.py`). The CV box in each job has **Tailor
@@ -278,16 +283,18 @@ then only noted (a dash left over becomes a comma).
 A letter that breaks a rule is sent back once with the reasons; a sentence
 that still breaks one is left out, and the box lists what was left out and
 why, plus names from the posting to check by eye. The letter is
-`resume/output/Shoumar_CoverLetter_<Company>_<MonYYYY>.md`, plain text to paste
+`resume/output/<Last name>_CoverLetter_<Company>_<MonYYYY>.md`, plain text to paste
 into a form or upload; a file you made by hand is never overwritten (`_2`).
 The box shows the file as it is now, so your edits stay. The daily run writes
 one for each new shortlisted job (`auto_cover`, `max_covers_per_run`, same
 catch-up), and each job in the daily report links its tailored CV and cover
 letter.
 
-**The resume folder** is `resume/` in this project: `build.py` and `resume.md`
-(both in git), and what they produce, `versions/`, `output/` and
-`applications.csv` (not in git, like `reports/`). It is inside the project, not
+**The resume folder** is `resume/` in this project: `build.py` (in git),
+`resume.md`, your base CV (not in git: start from `resume.example.md`), and
+what they produce, `versions/`, `output/` and `applications.csv` (not in git,
+like `reports/`). The name and contact lines on every CV come from `MY_*` in
+`.env`, so `resume.md` needs none. It is inside the project, not
 in `~/Documents`, because macOS keeps background jobs (the daily run) out of
 Documents. `resume_dir` and `cv_dir` in `config/outreach.json` may be relative
 to the project.
@@ -389,17 +396,20 @@ Ashby (`kraken.com`), and Token Metrics' Lever board no longer exists (disabled)
 - `config/outreach.json` — who to target by size, the job-board skip list,
   lookup and send limits, follow-up days, the models, the resume folder, and the
   CV and cover letter settings.
-- `.env` — `SERPAPI_API_KEY`, `ANTHROPIC_API_KEY`, `DEEPSEEK_API_KEY`, `HUNTER_API_KEY`,
+- `.env` — about you: `MY_NAME`, `MY_EMAIL`, `MY_PHONE`, `MY_LINKEDIN`, `MY_GITHUB`,
+  `MY_LOCATION` (printed on CVs, cover letters and emails; each wins over the same
+  Basics line in the profile). Keys: `SERPAPI_API_KEY`, `ANTHROPIC_API_KEY`, `DEEPSEEK_API_KEY`, `HUNTER_API_KEY`,
   `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD`, and `CLAUDE_CODE_BIN` if `claude` is not in
   `~/.local/bin` or on PATH. Not in git; keep it that way.
 - `config/cover_letter_guidelines.md` — how cover letters read (see Cover letters).
-- `profile/master_profile.md` — the facts about you. **CV tailoring and cover letters may
+- `profile/master_profile.md` — the facts about you, not in git (start from
+  `profile/master_profile.example.md`, a made-up person). **CV tailoring and cover letters may
   reorder, emphasize, rephrase and remove; they must never add anything that is not in this file.**
 
 ## Run it daily
 
 A macOS launchd job (`scripts/local.jobhunter.daily.plist`, installed in
-`~/Library/LaunchAgents/`) runs `scripts/run_daily.sh` every day at 09:00 local
+`~/Library/LaunchAgents/` with your paths filled in, see the top of that file) runs `scripts/run_daily.sh` every day at 09:00 local
 time. If the Mac is asleep at 09:00 it runs on wake; if the Mac is off, that day
 is skipped. Output goes to `data/run.log`; launchd's own errors go to
 `~/Library/Logs/jobhunter.log`.
@@ -410,7 +420,7 @@ launchctl print gui/$(id -u)/local.jobhunter.daily | grep "last exit"
 launchctl bootout gui/$(id -u)/local.jobhunter.daily      # stop the schedule
 ```
 
-To change the time, edit `Hour`/`Minute` in the plist, copy it to
+To change the time, edit `Hour`/`Minute` in the plist, install it in
 `~/Library/LaunchAgents/` again, then `bootout` and `bootstrap` it.
 
 The project is not inside `~/Desktop` on purpose: macOS blocks background jobs

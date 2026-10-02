@@ -18,7 +18,7 @@ from jobhunter.report import _prepared_line
 from jobhunter.store import JobStore
 from jobhunter.web.app import create_app
 
-from .conftest import FIXTURES, NOW, ROOT, store_job
+from .conftest import FIXTURES, NOW, ROOT, YOUR_PROFILES, store_job
 from .test_pitch import FakeClient
 from .test_web import AUTH, TOKEN, FakeServices
 
@@ -58,16 +58,19 @@ def test_the_letter_uses_the_facts_the_cv_prints():
     assert "Lead a team of 5" not in text  # the [lead] bullet: only for lead jobs, like on the CV
     assert "Lead a team of 5" in load_letter_facts(PROFILE_FILE, {"lead"}).text
     assert "working remotely from Beirut, Lebanon" in text and "Confirmed by me" not in text
-    assert "3500" not in text and "TODO" not in text and "961" not in text  # never salary, notes or contact
+    assert "4200" not in text and "TODO" not in text and "7788" not in text  # never salary, notes or contact
     assert not any(f.startswith("[") or "[core]" in f for f in FACTS.facts)
     assert FACTS.years == 3.3 and FACTS.name == "Mohamad Shoumar" and FACTS.location == "Beirut, Lebanon"
     assert FACTS.contact[0] == "me@example.com" and "kafka" not in FACTS.skills
 
 
-def test_your_profile_gives_a_letter_something_to_say():
-    """The real profile, by shape only, so editing it never breaks the tests."""
-    facts = load_letter_facts(ROOT / "profile" / "master_profile.md", set())
-    assert facts.name and facts.contact and len(facts.facts) >= 5
+@pytest.mark.parametrize("path", YOUR_PROFILES)
+def test_your_profile_gives_a_letter_something_to_say(path, monkeypatch):
+    """The real profile, by shape only, so editing it never breaks the tests. Name and contact come from .env."""
+    monkeypatch.setenv("MY_NAME", "Jane Doe")
+    monkeypatch.setenv("MY_EMAIL", "jane@example.com")
+    facts = load_letter_facts(path, set())
+    assert facts.name == "Jane Doe" and facts.contact[0] == "jane@example.com" and len(facts.facts) >= 5
     assert not any("TODO" in f or "Compensation" in f or "(Confirmed" in f for f in facts.facts)
 
 
@@ -263,7 +266,7 @@ def test_a_bad_letter_is_sent_back_once_with_the_reasons(filters):
     letter, usage, attempts = w.write(job_row(store, filters), "Acme", FACTS, ["Kafka"])
     assert attempts == 2 and letter.removed == [] and letter.problems == []
     sent = w.model.claude.calls
-    assert "1. About 3.3 years" in sent[0]["messages"][0]["content"] and "3500" not in sent[0]["messages"][0]["content"]
+    assert "1. About 3.3 years" in sent[0]["messages"][0]["content"] and "4200" not in sent[0]["messages"][0]["content"]
     assert "Asked for, not in the facts (found by code; there may be others): Kafka" in sent[0]["messages"][0]["content"]
     assert "kubernetes" in sent[1]["messages"][-1]["content"] and "1000+" in sent[1]["messages"][-1]["content"]
 

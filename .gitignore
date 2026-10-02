@@ -13,8 +13,14 @@ reports/
 # macOS folder metadata
 .DS_Store
 
-# The resume folder: build.py and resume.md are tracked; the CVs, cover letters and
-# the applications sheet it produces are personal output, like reports/.
+# You: your profile and master CV are yours, not code. Git has an example of each
+# (*.example.md, a made-up person); copy it and fill it in. Your name and contact
+# details go in .env (MY_NAME, MY_EMAIL, ...).
+profile/master_profile.md
+resume/resume.md
+
+# The resume folder: build.py is tracked; the CVs, cover letters and the
+# applications sheet it produces are personal output, like reports/.
 resume/versions/
 resume/output/
 resume/applications.csv

@@ -27,6 +27,10 @@ def _load(args) -> tuple[Paths, dict, Filters]:
     if not paths.sources_file.exists():
         raise SystemExit(f"no config at {paths.sources_file} (run from the project folder or pass --home)")
     load_dotenv(paths.env_file)
+    if not paths.profile_file.exists():
+        # Your profile is not in git: a fresh copy of the project starts from the example.
+        print(f"No {paths.profile_file.relative_to(paths.root)} yet, so no CVs, cover letters or emails: copy "
+              "profile/master_profile.example.md there and fill it in.", file=sys.stderr)
     return paths, load_json(paths.sources_file), Filters.load(paths.filters_file)
 
 

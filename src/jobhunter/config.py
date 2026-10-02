@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass, field, fields
 from pathlib import Path
 
@@ -75,6 +76,22 @@ def load_dotenv(path: Path) -> None:
             os.environ[key] = value
 
 
+# Your contact details live in .env, so no file in git holds them. Each one wins over the same
+# "- Email: ..." line in the profile's Basics, which still works when .env leaves it empty.
+MY_DETAILS = {"Name": "MY_NAME", "Email": "MY_EMAIL", "Phone": "MY_PHONE", "LinkedIn": "MY_LINKEDIN",
+              "GitHub": "MY_GITHUB", "Location": "MY_LOCATION"}
+
+
+def my_details(profile_text: str) -> dict[str, str]:
+    """{"Name": ..., "Email": ...}: the MY_* values from .env, else the profile's Basics lines. TODO ones are left out."""
+    found = {k: v.strip() for k, v in re.findall(r"^- (Name|Email|Phone|LinkedIn|GitHub|Location): (.+)$",
+                                                 profile_text, re.M)}
+    for key, env in MY_DETAILS.items():
+        if os.environ.get(env, "").strip():
+            found[key] = os.environ[env].strip()
+    return {k: v for k, v in found.items() if v and "TODO" not in v}
+
+
 def load_json(path: Path) -> dict:
     with path.open() as f:
         return json.load(f)
@@ -142,10 +159,11 @@ class OutreachConfig:
     daily_send_cap: int = 15
     daily_guessed_cap: int = 3
     # CVs to attach: PDFs in this folder. A file whose name contains the company (e.g.
-    # Shoumar_FullStack_LigaData_Sep2026.pdf) is picked for that company, else default_cv.
+    # Doe_FullStack_LigaData_Sep2026.pdf) is picked for that company, else default_cv. Empty
+    # default_cv means the master CV build.py makes: <Last name>_Resume_General.pdf.
     # A relative path is inside the project folder.
     cv_dir: str = "resume/output"
-    default_cv: str = "Shoumar_Resume_General.pdf"
+    default_cv: str = ""
     # Tailored CVs (cv.py): resume.md (the layout) and build.py live in resume_dir; build.py
     # writes the PDFs into its output/ folder, which is cv_dir.
     resume_dir: str = "resume"

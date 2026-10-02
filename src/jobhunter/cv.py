@@ -561,7 +561,8 @@ def tailor_note(config: OutreachConfig) -> str | None:
             return (f"Tailoring cannot read {config.resume_dir} from here (macOS blocks background jobs from "
                     "Documents): use Tailor CV in the app, or move resume_dir out of ~/Documents")
         except OSError:
-            return f"Tailoring needs {name} in {config.resume_dir} (resume_dir in config/outreach.json)"
+            hint = " (copy resume.example.md to resume.md)" if name == "resume.md" else ""
+            return f"Tailoring needs {name} in {config.resume_dir}{hint} (resume_dir in config/outreach.json)"
     return key_note(config.cv_model, "Tailoring")
 
 
@@ -757,7 +758,7 @@ MAX_EDIT_CHARS = 40_000
 def version_of(config: OutreachConfig, company: str, app) -> Path | None:
     """The versions/<name>.md behind the job's CV, or None.
 
-    First the CV the job uses (build.py makes output/Shoumar_X.pdf from versions/X.md), then its
+    First the CV the job uses (build.py makes output/<Last name>_X.pdf from versions/X.md), then its
     tailored one. The general CV (resume.md) is not editable here: change the profile and run
     `build.py sync` for that. Only a file that already exists in versions/ is ever returned.
     """

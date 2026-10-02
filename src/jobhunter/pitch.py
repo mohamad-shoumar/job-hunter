@@ -1,6 +1,6 @@
 """The cold email. By default fixed text from config/outreach.json (pitch_mode "fixed"):
 
-    Subject: <title> - Mohamad Shoumar
+    Subject: <title> - <your name>
 
     Hi <first name>,
 
@@ -8,8 +8,8 @@
 
     What's the best next step — a screening call or a technical task? I can turn either around this week.
 
-    <name>
-    Beirut · +15550107788 · LinkedIn (a link)
+    <your name>
+    <city> · <phone> · LinkedIn (a link)     (MY_* in .env)
 
 With pitch_mode "ai", the model writes the sentence after "Saw you are looking
 for a <title>." instead, and the checks below apply to it.
@@ -41,7 +41,7 @@ from datetime import datetime
 from pathlib import Path
 
 from . import tracking
-from .config import OutreachConfig
+from .config import OutreachConfig, my_details
 from .contacts import ROLE_LABELS, chosen_contact, clean_company_name
 from .extract import extract_skills
 from .llm import Usage, model_params
@@ -101,7 +101,7 @@ def split_tags(text: str) -> tuple[frozenset[str], str]:
 
 def load_profile(path: Path) -> Profile:
     text = path.read_text()
-    basics = dict(re.findall(r"^- (Name|LinkedIn|GitHub|Phone|Location): (.+)$", text, re.M))
+    basics = my_details(text)
     sections = re.split(r"^## ", text, flags=re.M)
     facts: list[str] = []
     for section in sections:
@@ -396,7 +396,7 @@ def linkedin_url(profile: Profile) -> str | None:
 
 
 def signature(profile: Profile) -> str:
-    """Name, then "Beirut · +15550107788 · LinkedIn <url>". The HTML copy turns LinkedIn into a link."""
+    """Name, then "Lisbon · +15550107788 · LinkedIn <url>". The HTML copy turns LinkedIn into a link."""
     url = linkedin_url(profile)
     phone = profile.phone.replace(" ", "") if profile.phone else None
     details = " · ".join(x for x in (profile.city, phone, f"LinkedIn <{url}>" if url else None) if x)
@@ -486,7 +486,16 @@ def cv_for(config: OutreachConfig, company: str, chosen: str | None) -> Path | N
     named = [o for o in options if key and key in re.sub(r"[^a-z0-9]", "", o.lower())]
     if named:
         return folder / named[0]
-    return folder / config.default_cv if config.default_cv in options else None
+    name = default_cv(config, options)
+    return folder / name if name else None
+
+
+def default_cv(config: OutreachConfig, options: list[str] | None = None) -> str | None:
+    """default_cv from outreach.json, else the master CV build.py makes (<Last name>_Resume_General.pdf)."""
+    options = cv_options(config) if options is None else options
+    if config.default_cv:
+        return config.default_cv if config.default_cv in options else None
+    return next((o for o in options if o.endswith("_Resume_General.pdf")), None)
 
 
 def follow_up(seq: int, subject: str, contact: sqlite3.Row | None, company: str, title: str,

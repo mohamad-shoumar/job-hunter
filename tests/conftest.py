@@ -6,12 +6,17 @@ from pathlib import Path
 
 import pytest
 
-from jobhunter.config import Filters
+from jobhunter.config import MY_DETAILS, Filters
 from jobhunter.models import REMOTE, Job
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = Path(__file__).parent / "fixtures"
 NOW = datetime(2026, 9, 25, 12, 0, tzinfo=timezone.utc)
+# Your profile (not in git, so a fresh copy has none) and the made-up example that is: tests check their shape only.
+YOUR_PROFILES = [
+    pytest.param(path, id=path.name, marks=pytest.mark.skipif(not path.exists(), reason=f"no {path.name} (not in git)"))
+    for path in (ROOT / "profile" / "master_profile.md", ROOT / "profile" / "master_profile.example.md")
+]
 
 
 def fixture_text(name: str) -> str:
@@ -50,9 +55,9 @@ class FakeHttp:
 @pytest.fixture(autouse=True)
 def no_real_keys(monkeypatch):
     """Tests never reach Hunter, Claude or Gmail, even when the shell has the keys set, and never run the
-    Claude Code CLI, even where it is installed."""
+    Claude Code CLI, even where it is installed. Your MY_* details are cleared too, so the fixtures' own apply."""
     for name in ("HUNTER_API_KEY", "ANTHROPIC_API_KEY", "DEEPSEEK_API_KEY", "GMAIL_ADDRESS", "GMAIL_APP_PASSWORD",
-                 "SERPAPI_API_KEY", "CLAUDE_CODE_BIN"):
+                 "SERPAPI_API_KEY", "CLAUDE_CODE_BIN", *MY_DETAILS.values()):
         monkeypatch.delenv(name, raising=False)
 
     def no_claude_code(*args, **kwargs):

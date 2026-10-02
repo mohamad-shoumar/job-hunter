@@ -21,7 +21,7 @@ from jobhunter.store import JobStore
 from jobhunter.text import iso
 from jobhunter.web.app import create_app
 
-from .conftest import FIXTURES, NOW, ROOT, store_job
+from .conftest import FIXTURES, NOW, ROOT, YOUR_PROFILES, store_job
 from .test_pitch import PROFILE, FakeClient
 from .test_web import AUTH, TOKEN, FakeServices
 
@@ -69,9 +69,10 @@ def test_facts_come_from_the_profile():
     assert SKILLS["Tools & Platforms"][-1] == "AI coding agents (Claude Code)"
 
 
-def test_your_profile_is_well_formed():
+@pytest.mark.parametrize("path", YOUR_PROFILES)
+def test_your_profile_is_well_formed(path):
     """The real profile, by shape only, so editing it never breaks the tests - but a typo still shows up here."""
-    roles, skills, headlines = load_facts(ROOT / "profile" / "master_profile.md")
+    roles, skills, headlines = load_facts(path)
     known = set(TAG_RULES) | {"core"}
     assert roles and skills and headlines
     for role in roles:
@@ -195,7 +196,7 @@ def test_a_bad_rewrite_is_sent_back_once(filters):
     assert attempts == 2 and plan.problems == [] and plan.bullets["R1"][0].startswith("Architected a serverless")
     first = client.calls[0]
     assert first["output_config"]["format"]["type"] == "json_schema" and first["thinking"] == {"type": "disabled"}
-    assert "R1.1: Architected" in first["messages"][0]["content"] and "961" not in first["messages"][0]["content"]
+    assert "R1.1: Architected" in first["messages"][0]["content"] and "7788" not in first["messages"][0]["content"]
     assert "1000+" in client.calls[1]["messages"][-1]["content"]
 
 

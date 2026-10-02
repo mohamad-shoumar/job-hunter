@@ -29,9 +29,9 @@ def check(pitch, hook="I saw your Backend Engineer posting.", evidence=(), subje
 def test_profile_facts_leave_out_contact_details_and_salary():
     text = PROFILE.facts_text
     assert "800+ concurrent Python jobs" in text and "team of 5 engineers" in text
-    assert "961" not in text and "3500" not in text and "me@example" not in text and "TODO" not in text
+    assert "7788" not in text and "4200" not in text and "me@example.com" not in text and "TODO" not in text
     assert PROFILE.years == 3.3
-    assert PROFILE.linkedin == "linkedin.com/in/mohamad-shoumar" and "kafka" not in PROFILE.skills
+    assert PROFILE.linkedin == "linkedin.com/in/example" and "kafka" not in PROFILE.skills
 
 
 def test_real_facts_pass():
@@ -84,7 +84,7 @@ def test_the_email_is_your_template(filters):
         "workflows in production.\n\n"
         "What's the best next step — a screening call or a technical task? I can turn either around this week.\n\n"
         "Mohamad Shoumar\n"
-        "Beirut · +15550107788 · LinkedIn <https://www.linkedin.com/in/mohamad-shoumar/>"
+        "Beirut · +15550107788 · LinkedIn <https://www.linkedin.com/in/example/>"
     )
     assert "looking for an AI Engineer." in assemble("x.", None, "Acme", "AI Engineer", PROFILE)
 
@@ -94,8 +94,8 @@ def test_the_plain_copy_spells_out_the_link():
 
 
 def test_the_html_version_links_linkedin():
-    html = to_html("Hi,\n\nMohamad Shoumar\nBeirut · LinkedIn <https://www.linkedin.com/in/mohamad-shoumar/> · CV attached")
-    assert '<a href="https://www.linkedin.com/in/mohamad-shoumar/">LinkedIn</a>' in html and "<br>" in html
+    html = to_html("Hi,\n\nMohamad Shoumar\nBeirut · LinkedIn <https://www.linkedin.com/in/example/> · CV attached")
+    assert '<a href="https://www.linkedin.com/in/example/">LinkedIn</a>' in html and "<br>" in html
 
 
 def test_the_cv_is_picked_by_company(tmp_path):
@@ -149,7 +149,7 @@ def test_a_bad_draft_is_retried_with_the_reasons(filters):
     assert first["thinking"] == {"type": "disabled"} and first["output_config"]["format"]["type"] == "json_schema"
     assert "claims 5 years" in client.calls[1]["messages"][-1]["content"]
     assert "ONE line" in first["system"] and draft.subject == "Senior Backend Engineer - Mohamad Shoumar"
-    assert "961" not in first["messages"][0]["content"]  # the phone number never reaches the model
+    assert "7788" not in first["messages"][0]["content"]  # the phone number never reaches the model
 
 
 def test_a_draft_that_stays_bad_is_blocked(filters):
