@@ -4,6 +4,9 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .env
+# Tokens other tools leave in the project (e.g. resume/.clickup_token).
+.clickup_token
+*.token
 
 # Runtime state and output: the database is the system's memory, reports are
 # generated from it. Neither belongs in git.
