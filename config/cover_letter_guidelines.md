@@ -28,7 +28,9 @@ every sentence you write against the engineer's numbered facts.
 Keep three things in mind:
 
 - **The reader is fast.** Many hiring managers spend under 30 seconds on a
-  letter. The first two sentences decide whether they read the rest.
+  letter. The first two sentences decide whether they read the rest, and
+  the last one is what they remember. Spend your best material on the
+  opening and the closing.
 - **Polish is free now.** Since AI writing tools spread, a smooth, tailored
   letter no longer tells an employer much, because everyone can make one.
   What still works is something specific and checkable: a real system the
@@ -63,11 +65,28 @@ Keep three things in mind:
 
 ## 4. Opening
 
-- Starting with "I" is fine. "I'm applying for the Backend Engineer role
-  because..." is a good opening when the "because" is specific.
-- Name the role, then give one concrete reason this job fits: a problem the
-  posting says the team has, or one part of the work that matches something
-  the engineer built.
+The opening is the most important part of the letter. Its job is to make
+the reader think "this person has done our hard part before".
+
+- **Never announce the application.** No "I'm applying for the X role", "I
+  am writing to apply", "please accept my application". The reader is on
+  the application page for that job, and the letter's header already names
+  it. That sentence spends the best line of the letter on something they
+  know. Code removes it.
+- **Lead with the match.** Put the posting's hardest or most central
+  problem next to the thing the engineer built that solves the same kind
+  of problem. Name the real system, and if it fits, one number from the
+  fact. Two sentences at most.
+- Good shapes (write your own, never copy these):
+  - The connection: "Making sure no payment event gets lost is the same
+    problem I solved for our backtesting platform: 800+ concurrent Python
+    jobs on AWS Lambda without a production failure."
+  - The thing built, then why it matters here: "I built the job system
+    behind CoinQuant's backtesting platform, and your ingestion pipeline
+    has the same shape: long, multi-step jobs that must never fail
+    silently."
+- Starting with "I" is fine. Naming the company is fine. Naming the job
+  title is not needed; do it only when the title itself carries the match.
 - **Do not read the company's own description back to them.** "Slite is
   expanding its vision with Super, a second product that..." tells them what
   they wrote. They learn nothing about the engineer.
@@ -134,15 +153,23 @@ Code writes the gap sentence, not you. You only choose which gap, if any.
 
 ## 8. Closing
 
-- One or two sentences. A concrete offer and a thank-you is enough.
-  "I'd be glad to walk you through how the platform handles failed jobs.
-  Thanks for reading." Other shapes work too: a plain line about timing or
-  time zone, or simply "Happy to talk whenever suits you."
+The closing is the second most important part: it is the last thing read.
+
+- One or two sentences. Tie back to the main story and offer something
+  concrete to talk about, aimed at the posting's problem. "I'd be glad to
+  walk you through how the platform handles failed jobs, since that's the
+  part your pipeline can't get wrong." A short thank-you after it is fine.
+- **No logistics.** Never mention time zone, working hours, location,
+  notice period, start date or availability, in the closing or anywhere
+  else. The header shows where the engineer is, and the application form
+  asks for the rest. A logistics line as the last sentence turns the
+  letter's final impression into admin. Code removes it.
 - Nothing new about the engineer, no summary of the letter, no restated
   enthusiasm.
 - Not "I would welcome the chance to discuss how I can contribute", not
   "thank you for your time and consideration", not "I look forward to
-  hearing from you".
+  hearing from you", not a bare "Happy to talk whenever suits you" with
+  nothing specific in it.
 
 ## 9. Voice
 
@@ -263,6 +290,10 @@ sentence (for example "comprehensive test suite").
 
 ### Patterns to avoid
 
+- An opening that announces the application: "I'm applying for", "I am
+  writing to apply", "please accept my application".
+- Logistics anywhere in the opening or closing: time zone, UTC, notice,
+  start date, "based in", "I work remotely from".
 - A paragraph that opens by restating the posting: "The role calls for",
   "The role asks for", "The posting emphasizes", "You need", "<Company>
   values".
@@ -311,9 +342,9 @@ start or end with the same sentence.
 - Before: "Slite is expanding its vision with Super, a second product that
   makes AI ready-to-use at work by syncing company data and providing teams
   with powerful recipes and tools."
-- After: "I'm applying for the Product Engineer role on Super. You want
-  someone who builds a feature end to end, and at CoinQuant I built both the
-  Python API and the interface of our backtesting platform."
+- After: "Super needs features built end to end, from the API to the
+  screen. At CoinQuant I built both halves of our backtesting platform: the
+  Python API and the interface on top of it."
 
 **A CV bullet pasted in whole (this fact, in nearly these words, was in all six letters).**
 
@@ -351,6 +382,23 @@ start or end with the same sentence.
   engineer built, and three gaps in a row read as three reasons to say no.
   If the posting lists Kubernetes as a must-have, name that one alone.
 
+**An opening that announces the application.**
+
+- Before: "I'm applying for the Full Stack Engineer role. You want someone
+  who owns features end to end with real depth on the backend."
+- After: "At CoinQuant I own the backtesting platform end to end: the job
+  system on AWS Lambda and SQS behind it, and the Next.js chart users see."
+  The header already says Full Stack Engineer.
+
+**A closing that ends on logistics.**
+
+- Before: "I'm in Beirut on UTC+2 in winter and UTC+3 in summer, the same
+  as EET. Happy to walk you through the failure handling whenever suits
+  you."
+- After: "I'd be glad to walk you through how failed jobs are retried and
+  refunded, since a lost job is the failure your platform can least
+  afford."
+
 **A closing made of filler.**
 
 - Before: "I'd bring a scrappy, automation-first mindset to Dremio's
@@ -365,9 +413,9 @@ For a made-up posting: Backend Engineer at Northwind, a payments API. The
 posting says the hardest part of the job is making sure no payment event is
 lost, and asks for Python, PostgreSQL and message queues.
 
-> I'm applying for the Backend Engineer role. Your posting says the hard part
-> is making sure no payment event gets lost, and that's the same problem I
-> solved for our backtesting platform at CoinQuant.
+> Making sure no payment event gets lost is the same problem I solved for
+> the backtesting platform at CoinQuant. There, a job that fails is never
+> silently dropped.
 >
 > Each backtest is a Python job on AWS Lambda, fed by an SQS queue. I built
 > that system, and it runs 800+ concurrent jobs without a production failure.
@@ -376,19 +424,20 @@ lost, and asks for Python, PostgreSQL and message queues.
 > retry never saves a result twice.
 >
 > Before that I led our move from Bazel to Poetry for the Python services,
-> which made builds reproducible and dependencies simpler to manage. I've
-> worked remotely from Beirut for CoinQuant since 2023.
+> which made builds reproducible and dependencies simpler to manage.
 >
-> I'd be glad to walk you through the failure handling in more detail. Thanks
-> for reading.
+> I'd be glad to walk you through the retry and refund path, since that's
+> the part a payments API can't get wrong. Thanks for reading.
 
-About 145 words. One main story, one supporting point, one line of
-logistics. No sentence restates the posting except the opening's one reason.
+About 145 words. The opening puts their hardest problem next to the
+engineer's system, without naming the job title. One main story, one
+supporting point. The closing comes back to the same story. No logistics.
 
 ## 15. Check before you answer
 
 - [ ] 150 to 250 words, never over 300.
-- [ ] The opening names the role and gives one specific reason.
+- [ ] The opening does not announce the application; it puts the
+      posting's main problem next to something the engineer built.
 - [ ] One main story, told in plain words, not pasted from a bullet.
 - [ ] No paragraph opens by restating the posting.
 - [ ] Every fact about the engineer is in the numbered facts; no feelings,
@@ -396,7 +445,8 @@ logistics. No sentence restates the posting except the opening's one reason.
 - [ ] No word or phrase from "Never use", at most one from "Use at most one".
 - [ ] No em dash.
 - [ ] At most one gap chosen, and only a central, required one.
-- [ ] The closing is one or two plain sentences.
+- [ ] The closing is one or two plain sentences that come back to the main
+      story. No time zone, location, notice or availability.
 - [ ] Notes say which sentence the engineer should make their own.
 
 <!-- writer:end -->
@@ -412,7 +462,13 @@ Done (`src/jobhunter/cover.py`):
   Dashes, ", -ing" add-ons, questions, two "Use at most one" words and a
   letter over 300 words are sent back once, then only noted; a dash that is
   left becomes a comma. In a body paragraph, a sentence that opens by
-  restating the posting ("The role calls for...") is a problem.
+  restating the posting ("The role calls for...") is a problem. So is a
+  sentence that announces the application ("I'm applying for...") and, in
+  the opening or closing, logistics (time zone, notice, location). When the
+  whole opening is removed, the first body paragraph opens the letter; no
+  stock line is added.
+- The letter's facts no longer include the profile's logistics lines (where
+  you live, time zone, notice period). The header still shows your location.
 - Gaps: at most 1, and only when the posting names it in the title or twice
   and the facts have nothing close to it (`gap_matters`; the CI/CD case).
 - Writer model: `cover_model` is `claude-code` (`claude -p`, your Claude
@@ -498,6 +554,28 @@ Length, shape, tone:
   missing requirement and show how you'll make up for it; The Muse says
   apologizing for missing experience tells them you're not a great hire.
   Section 7's "one central gap at most, never apologize" sits between them.
+
+Openings and closings (added October 2026):
+
+- [opinion] Ask a Manager says a plain opening ("I'm interested in your X
+  position because...") is fine, and a freeCodeCamp hiring manager agrees
+  ("I'm interested in X"). This file goes further on purpose: the header
+  already names the job, so the first line goes to the fit.
+  https://www.askamanager.org/2018/01/these-are-bad-ways-to-start-your-cover-letter.html
+  https://www.freecodecamp.org/news/how-to-improve-your-cover-letter/
+- [opinion] Software hiring advice that does agree: open with one
+  hand-picked achievement that matches the job, not a self-introduction
+  (Springboard, Lilach Bullock); "you must add something specific about the
+  role/company", which "will get you miles ahead of others" (a hiring
+  manager on Hacker News, 2024).
+  https://www.springboard.com/blog/software-engineering/software-engineer-cover-letter/
+  https://news.ycombinator.com/item?id=42532176
+- [opinion] Closings: career sites agree the last paragraph is what the
+  reader remembers and should point at one standout match plus a next step.
+  Their formula (restate enthusiasm, 70 to 120 words) is left out: it is the
+  filler sections 8 and 10 ban. Logistics in the closing was the app's own
+  habit, not advice from any source.
+  https://huntr.co/blog/how-to-end-a-cover-letter
 
 AI tells:
 

@@ -8,8 +8,10 @@ CLAUDE.md):
 
   - the facts it may use are the ones the tailored CV prints for this job:
     the summary, the Experience bullets for the job's tags (cv.job_tags, the
-    same [core]/[lead]/... rules), skills, education, certifications, and
-    where you live and work from (never the salary line);
+    same [core]/[lead]/... rules), skills, education and certifications.
+    Never the logistics lines (where you live, time zone, notice, salary):
+    the header already shows where you are, and the letter's few lines go
+    to why you fit;
   - each paragraph names the facts it uses. In it, every number must be in
     one of those facts next to the same word ("800+ concurrent jobs"), every
     tool must be in them, and no seniority word ("senior", "lead") may be
@@ -68,8 +70,6 @@ _CLOSE_TO = {
      "ci/cd pipelines"): ("quality gates", "deploy gates", "release qa"),
     ("observability", "monitoring"): ("datadog", "grafana"),
 }
-# Logistics lines a letter may use. Never "Compensation expectations".
-_LOGISTICS = ("Lives in", "Time zone", "Notice period")
 _FIRST_PERSON = re.compile(r"\b(?:I|I'm|I've|I'd|I'll|my|me|mine|myself)\b", re.I)
 _YEARS = {"year", "years", "yr", "yrs"}
 _OFFSET = re.compile(r"\b(?:UTC|GMT)\s?[+\-−]\s?\d{1,2}(?::\d\d)?", re.I)
@@ -154,7 +154,6 @@ def load_letter_facts(profile_path: Path, tags) -> LetterFacts:
             facts.append(joined)
     for name in ("Skills (confirmed)", "Education", "Certifications"):
         facts += _bullets(sections.get(name, ""))
-    facts += [b for b in _bullets(sections.get("Work authorization and logistics", "")) if b.startswith(_LOGISTICS)]
 
     basics = my_details(text)
     joined = "\n".join(facts)
@@ -296,6 +295,17 @@ _MIRROR = re.compile(
     r"|requires?|emphasi[sz]es|mentions|needs|wants|is looking for|looks for|values)\b"
     r"|^your team (?:needs|wants|values|is looking for)\b"
     r"|^you(?:'re| are| will)? (?:need|want|ask for|are looking for|look for)\b", re.I)
+# "I'm applying for the X role": the header and the form already say which job, so it wastes the first line.
+_ANNOUNCES = re.compile(
+    r"\b(?:I(?:'m| am)|I(?:'d| would) like to|I want to|I wish to|I'm writing to|I am writing to) "
+    r"(?:apply|applying|be considered)\b|\bmy application (?:for|to)\b", re.I)
+# Logistics: time zone, notice, start date, where you are. The header shows the location; the rest is for the form.
+_LOGISTICS_TALK = re.compile(
+    r"\btime ?zones?\b|\b(?:UTC|GMT|CET|EET|EST|PST)\b|\bnotice\b|\bstart date\b|\bavailable to start\b"
+    r"|\bcan start\b|\bbased (?:in|out of)\b|\b(?:work|working|live|living) (?:remotely )?from\b|\bhours overlap\b"
+    r"|\boverlap with\b", re.I)
+ANNOUNCES_ISSUE = "announces the application; the reader knows the job. Open with why you fit it"
+LOGISTICS_ISSUE = "talks logistics (time zone, notice, location); leave those to the CV header and the form"
 _ING_TAIL = re.compile(r",\s+([a-z]+ing)\b[^,]*$", re.I)
 # -ing words that are not an add-on clause after a comma.
 _NOT_ADD_ON = {"including", "during", "according", "regarding", "following", "nothing", "something", "anything",
@@ -333,8 +343,9 @@ def check_style(text: str, sources: list[str], job: JobText, style: Style,
                 framing: bool) -> tuple[list[str], list[str], list[str]]:
     """(problems, style issues, "Use at most one" words) for one sentence.
 
-    Problems are a "Never use" phrase and, in a paragraph, an opening that restates the posting: like a
-    fact problem, sent back once and then the sentence is left out. Style issues are sent back once and
+    Problems are a "Never use" phrase, a sentence that announces the application ("I'm applying for"),
+    logistics in the opening or closing (time zone, notice, location) and, in a paragraph, an opening that
+    restates the posting: like a fact problem, sent back once and then the sentence is left out. Style issues are sent back once and
     then only noted. A phrase that is in the facts the sentence cites is allowed.
     """
     text = text.replace("’", "'")
@@ -346,6 +357,10 @@ def check_style(text: str, sources: list[str], job: JobText, style: Style,
         return bool(re.search(rf"(?<!\w){re.escape(phrase)}(?!\w)", low)) and phrase not in cited
 
     problems = [f'uses "{p}", which is on the "Never use" list' for p in style.never if uses(p)]
+    if _ANNOUNCES.search(text):
+        problems.append(ANNOUNCES_ISSUE)
+    if framing and _LOGISTICS_TALK.search(text):
+        problems.append(LOGISTICS_ISSUE)
     company = re.escape(job.company) if job.company else None
     if not framing and (_MIRROR.search(text) or (company and re.match(
             rf"{company}(?:'s)? (?:values|needs|wants|is looking|asks|expects)\b", text, re.I))):
@@ -630,15 +645,18 @@ def letter_title(title: str) -> str:
     return _TITLE_NOISE.sub("", title).strip() or title
 
 
-def body_of(letter: Letter, company: str, title: str, gap_text: str) -> list[str]:
-    """The letter's paragraphs: what survived the check, the gap sentence, and a plain line where a part is empty."""
-    opening = " ".join(c.text for c in letter.opening) or f"I'm applying for the {letter_title(title)} role at {company}."
+def body_of(letter: Letter, gap_text: str) -> list[str]:
+    """The letter's paragraphs: what survived the check, the gap sentence, and a plain closing when it is empty.
+
+    No opening survived: the first body paragraph opens the letter. A stock "I'm applying for ..." line
+    would only repeat the header."""
+    opening = " ".join(c.text for c in letter.opening)
     body = [" ".join(c.text for c in part) for part in letter.paragraphs]
     gap = gap_sentence(letter.gaps, gap_text)
     if gap:
         body = body[:-1] + [f"{body[-1]} {gap}"] if body else [gap]
     closing = " ".join(c.text for c in letter.closing) or "Thanks for reading."
-    return [opening, *body, closing]
+    return [p for p in (opening, *body, closing) if p]
 
 
 def render_letter(body: list[str], facts: LetterFacts, company: str, title: str, now: datetime) -> str:
@@ -703,7 +721,7 @@ def cover_for_job(store: JobStore, job_id: int, writer: CoverWriter, profile_pat
     if not letter.paragraphs:  # nothing worth sending: write no file, so the daily run tries again tomorrow
         why = "; ".join(letter.missing + letter.removed[:3]) or "the answer was empty"
         raise CoverError(f"No cover letter written: nothing in the answer passed the checks ({why[:400]})")
-    body = body_of(letter, company, job["title"] or "", config.cover_gap_text)
+    body = body_of(letter, config.cover_gap_text)
     text = render_letter(body, facts, company, job["title"] or "", now)
     folder = Path(config.cv_dir).expanduser()
     folder.mkdir(parents=True, exist_ok=True)

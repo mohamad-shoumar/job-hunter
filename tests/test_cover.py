@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from jobhunter import tracking
 from jobhunter.config import OutreachConfig, Paths
 from jobhunter.cover import (
-    GUIDELINES_FILE, CoverWriter, JobText, Style, check_sentence, check_style, cover_for_job, gap_matters,
+    ANNOUNCES_ISSUE, GUIDELINES_FILE, LOGISTICS_ISSUE, CoverWriter, JobText, Style, body_of, check_sentence, check_style, cover_for_job, gap_matters,
     gap_sentence, letter_from, load_letter_facts, posting_gaps, posting_matches, system_prompt, valid_gap,
 )
 from jobhunter.llm import JsonModel
@@ -54,7 +54,8 @@ BAD = {**GOOD, "paragraphs": [
 
 def test_the_letter_uses_the_facts_the_cv_prints():
     text = FACTS.text
-    assert "800+ concurrent Python jobs" in text and "Zapier Academy" in text and "UTC+3" in text
+    assert "800+ concurrent Python jobs" in text and "Zapier Academy" in text
+    assert "UTC+3" not in text and "Notice period" not in text and "Lives in" not in text  # logistics: the form's job
     assert "Lead a team of 5" not in text  # the [lead] bullet: only for lead jobs, like on the CV
     assert "Lead a team of 5" in load_letter_facts(PROFILE_FILE, {"lead"}).text
     assert "working remotely from Beirut, Lebanon" in text and "Confirmed by me" not in text
@@ -133,8 +134,21 @@ def test_the_job_title_and_company_claim_nothing():
     assert framing("I am applying for the Senior Backend Engineer (Python) role at Acme.") == ([], [])
 
 
-def test_a_known_time_zone_is_not_a_number_to_check():
-    assert framing("Working from Beirut, I am on UTC+3 in summer.") == ([], [])
+def test_the_letter_never_announces_itself_or_talks_logistics():
+    """The header and the form already say which job, where you are and when you can start."""
+    for opening in ("I'm applying for the Backend Engineer role.", "I am writing to apply for this job.",
+                    "I'd like to be considered for the Platform role.", "Please accept my application for the role."):
+        assert ANNOUNCES_ISSUE in style(opening, framing=True)[0], opening
+    for closing in ("I'm in Beirut on UTC+3, the same as EET.", "I can start with 2 weeks of notice.",
+                    "I work remotely from Beirut.", "Our time zones overlap well."):
+        assert LOGISTICS_ISSUE in style(closing, framing=True)[0], closing
+    assert style("I've worked remotely from Beirut for CoinQuant since 2023.", 4)[0] == []  # experience, in a paragraph
+    assert style("Happy to walk you through the failure handling.", framing=True)[0] == []
+    # An opening that is left out after the retry gets no stock line: the first paragraph opens the letter.
+    letter = letter_from({**GOOD, "opening": "I'm applying for the Backend Engineer role."}, FACTS, JOB, [], STYLE)
+    letter.drop_failed()
+    assert letter.opening == [] and "I'm applying" in letter.removed[0]
+    assert body_of(letter, "")[0].startswith(GOOD["paragraphs"][0]["text"][:20])
 
 
 # --- gaps ------------------------------------------------------------------------------------------
