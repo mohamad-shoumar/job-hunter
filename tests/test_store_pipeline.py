@@ -4,7 +4,7 @@ import json
 from datetime import timedelta
 
 from jobhunter import pipeline
-from jobhunter.config import Paths
+from jobhunter.config import Filters, Paths
 from jobhunter.models import NEEDS_REVIEW, REJECTED, SHORTLISTED
 from jobhunter.report import write_report
 from jobhunter.sources import SourceResult
@@ -326,3 +326,15 @@ def test_the_outreach_step_runs_without_any_keys(tmp_path, filters):
     summary = run_outreach(store, Paths(tmp_path), [job_id], NOW)
     assert summary["errors"] == [] and summary["contacts"] is None
     assert any("HUNTER_API_KEY" in n for n in summary["notes"])
+
+
+def test_a_blocked_company_is_rejected_with_its_reason(filters):
+    from jobhunter.classify import classify
+
+    filters.blocked_companies = Filters.from_dict(
+        {"blocked_companies": [{"name": "Acme Inc.", "why": "US-only roles"}]}).blocked_companies
+    open_job = make_job(company="ACME", allowed_locations=["Worldwide"])  # would be shortlisted otherwise
+    result = classify(open_job, filters, NOW)
+    assert result.status == REJECTED and result.reject_code == "blocked_company"
+    assert result.reject_reason == 'Company is on your blocked list: "Acme Inc." (US-only roles)'
+    assert classify(make_job(company="Acme Labs", allowed_locations=["Worldwide"]), filters, NOW).status == SHORTLISTED

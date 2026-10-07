@@ -20,6 +20,7 @@ _ELIGIBILITY_ORDER = {ELIGIBLE: 0, LIKELY: 1}
 
 # Rejection groups, in report order: (code, heading, explanation).
 _REJECT_GROUPS = [
+    ("blocked_company", "Company on your blocked list", "`blocked_companies` in `config/filters.json`."),
     ("title_excluded", "Title has an excluded word",
      "The word is in `title_exclude` or `title_exclude_single_role` in `config/filters.json`."),
     ("other_stack", "Role built on another language",

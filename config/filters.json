@@ -6,6 +6,13 @@
   "stretch_yoe_at_least": 5,
   "dedupe_window_days": 60,
 
+  "_blocked_companies": "Companies you never want shortlisted again. Rejected before any other rule, with the reason quoted. Matched on the normalized company name (Inc, Ltd, .com etc. ignored).",
+  "blocked_companies": [
+    {"name": "Tailscale", "why": "roles need residence in Canada, the US or the UK"},
+    {"name": "Reddit", "why": "remote roles are US-only"},
+    {"name": "WorkHero", "why": "international engineering roles closed; the rest are US-only"}
+  ],
+
   "_title_include": "A title must contain at least one of these.",
   "title_include": [
     "backend", "software engineer", "software developer", "software development engineer",

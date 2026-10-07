@@ -19,6 +19,11 @@ question, one field or one stuck page. Make a sensible choice, note it, keep goi
 Everything else (uploading the CV, answering questions, clicking Next between form pages, Tailor CV,
 Find contact, Write with AI) you do without asking.
 
+The user has said yes, for every run, to ticking an application form's privacy notice / data
+processing / candidate privacy policy checkbox (the one a form needs before it can be submitted).
+Tick it and note it in the report. This covers only those boxes on application forms, not
+creating an account, newsletters or marketing opt-ins (leave those unticked).
+
 ## Facts you may use
 
 - Only `profile/master_profile.md` (in `~/job-hunter`, not in git) and the job's tailored CV. Read
@@ -63,11 +68,33 @@ Find contact, Write with AI) you do without asking.
   one is given.
 - If the role can't be found anywhere or is closed, note that for the report and move to the next job.
   Don't change the job's stage.
+- If the company can't hire from Lebanon (residence required in another country, US-only), skip it
+  and say so in the report. If the user wants that company never shortlisted again, add it to
+  `blocked_companies` in `config/filters.json` with a short `why`, then run
+  `.venv/bin/jobhunter reclassify`.
 
 ### 3. Fill the form
-- Upload the tailored CV PDF wherever a resume is asked for. If a cover letter is asked for and one
+- Upload the tailored CV PDF wherever a resume is asked for. If `find`/`read_page` can't see the
+  file box (SmartRecruiters and other sites hide it inside a web component, "shadow DOM"), use a
+  stand-in box (below). Don't fetch the PDF from the app's `/api/cv/` from the page: Chrome holds
+  that request for a local-network permission and the tab freezes. If a cover letter is asked for and one
   exists (`resume/output/<Last>_CoverLetter_<Company>_*.md`), paste or upload it. If none exists,
   press **Write cover letter** in the app first. If it's optional and that fails, skip it.
+- **Hidden file box, stand-in method** (tested on SmartRecruiters, Oct 2026):
+  1. `javascript_tool`: add a plain box the tools can see:
+     `let p=document.createElement('input'); p.type='file'; p.id='jh-proxy'; p.setAttribute('aria-label','jh proxy file input'); p.style.cssText='position:fixed;top:0;left:0;z-index:99999'; document.body.appendChild(p)`
+  2. `find` "jh proxy file input", then `file_upload` the PDF into it.
+  3. `javascript_tool`: find the real box and copy the file over:
+     ```js
+     function deep(r,o=[]){r.querySelectorAll('*').forEach(e=>{if(e.tagName==='INPUT'&&e.type==='file')o.push(e);if(e.shadowRoot)deep(e.shadowRoot,o)});return o}
+     const t=deep(document).find(i=>i.id==='<id>');  // list ids + page position first to pick the Resume one
+     const dt=new DataTransfer(); dt.items.add(document.getElementById('jh-proxy').files[0]); t.files=dt.files;
+     t.dispatchEvent(new Event('input',{bubbles:true,composed:true})); t.dispatchEvent(new Event('change',{bubbles:true,composed:true}));
+     document.getElementById('jh-proxy').remove()
+     ```
+     On SmartRecruiters the Resume box is `spl-dropzone-file-input-1` (the lower one on the page);
+     `-2` is the "Easy Apply" autofill box at the top. Check the screenshot shows the file name
+     under Resume.
 - Profile photo / avatar field: upload `~/Downloads/image.png` (the user's headshot).
 - Fill every field from the profile and CV (autofill first, then fix what autofill got wrong).
 - Standard answers:
@@ -84,6 +111,13 @@ Find contact, Write with AI) you do without asking.
     (Levels.fyi, Glassdoor, the posting's own range). Ask for a bit below the usual figure, but
     never below the "Salary floor" line in the profile. Use the form's currency and period (monthly
     or yearly). If nothing turns up, use the floor plus about 10%.
+  - **Code sample / project you're proud of / portfolio link:** https://github.com/mohamad-shoumar/job-hunter
+    If the form also asks why (or "tell us about it"), use this, as the user wrote it:
+    "A job-search tool I built that uses Claude to tailor my CV. The rule is that the model may
+    reword my experience, but code decides what's true. check_bullet compares each AI rewrite to
+    the original bullet and rejects any new number, technology, seniority word or name, with a
+    readable reason for each. I'm proud of it because it makes an AI feature trustworthy without
+    trusting the AI."
   - **Open questions** ("Why this role?", "A feature you're proud of", "Tell us about a challenge"):
     write 3-6 confident sentences built on the best-matching CV bullet for this posting. Tie it to
     what the company does, and don't make up anything that isn't in the CV.
@@ -91,8 +125,10 @@ Find contact, Write with AI) you do without asking.
 - **Stuck?** If a page freezes, an upload fails or a button doesn't respond, reload and try again
   (up to 2 retries per step). If it still fails, leave the tab as it is, note it and go to the next
   job. Never stop the whole run because of one job.
-- **CAPTCHA or account sign-up:** don't solve or create it. Fill what you can, leave the tab open
-  and note it for the user.
+- **CAPTCHA or account sign-up:** don't solve or create it (Claude may not create accounts or type
+  passwords, even with permission). Fill what you can, leave the tab open and note it for the user.
+  Proxify ("Get paid, not played" postings, often re-posted on job boards) always needs a talent
+  account, so the user does those.
 - Finish at the final **Apply/Submit** button. Don't press it. Leave the tab open.
 
 ### 4. Email draft

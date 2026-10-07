@@ -10,6 +10,7 @@ from datetime import datetime
 
 from .config import Filters
 from .eligibility import assess_eligibility
+from .identity import company_key
 from .models import (
     CAN_HIRE,
     CANNOT_HIRE,
@@ -53,6 +54,12 @@ def classify(job: Job, filters: Filters, now: datetime, check_age: bool = True) 
     if eligibility.verdict == UNCLEAR and job.ai_check:
         eligibility = apply_ai_check(eligibility, job.ai_check)
     relevance, score = assess_relevance(job, filters)
+
+    blocked = filters.blocked_companies.get(company_key(job.company))
+    if blocked:
+        name, why = blocked
+        reason = f'Company is on your blocked list: "{name}"' + (f" ({why})" if why else "")
+        return Classification(REJECTED, eligibility, relevance, score, reason, "blocked_company")
 
     # Age is measured at discovery, so re-running the rules later does not
     # reject jobs that were fresh when they were found.

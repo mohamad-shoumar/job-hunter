@@ -13,6 +13,7 @@
 - A source's "no location given" is unknown, never "Worldwide" (Himalayas shows "Worldwide" for US-only roles).
 - The SQLite DB (`data/jobs.sqlite`) is the memory; Markdown reports are output only. Rejected jobs stay stored on purpose, so they never reappear as new.
 - Reports are `reports/<YYYY-MM-DD>.md`, one per day, rendered from `jobs.report_date` (see `store.py`); there is no `latest.md` or run-numbered file. A date-range run (`--from/--to`) fetches once and files jobs by posting day.
+- `blocked_companies` in `config/filters.json` rejects a company before any other rule (code `blocked_company`, its `why` quoted): companies the user never wants shortlisted again.
 - After changing `config/filters.json` or the rules, run `.venv/bin/jobhunter reclassify`.
 - Tests: `.venv/bin/pytest`. A new source = a module in `src/jobhunter/sources/` with `from_config()`, an entry in `BUILDERS`, and a test against a trimmed real response in `tests/fixtures/`. `tests/fixtures/hunter_*.json` are Hunter's documented examples (no key yet): replace them with trimmed real responses once `HUNTER_API_KEY` is set. Tests never reach Hunter, Claude or Gmail (`conftest.no_real_keys`).
 - Error lines go through `sources.base.describe_error`, which drops query strings, so the SerpApi key never reaches logs or reports. The `httpx` logger stays at WARNING for the same reason.

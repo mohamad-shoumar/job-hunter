@@ -8,6 +8,7 @@ import re
 from dataclasses import dataclass, field, fields
 from pathlib import Path
 
+from .identity import company_key
 from .text import normalize_words
 
 
@@ -108,6 +109,8 @@ class Filters:
     title_exclude_unless_python: list[str]
     title_exclude_single_role: list[str]
     fit_weights: dict[str, int]
+    # company_key -> (name as written, why): these companies are rejected outright.
+    blocked_companies: dict[str, tuple[str, str]] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, data: dict) -> Filters:
@@ -124,6 +127,8 @@ class Filters:
             title_exclude_unless_python=words("title_exclude_unless_python"),
             title_exclude_single_role=words("title_exclude_single_role"),
             fit_weights={k.lower(): int(v) for k, v in data.get("fit_weights", {}).items()},
+            blocked_companies={company_key(b["name"]): (b["name"], b.get("why", ""))
+                               for b in data.get("blocked_companies", []) if company_key(b["name"])},
         )
 
     @classmethod
