@@ -79,14 +79,27 @@ def test_the_email_is_your_template(filters):
     assert app["subject"] == "Full Stack Engineer - Mohamad Shoumar"
     assert app["body"] == (
         "Hi Rima,\n\n"
-        "Saw you are looking for a Full Stack Engineer. In three years at a trading firm I went from full-stack "
-        "developer to leading a team of 5, building the platforms the firm runs on: 800+ concurrent jobs and 115+ AI "
-        "workflows in production.\n\n"
-        "What's the best next step — a screening call or a technical task? I can turn either around this week.\n\n"
+        "I just applied for the Full Stack Engineer role. I led my team's move to AI-first engineering, with 115+ AI "
+        "workflows running in production.\n\n"
+        "From your side, what quality stands out the most for this role at LigaData?\n\n"
         "Mohamad Shoumar\n"
         "Beirut · +15550107788 · LinkedIn <https://www.linkedin.com/in/example/>"
     )
-    assert "looking for an AI Engineer." in assemble("x.", None, "Acme", "AI Engineer", PROFILE)
+    assert "I just applied for the AI Engineer role." in assemble("x.", None, "Acme", "AI Engineer", PROFILE)
+
+
+def test_hr_and_recruiters_get_their_own_question(filters):
+    store = JobStore(":memory:")
+    job_id = store_job(store, filters, company="LigaData", title="Full Stack Engineer")
+    draft_for_job(store, job_id, None, PROFILE, FIXED, NOW)
+    team_question = "\n\nWhat's the biggest thing your team needs to get right this year?\n\n"
+    assert team_question in tracking.get_application(store, job_id)["body"]  # no contact yet
+    save_manual_contact(store, job_id, "Sam Lee", "sam@ligadata.com", "Talent Acquisition Partner", NOW)
+    reassemble(store, job_id, PROFILE, NOW, FIXED)
+    assert "for this role at LigaData?" in tracking.get_application(store, job_id)["body"]
+    save_manual_contact(store, job_id, "Ana Ruiz", "ana@ligadata.com", "CEO", NOW)
+    reassemble(store, job_id, PROFILE, NOW, FIXED)
+    assert team_question in tracking.get_application(store, job_id)["body"]
 
 
 def test_the_plain_copy_spells_out_the_link():
@@ -186,7 +199,7 @@ def test_a_new_contact_rebuilds_an_unedited_draft(filters):
     store = JobStore(":memory:")
     job_id = acme(store, filters)
     draft_for_job(store, job_id, None, PROFILE, FIXED, NOW)
-    assert tracking.get_application(store, job_id)["body"].startswith("Hi Acme team,\n\nSaw you are looking for a Senior")
+    assert tracking.get_application(store, job_id)["body"].startswith("Hi Acme team,\n\nI just applied for the Senior")
     save_manual_contact(store, job_id, "Ana Ruiz", "ana@acme.io", "CEO", NOW)
     reassemble(store, job_id, PROFILE, NOW, FIXED)
     assert tracking.get_application(store, job_id)["body"].startswith("Hi Ana,")

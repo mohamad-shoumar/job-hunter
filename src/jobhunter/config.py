@@ -153,6 +153,8 @@ class OutreachConfig:
     subject_template: str = "{title} - {name}"
     pitch_text: str = ""
     ask_text: str = ""
+    # The closing question for HR and recruiters; empty means ask_text.
+    hr_ask_text: str = ""
     auto_draft: bool = True
     follow_up_business_days: list[int] = field(default_factory=lambda: [4, 7])
     ghost_after_business_days: int = 7

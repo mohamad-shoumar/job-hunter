@@ -163,20 +163,18 @@ and spreads the Hunter credits left over the days until they reset. It never
 looks up in a date-range run (that would spend the month).
 
 **The email** (`src/jobhunter/pitch.py`) is your own text from
-`config/outreach.json` (`subject_template`, `pitch_text`, `ask_text`), with no
-AI and no cost:
+`config/outreach.json` (`subject_template`, `pitch_text`, `ask_text`,
+`hr_ask_text`), with no AI and no cost:
 
 ```
 Subject: Full Stack Engineer - Jane Doe
 
 Hi Rima,
 
-Saw you are looking for a Full Stack Engineer. In three years at a trading firm
-I went from full-stack developer to leading a team of 5, building the platforms
-the firm runs on: 800+ concurrent jobs and 115+ AI workflows in production.
+I just applied for the Full Stack Engineer role. I led my team's move to
+AI-first engineering, with 115+ AI workflows running in production.
 
-What's the best next step — a screening call or a technical task? I can turn
-either around this week.
+What's the biggest thing your team needs to get right this year?
 
 Jane Doe
 Beirut · +15550107788 · LinkedIn
@@ -185,6 +183,9 @@ Beirut · +15550107788 · LinkedIn
 The name, city, phone and LinkedIn come from `MY_NAME`, `MY_LOCATION`,
 `MY_PHONE` and `MY_LINKEDIN` in `.env`.
 
+- HR and recruiters get `hr_ask_text` as the question instead: "From your
+  side, what quality stands out the most for this role at {company}?". The
+  question never asks for a call, an interview or a referral.
 - The title has noise like "- Remote" or "(m/f/d)" removed.
 - Emails go out as plain text ("LinkedIn: https://…") plus an HTML copy, where
   "LinkedIn" is a link.

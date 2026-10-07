@@ -26,11 +26,12 @@
   "fallback_model": "claude-haiku-4-5",
   "fallback_max_searches": 2,
 
-  "_email": "Your email, word for word. {title} is the job title (noise like '- Remote' removed), {name} your name, {company} the company. The body is: Hi <first name>, / Saw you are looking for a {title}. <pitch_text> / <ask_text> / signature (city, phone, LinkedIn link). pitch_mode \"fixed\" uses this text with no AI; \"ai\" lets pitch_model write the second sentence instead.",
+  "_email": "Your email, word for word. {title} is the job title (noise like '- Remote' removed), {name} your name, {company} the company. The body is: Hi <first name>, / I just applied for the {title} role. <pitch_text> / <ask_text> / signature (city, phone, LinkedIn link). HR and recruiters get hr_ask_text instead of ask_text. The question asks for nothing (no call, interview or referral). pitch_mode \"fixed\" uses this text with no AI; \"ai\" lets pitch_model write the second sentence instead.",
   "pitch_mode": "fixed",
   "subject_template": "{title} - {name}",
-  "pitch_text": "In three years at a trading firm I went from full-stack developer to leading a team of 5, building the platforms the firm runs on: 800+ concurrent jobs and 115+ AI workflows in production.",
-  "ask_text": "What's the best next step — a screening call or a technical task? I can turn either around this week.",
+  "pitch_text": "I led my team's move to AI-first engineering, with 115+ AI workflows running in production.",
+  "ask_text": "What's the biggest thing your team needs to get right this year?",
+  "hr_ask_text": "From your side, what quality stands out the most for this role at {company}?",
 
   "_pitch": "The model writing the 1-2 sentence pitch. deepseek-* models use DEEPSEEK_API_KEY (well under $0.01 per email); claude-* models use ANTHROPIC_API_KEY. The fact guard checks both the same way. Drafts are written in the daily run once a contact is known.",
   "pitch_model": "deepseek-flash",

@@ -4,15 +4,19 @@
 
     Hi <first name>,
 
-    Saw you are looking for a <title>. In three years at a trading firm I went from full-stack developer to leading a team of 5, building the platforms the firm runs on: 800+ concurrent jobs and 115+ AI workflows in production.
+    I just applied for the <title> role. I led my team's move to AI-first engineering, with 115+ AI workflows running in production.
 
-    What's the best next step — a screening call or a technical task? I can turn either around this week.
+    What's the biggest thing your team needs to get right this year?
 
     <your name>
     <city> · <phone> · LinkedIn (a link)     (MY_* in .env)
 
-With pitch_mode "ai", the model writes the sentence after "Saw you are looking
-for a <title>." instead, and the checks below apply to it.
+HR and recruiters get hr_ask_text as the question instead ("From your side,
+what quality stands out the most for this role at <company>?"). The question
+asks for nothing: no call, interview or referral.
+
+With pitch_mode "ai", the model writes the sentence after "I just applied for
+the <title> role." instead, and the checks below apply to it.
 
 The model gets the profile's experience, skills and education as numbered
 facts (never the phone or salary lines) and says which facts it used. Then
@@ -247,8 +251,8 @@ def check_draft(subject: str, hook: str, pitch: str, evidence_ids: list[int], pr
 SYSTEM = """\
 You write ONE line for a very short cold email from a software engineer to a \
 person at a company that posted a job. Code writes everything else (greeting, \
-"Saw you are looking for a <role>.", the ask, the signature, and a separate \
-line about leading a team). So write only the proof line.
+"I just applied for the <role> role.", the closing question, the signature). \
+So write only the proof line.
 
 The line: one sentence, at most 18 words, the single most relevant thing the \
 engineer built for this role, taken from ONE fact, with that fact's own \
@@ -432,16 +436,21 @@ def subject_for(title: str, profile: Profile, template: str = "{title} - {name}"
     return template.format(title=short_title(title), name=profile.name)
 
 
-def _article(word: str) -> str:
-    return "an" if word[:1].lower() in "aeiou" else "a"
-
-
 def opening(title: str) -> str:
-    role = short_title(title)
-    return f"Saw you are looking for {_article(role)} {role}."
+    return f"I just applied for the {short_title(title)} role."
 
 
-_DEFAULT_ASK = "What's the best next step — a screening call or a technical task? I can turn either around this week."
+_DEFAULT_ASK = "What's the biggest thing your team needs to get right this year?"
+_HR_ROLES = ("hr", "recruiter")
+
+
+def ask_for(contact, config: OutreachConfig | None) -> str:
+    """The closing question: hr_ask_text for HR and recruiters, else ask_text."""
+    if config is None:
+        return ""
+    if _field(contact, "role") in _HR_ROLES and config.hr_ask_text:
+        return config.hr_ask_text
+    return config.ask_text
 
 
 def assemble(pitch: str, contact, company: str, title: str, profile: Profile, ask_text: str = "") -> str:
@@ -523,7 +532,7 @@ def save_draft(store: JobStore, job_id: int, draft: Draft, contact: sqlite3.Row 
     job = store.get(job_id)
     app = tracking.ensure_application(store, job_id, now)
     company, _ = clean_company_name(job["company"])
-    body = assemble(draft.pitch, contact, company, job["title"], profile, config.ask_text if config else "")
+    body = assemble(draft.pitch, contact, company, job["title"], profile, ask_for(contact, config))
     meta = {"model": draft.model, "cost_usd": draft.cost_usd, "evidence_ids": draft.evidence_ids,
             "attempts": draft.attempts, "written_at": iso(now), "contact_id": contact["id"] if contact else None}
     store.conn.execute(
@@ -552,7 +561,7 @@ def reassemble(store: JobStore, job_id: int, profile: Profile, now: datetime,
     contact = (store.conn.execute("SELECT * FROM contacts WHERE id = ?", (app["contact_id"],)).fetchone()
                if app["contact_id"] else None)
     company, _ = clean_company_name(job["company"])
-    body = assemble(app["pitch"], contact, company, job["title"], profile, config.ask_text if config else "")
+    body = assemble(app["pitch"], contact, company, job["title"], profile, ask_for(contact, config))
     if body != app["body"]:
         store.conn.execute("UPDATE applications SET body = ?, draft_version = draft_version + 1, updated_at = ? "
                            "WHERE job_id = ?", (body, iso(now), job_id))
@@ -584,7 +593,7 @@ def _personal_part(body: str, profile: Profile, title: str) -> str:
     """The body minus the greeting, opening, ask and signature, for the soft check on your edits."""
     text = body.split(f"\n{profile.name}\n")[0] if f"\n{profile.name}\n" in body else body
     text = text.replace(opening(title), " ")
-    text = re.sub(r"(?:Saw you are looking for [^.\n]*\.|15 minutes to talk through[^?\n]*\?|"
+    text = re.sub(r"(?:Saw you are looking for [^.\n]*\.|I just applied for [^.\n]*\.|15 minutes to talk through[^?\n]*\?|"
                   r"Happy to take a short trial task instead\.|Could (?:I|you) [^?\n]*\?|"
                   r"Would you be open to [^?\n]*\?)", " ", text)
     return re.sub(r"^\s*Hi [^,\n]*,?", " ", text)
