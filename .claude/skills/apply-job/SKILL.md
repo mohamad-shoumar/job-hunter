@@ -95,6 +95,14 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
      On SmartRecruiters the Resume box is `spl-dropzone-file-input-1` (the lower one on the page);
      `-2` is the "Easy Apply" autofill box at the top. Check the screenshot shows the file name
      under Resume.
+     After the change event the site empties the box again, so reading `t.files` afterwards shows 0:
+     trust the screenshot, not that number.
+- **SmartRecruiters notes:** the "Message to the Hiring Team" box rejects semicolons (`;`). The
+  City field needs the suggestion clicked ("Beirut, Beyrouth, Lebanon"). Jobs for Humanity adds a
+  "Preliminary questions" page after Next: industries Financial services + Computers and
+  information technology, function Engineering, 3 - 5 years, the floor bracket for monthly salary
+  (3,000 - 3,500), languages English only (the profile's languages line is TODO), visa No,
+  gender and community "Prefer not to say/answer", disability left empty, privacy box ticked.
 - Profile photo / avatar field: upload `~/Downloads/image.png` (the user's headshot).
 - Fill every field from the profile and CV (autofill first, then fix what autofill got wrong).
 - Standard answers:
