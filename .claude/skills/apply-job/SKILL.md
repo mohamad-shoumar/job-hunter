@@ -1,0 +1,109 @@
+---
+name: apply-job
+description: Work through the "To apply" column of the jobhunter app in Chrome - get a checked tailored CV, fill the job's application form on the company site, draft the outreach email - and stop before the final Apply/Submit and Send. Use when the user says "apply to my jobs", "go through To apply", or names a job to apply to.
+---
+
+# Apply to jobs from the "To apply" column
+
+Runs in the user's real Chrome through Claude in Chrome (`mcp__claude-in-chrome__*`; read the
+`claude-in-chrome` skill first). The goal is to be **autonomous**: never stop the whole run on one
+question, one field or one stuck page. Make a sensible choice, note it, keep going.
+
+## Two hard stops (the only things you never do)
+
+1. **Never press the final Apply / Submit / Send application button.** Fill everything, scroll to it,
+   leave the tab open for the user to press it.
+2. **Never press Send on an email** in the app. Draft it and leave it. (CLAUDE.md: emails go out
+   only from the user's own click on Send.)
+
+Everything else (uploading the CV, answering questions, clicking Next between form pages, Tailor CV,
+Find contact, Write with AI) you do without asking.
+
+## Facts you may use
+
+- Only `profile/master_profile.md` (in `~/job-hunter`, not in git) and the job's tailored CV. Read
+  the profile once at the start of the run.
+- Name, email, phone, LinkedIn and the like: `MY_*` in `~/job-hunter/.env`. Use them only to fill forms.
+  Never write them into a tracked file.
+- Never invent a skill, employer, title, date, project or number. For open questions you can choose
+  the story and polish the wording, but the facts come from the CV.
+
+## Setup
+
+1. Make sure the app is running: `curl -s http://127.0.0.1:8765/api/status`. If it isn't, start
+   `cd ~/job-hunter && .venv/bin/jobhunter serve` in the background and wait for it.
+2. Open http://127.0.0.1:8765/#pipeline in a new tab. The **To apply** column lists shortlisted
+   jobs the user hasn't applied to yet. Do them one at a time, top to bottom (or only the job the
+   user named).
+
+## For each job
+
+### 1. CV
+- Open the job's card. In the **CV** section:
+  - If it shows a tailored CV ("Tailored ... by ..."), use it.
+  - If not, press **Tailor CV to this job** and wait until the tailored info appears (it can take a
+    minute).
+- **Quick check before using it** (open it with "View ↗", or read
+  `~/job-hunter/resume/versions/` / `resume/output/`):
+  - The name and contact line are right, and it is 1-2 pages.
+  - The employers, titles and dates match `resume/resume.md`.
+  - The headline makes sense for this role.
+  - There is no Summary section, and no `TODO` or leftover tag such as `[core]`.
+  - The "Code changed these" warnings don't point to a broken line.
+  If something critical is wrong, fall back to the general CV (`<Last>_Resume_General.pdf` in
+  `resume/output/`), note it for the report and keep going. Don't hand-edit the CV.
+- The PDF is already on disk in `~/job-hunter/resume/output/`, so upload it from there. Press
+  **Download ↓** too if the user wants a copy in Downloads.
+
+### 2. Find the real application page
+- Press **Open posting ↗**.
+- If the posting is behind a sign-in or paywall (We Work Remotely always is), don't sign in and
+  don't pay. Search for the same role on the company's own careers page or its job board (Greenhouse,
+  Lever, Ashby, Workable, BambooHR, LinkedIn) and apply there. Match the title, and the location if
+  one is given.
+- If the role can't be found anywhere or is closed, note that for the report and move to the next job.
+  Don't change the job's stage.
+
+### 3. Fill the form
+- Upload the tailored CV PDF wherever a resume is asked for. If a cover letter is asked for and one
+  exists (`resume/output/<Last>_CoverLetter_<Company>_*.md`), paste or upload it. If none exists,
+  press **Write cover letter** in the app first. If it's optional and that fails, skip it.
+- Profile photo / avatar field: upload `~/Downloads/image.png` (the user's headshot).
+- Fill every field from the profile and CV (autofill first, then fix what autofill got wrong).
+- Standard answers:
+  - **Authorized to work?** Yes, in Lebanon (lives in Beirut). If the question is about the US, EU
+    or another specific country, answer truthfully from the profile (contractor / EOR, no visa
+    needed for remote work). Sponsorship needed? No, when the role is remote.
+  - **Location / time zone / notice:** from the profile's "Work authorization and logistics" section.
+  - **Disability, medical needs, accommodations or adjustments:** No / none needed.
+  - **Gender, race, veteran and other voluntary questions:** "Prefer not to say" / "Decline to
+    self-identify" when that option exists.
+  - **How did you hear about us:** the site the job came from (the job's source in the app), or
+    "Job board".
+  - **Expected salary:** do a quick web search for what this company pays for this role and level
+    (Levels.fyi, Glassdoor, the posting's own range). Ask for a bit below the usual figure, but
+    never below the "Salary floor" line in the profile. Use the form's currency and period (monthly
+    or yearly). If nothing turns up, use the floor plus about 10%.
+  - **Open questions** ("Why this role?", "A feature you're proud of", "Tell us about a challenge"):
+    write 3-6 confident sentences built on the best-matching CV bullet for this posting. Tie it to
+    what the company does, and don't make up anything that isn't in the CV.
+- **Unsure about a field?** Pick the most reasonable answer, note it for the report, keep going.
+- **Stuck?** If a page freezes, an upload fails or a button doesn't respond, reload and try again
+  (up to 2 retries per step). If it still fails, leave the tab as it is, note it and go to the next
+  job. Never stop the whole run because of one job.
+- **CAPTCHA or account sign-up:** don't solve or create it. Fill what you can, leave the tab open
+  and note it for the user.
+- Finish at the final **Apply/Submit** button. Don't press it. Leave the tab open.
+
+### 4. Email draft
+- Back in the app, on the job's card: if there's no contact, press **Find contact**. Then press
+  **Write with AI** (or **Fill template**) to draft the email. The app's own rules and checks
+  (`pitch.py`, `check_draft`) write and check it.
+- If the draft shows "needs edit" warnings, leave them for the user. **Don't press Send.**
+- If no contact can be found, still draft the email so it's ready, and note "no contact".
+
+## At the end
+
+Report one line per job: company, role, where you applied (the URL of the tab left open), CV used,
+salary entered, anything you guessed or skipped, and the email status (drafted / no contact /
+needs edit). The user then goes through the open tabs and presses Apply, and presses Send in the app.
