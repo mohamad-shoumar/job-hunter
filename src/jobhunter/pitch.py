@@ -6,7 +6,7 @@
 
     I just applied for the <title> role. I led my team's move to AI-first engineering, with 115+ AI workflows running in production.
 
-    What's the biggest thing your team needs to get right this year?
+    Once this role is filled, what's the first thing you'd want that person to get right?
 
     <your name>
     <city> · <phone> · LinkedIn (a link)     (MY_* in .env)
@@ -440,7 +440,7 @@ def opening(title: str) -> str:
     return f"I just applied for the {short_title(title)} role."
 
 
-_DEFAULT_ASK = "What's the biggest thing your team needs to get right this year?"
+_DEFAULT_ASK = "Once this role is filled, what's the first thing you'd want that person to get right?"
 _HR_ROLES = ("hr", "recruiter")
 
 

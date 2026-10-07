@@ -174,7 +174,7 @@ Hi Rima,
 I just applied for the Full Stack Engineer role. I led my team's move to
 AI-first engineering, with 115+ AI workflows running in production.
 
-What's the biggest thing your team needs to get right this year?
+Once this role is filled, what's the first thing you'd want that person to get right?
 
 Jane Doe
 Beirut · +15550107788 · LinkedIn

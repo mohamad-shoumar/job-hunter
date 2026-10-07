@@ -92,14 +92,14 @@ def test_hr_and_recruiters_get_their_own_question(filters):
     store = JobStore(":memory:")
     job_id = store_job(store, filters, company="LigaData", title="Full Stack Engineer")
     draft_for_job(store, job_id, None, PROFILE, FIXED, NOW)
-    team_question = "\n\nWhat's the biggest thing your team needs to get right this year?\n\n"
-    assert team_question in tracking.get_application(store, job_id)["body"]  # no contact yet
+    role_question = "\n\nOnce this role is filled, what's the first thing you'd want that person to get right?\n\n"
+    assert role_question in tracking.get_application(store, job_id)["body"]  # no contact yet
     save_manual_contact(store, job_id, "Sam Lee", "sam@ligadata.com", "Talent Acquisition Partner", NOW)
     reassemble(store, job_id, PROFILE, NOW, FIXED)
     assert "for this role at LigaData?" in tracking.get_application(store, job_id)["body"]
     save_manual_contact(store, job_id, "Ana Ruiz", "ana@ligadata.com", "CEO", NOW)
     reassemble(store, job_id, PROFILE, NOW, FIXED)
-    assert team_question in tracking.get_application(store, job_id)["body"]
+    assert role_question in tracking.get_application(store, job_id)["body"]
 
 
 def test_the_plain_copy_spells_out_the_link():

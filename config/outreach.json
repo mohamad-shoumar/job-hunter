@@ -30,7 +30,7 @@
   "pitch_mode": "fixed",
   "subject_template": "{title} - {name}",
   "pitch_text": "I led my team's move to AI-first engineering, with 115+ AI workflows running in production.",
-  "ask_text": "What's the biggest thing your team needs to get right this year?",
+  "ask_text": "Once this role is filled, what's the first thing you'd want that person to get right?",
   "hr_ask_text": "From your side, what quality stands out the most for this role at {company}?",
 
   "_pitch": "The model writing the 1-2 sentence pitch. deepseek-* models use DEEPSEEK_API_KEY (well under $0.01 per email); claude-* models use ANTHROPIC_API_KEY. The fact guard checks both the same way. Drafts are written in the daily run once a contact is known.",
