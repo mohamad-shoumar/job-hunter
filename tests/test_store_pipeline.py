@@ -337,4 +337,6 @@ def test_a_blocked_company_is_rejected_with_its_reason(filters):
     result = classify(open_job, filters, NOW)
     assert result.status == REJECTED and result.reject_code == "blocked_company"
     assert result.reject_reason == 'Company is on your blocked list: "Acme Inc." (US-only roles)'
+    linked = make_job(company="Acme https://acme.example", allowed_locations=["Worldwide"])  # Hacker News style
+    assert classify(linked, filters, NOW).reject_code == "blocked_company"
     assert classify(make_job(company="Acme Labs", allowed_locations=["Worldwide"]), filters, NOW).status == SHORTLISTED

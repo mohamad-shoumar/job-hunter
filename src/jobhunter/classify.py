@@ -6,6 +6,7 @@ stored AI web check (ai_check.py) get a say, and only with a verified quote.
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 
 from .config import Filters
@@ -55,7 +56,8 @@ def classify(job: Job, filters: Filters, now: datetime, check_age: bool = True) 
         eligibility = apply_ai_check(eligibility, job.ai_check)
     relevance, score = assess_relevance(job, filters)
 
-    blocked = filters.blocked_companies.get(company_key(job.company))
+    # Hacker News names come as "WorkHero https://workhero.pro": the link is not part of the name.
+    blocked = filters.blocked_companies.get(company_key(re.sub(r"https?://\S+", " ", job.company or "")))
     if blocked:
         name, why = blocked
         reason = f'Company is on your blocked list: "{name}"' + (f" ({why})" if why else "")
