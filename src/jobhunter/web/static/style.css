@@ -131,7 +131,7 @@ input[type=text], input[type=email], input[type=search] { width: 100%; }
 .card li a { cursor: pointer; }
 
 /* pipeline */
-.board { display: grid; grid-template-columns: repeat(6, minmax(170px, 1fr)); gap: 10px; overflow-x: auto; }
+.board { display: grid; grid-template-columns: repeat(8, minmax(170px, 1fr)); gap: 10px; overflow-x: auto; }
 .column { background: var(--panel-2); border-radius: var(--radius); padding: 8px; min-height: 120px; }
 .column h3 { display: flex; justify-content: space-between; }
 .pcard { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px; margin-top: 8px; }
@@ -189,5 +189,5 @@ form.inline { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 6px; 
   .job-side { align-items: flex-start; text-align: left; flex-direction: row; flex-wrap: wrap; }
   form.inline { grid-template-columns: 1fr; }
   .kv { grid-template-columns: 1fr; }
-  .board { grid-template-columns: repeat(6, 78vw); }
+  .board { grid-template-columns: repeat(8, 78vw); }
 }

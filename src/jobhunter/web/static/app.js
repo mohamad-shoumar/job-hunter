@@ -640,22 +640,40 @@ async function renderToday() {
 
 // --- pipeline ----------------------------------------------------------------------
 
+// Board columns. "To apply" is shortlisted jobs you haven't acted on (stage new); rejected gets its own
+// column, and Closed holds the other reasons (ghosted, skipped).
+const BOARD = [
+  { key: "to_apply", label: "To apply", stage: "new" },
+  ...["saved", "reached_out", "replied", "interviewing", "offer"].map((s) => ({ key: s, stage: s })),
+  { key: "rejected", label: "Rejected", stage: "closed", reason: "rejected" },
+  { key: "closed", label: "Closed", stage: "closed" },
+];
+function boardKey(j) {
+  if (!j.stage || j.stage === "new") return "to_apply";
+  if (j.stage === "closed") return j.closed_reason === "rejected" ? "rejected" : "closed";
+  return j.stage;
+}
+
 async function renderPipeline() {
-  const [tracked, closed] = await Promise.all([api("/api/jobs?view=tracked"), api("/api/jobs?view=closed")]);
-  const jobs = [...tracked.jobs, ...closed.jobs];
-  const stages = (state.status?.stages || []).filter((s) => s !== "new");
-  $("#main").innerHTML = `<div class="board">${stages.map((stage) => {
-    const cards = jobs.filter((j) => j.stage === stage);
-    return `<div class="column"><h3>${esc(stageLabel(stage))} <span>${cards.length}</span></h3>${cards.map((j) => `
+  const [open, tracked, closed] = await Promise.all([
+    api("/api/jobs?view=shortlisted"), api("/api/jobs?view=tracked"), api("/api/jobs?view=closed"),
+  ]);
+  const toApply = open.jobs.filter((j) => !j.stage || j.stage === "new");
+  const jobs = [...toApply, ...tracked.jobs, ...closed.jobs];
+  const options = (current) => BOARD.map((c) => `<option value="${c.key}" ${c.key === current ? "selected" : ""}>${esc(c.label || stageLabel(c.stage))}</option>`).join("");
+  $("#main").innerHTML = `<div class="board">${BOARD.map((col) => {
+    const cards = jobs.filter((j) => boardKey(j) === col.key);
+    return `<div class="column"><h3>${esc(col.label || stageLabel(col.stage))} <span>${cards.length}</span></h3>${cards.map((j) => `
       <div class="pcard">
         <div class="job-title" data-open="${j.id}">${esc(j.title)}</div>
         <div class="small muted">${esc(j.company)}</div>
         <div class="job-meta small" style="margin-top:4px">
+          ${col.key === "to_apply" ? `<span class="chip">fit ${j.fit}</span>${j.has_cv ? `<span class="chip good">CV</span>` : ""}${j.has_cover ? `<span class="chip good">letter</span>` : ""}` : ""}
           ${j.applied_at ? `<span class="chip">applied</span>` : ""}${j.emailed_at ? `<span class="chip info">emailed ${esc(day(j.emailed_at))}</span>` : ""}
           ${j.stage === "reached_out" && j.next_follow_up_at ? `<span class="chip ${new Date(j.next_follow_up_at) <= new Date() ? "warn" : ""}">follow-up ${esc(day(j.next_follow_up_at))}</span>` : ""}
-          ${j.closed_reason ? `<span class="chip">${esc(j.closed_reason)}</span>` : ""}
+          ${j.closed_reason && col.key === "closed" ? `<span class="chip">${esc(j.closed_reason)}</span>` : ""}
         </div>
-        <select data-move="${j.id}">${stages.map((s) => `<option value="${s}" ${s === stage ? "selected" : ""}>${esc(stageLabel(s))}</option>`).join("")}</select>
+        <select data-move="${j.id}">${options(col.key)}</select>
       </div>`).join("") || `<div class="small muted" style="margin-top:8px">Empty</div>`}</div>`;
   }).join("")}</div>`;
 }
@@ -738,11 +756,12 @@ document.addEventListener("change", async (e) => {
       return setDetail(detail, e.target.value === "none" ? "No CV will be attached" : "CV updated");
     }
     if (e.target.matches("[data-move]")) {
-      const stage = e.target.value;
-      const reason = stage === "closed" ? prompt("Why closed? rejected, ghosted or skipped", "rejected") : undefined;
+      const col = BOARD.find((c) => c.key === e.target.value);
+      const stage = col.stage;
+      const reason = col.reason || (stage === "closed" ? prompt("Why closed? ghosted or skipped", "skipped") : undefined);
       if (stage === "closed" && !reason) return renderPipeline();
       await api(`/api/jobs/${e.target.dataset.move}/stage`, { method: "POST", body: { stage, reason } });
-      toast(`Moved to ${stageLabel(stage, reason)}`);
+      toast(`Moved to ${col.label || stageLabel(stage, reason)}`);
       return renderPipeline();
     }
   } catch (err) {
