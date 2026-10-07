@@ -381,6 +381,19 @@ def test_tailor_attaches_the_cv_and_the_page_can_show_it(cv_client):
     assert "Shoumar_Backend_Acme_Sep2026.pdf" in saved.headers["content-disposition"]
 
 
+def test_job_sites_can_fetch_a_cv_but_nothing_else(cv_client):
+    pdf = cv_client.get("/api/cv/Shoumar_Resume_General.pdf", headers={"Origin": "https://jobs.example.com"})
+    assert pdf.headers["access-control-allow-origin"] == "*"
+    assert pdf.headers["access-control-allow-private-network"] == "true"
+    asked = cv_client.options("/api/cv/Shoumar_Resume_General.pdf", headers={
+        "Origin": "https://jobs.example.com", "Access-Control-Request-Method": "GET",
+        "Access-Control-Request-Private-Network": "true"})
+    assert asked.status_code == 204 and asked.headers["access-control-allow-methods"] == "GET"
+    assert asked.headers["access-control-allow-private-network"] == "true"
+    assert "access-control-allow-origin" not in cv_client.get("/api/jobs/1").headers
+    assert cv_client.post("/api/cv/Shoumar_Resume_General.pdf", json={}, headers=AUTH).status_code == 405
+
+
 def test_only_cvs_in_the_folder_can_be_read(cv_client):
     assert cv_client.get("/api/cv/resume.md").status_code == 404
     assert cv_client.get("/api/cv/..%2Fresume.md").status_code == 404

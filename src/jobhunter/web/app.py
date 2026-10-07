@@ -6,7 +6,10 @@ Locked to you:
     which stops DNS-rebinding pages from reaching it;
   - every request that changes something needs the random token put into the
     page at startup (X-JH-Token), a JSON body and no foreign Origin, so another
-    website open in your browser cannot press Send for you. There is no CORS.
+    website open in your browser cannot press Send for you. There is no CORS,
+    except on GET /api/cv/...: any page may read a CV PDF (Chrome asks you once
+    per site before a site reaches this computer), so a job site can attach it
+    when the Chrome extension applies for you. Nothing there changes anything.
 
 Each request opens its own SQLite connection; the schema is migrated once at
 startup. Emails are sent only by POST /api/jobs/{id}/send, i.e. by your click.
@@ -22,7 +25,7 @@ from pathlib import Path
 from typing import Callable
 
 from fastapi import Body, Depends, FastAPI, Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from .. import tracking
@@ -46,6 +49,8 @@ from ..text import parse_datetime, utcnow
 
 STATIC = Path(__file__).parent / "static"
 _MUTATING = {"POST", "PUT", "PATCH", "DELETE"}
+# Only CV PDFs are open to other sites (see the top of this file).
+_CV_CORS = {"Access-Control-Allow-Origin": "*", "Access-Control-Allow-Private-Network": "true"}
 
 
 class Services:
@@ -113,6 +118,14 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
         host = request.headers.get("host", "")
         if allowed_hosts is not None and host not in allowed_hosts:
             return JSONResponse({"error": "wrong host"}, status_code=403)
+        if request.url.path.startswith("/api/cv/"):
+            if request.method == "OPTIONS":  # the browser asks first: allow reading, nothing else
+                return Response(status_code=204, headers={**_CV_CORS, "Access-Control-Allow-Methods": "GET"})
+            if request.method not in ("GET", "HEAD"):
+                return JSONResponse({"error": "CVs can only be read"}, status_code=405)
+            response = await call_next(request)
+            response.headers.update(_CV_CORS)
+            return response
         if request.method in _MUTATING:
             origin = request.headers.get("origin")
             if origin and allowed_hosts is not None and origin not in allowed_origins:
