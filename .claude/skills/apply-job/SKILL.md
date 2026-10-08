@@ -1,6 +1,6 @@
 ---
 name: apply-job
-description: Work through the "To apply" column of the jobhunter app in Chrome - get a checked tailored CV, fill the job's application form on the company site, draft the outreach email - and stop before the final Apply/Submit and Send. Use when the user says "apply to my jobs", "go through To apply", or names a job to apply to.
+description: Work through the "To apply" column of the jobhunter app in Chrome - get a checked tailored CV, fill the job's application form on the company site or in LinkedIn Easy Apply, draft the outreach email - and stop before the final Apply/Submit and Send. Use when the user says "apply to my jobs", "go through To apply", or names a job to apply to.
 ---
 
 # Apply to jobs from the "To apply" column
@@ -103,6 +103,23 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
   information technology, function Engineering, 3 - 5 years, the floor bracket for monthly salary
   (3,000 - 3,500), languages English only (the profile's languages line is TODO), visa No,
   gender and community "Prefer not to say/answer", disability left empty, privacy box ticked.
+- **LinkedIn Easy Apply** (the user is already signed in to LinkedIn in Chrome):
+  - Use it only when the LinkedIn job page shows an **Easy Apply** button. A plain **Apply** button
+    goes to the company site: follow it and fill that form instead.
+  - Never sign in, type a password, or edit the user's LinkedIn profile. If LinkedIn asks to sign
+    in or shows a security check, stop on that job, note it and move on.
+  - Go slowly, like a person: one job at a time, no browsing or scraping lists of jobs, and at most
+    10 Easy Apply forms per run. LinkedIn forbids automation and can restrict the account, so if
+    it shows any "unusual activity" warning, stop all LinkedIn work for the run and say so in the report.
+  - **Contact info:** check the email and phone against `MY_*` in `.env`; fix them if they differ.
+  - **Resume:** press **Upload resume** and upload the tailored PDF (use the stand-in method above if
+    the file box is hidden). Make sure the tailored file is the one selected, not an older resume.
+  - **Screening questions:** "How many years of experience with X?" gets the years from the
+    profile. If X isn't in the profile, answer 0 and note it, never a guess. Yes/No skill questions
+    are Yes only when the skill is in the profile. Other questions use the standard answers below.
+  - Press **Next** / **Review** between steps. On the Review page untick **Follow <company>**.
+  - Stop at **Submit application**. Don't press it. Leave the Easy Apply window open in that tab
+    (closing it asks to save or discard: don't close it).
 - Profile photo / avatar field: upload `~/Downloads/image.png` (the user's headshot).
 - Fill every field from the profile and CV (autofill first, then fix what autofill got wrong).
 - Standard answers:
