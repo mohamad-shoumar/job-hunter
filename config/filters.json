@@ -15,7 +15,7 @@
 
   "_title_include": "A title must contain at least one of these.",
   "title_include": [
-    "backend", "software engineer", "software developer", "software development engineer",
+    "backend", "software engineer", "software engineering", "software developer", "software development engineer", "web developer",
     "python", "fastapi", "django", "flask",
     "ai engineer", "applied ai", "ai ml engineer", "llm engineer", "genai engineer", "generative ai engineer",
     "ai developer", "ai automation", "automation engineer", "ai application engineer", "ai agent engineer",

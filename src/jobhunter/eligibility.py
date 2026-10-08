@@ -110,7 +110,17 @@ def _snippet(text: str, start: int, end: int, width: int = 160) -> str:
     right_candidates = [i for i in (text.find(".", end), text.find("\n", end)) if i != -1]
     right = min(right_candidates) if right_candidates else len(text)
     snippet = " ".join(text[left:right].split())
-    return snippet if len(snippet) <= width else snippet[: width - 1].rstrip() + "\u2026"
+    if len(snippet) <= width:
+        return snippet
+    # A run-on line with no full stops: keep the part around the match, so the
+    # quote shows the words that matched ("Candidates must be based in ...").
+    lead = " ".join(text[left:start].split())
+    cut = max(0, len(lead) - width // 4)
+    if cut:
+        space = snippet.find(" ", cut)
+        cut = space + 1 if 0 <= space < cut + 20 else cut
+    window = snippet[cut:cut + width - 2].rstrip()
+    return ("\u2026" if cut else "") + window + ("\u2026" if cut + width - 2 < len(snippet) else "")
 
 
 class DescriptionSignals:

@@ -92,7 +92,12 @@ _YOE = re.compile(
     re.I,
 )
 _OPTIONAL_CONTEXT = re.compile(r"\b(?:preferred|nice to have|nice-to-have|bonus|ideally|a plus|is a plus)\b", re.I)
-_BRAG_CONTEXT = re.compile(r"\b(?:we have|our|company has|with over|for over)\s*$", re.I)
+# "With more than 10 years of experience in this field and 40 employees": a
+# sentence that opens this way is about the company; "Candidates with more
+# than 5 years" is not caught, since it does not start the sentence.
+_BRAG_CONTEXT = re.compile(
+    r"(?:\b(?:we have|our|company has|with over|for over)|(?:^|[.!?:]\s+)(?:with|for)\s+more\s+than)\s*$", re.I
+)
 
 
 def extract_required_yoe(text: str) -> int | None:
@@ -108,7 +113,7 @@ def extract_required_yoe(text: str) -> int | None:
         if _OPTIONAL_CONTEXT.search(line):
             continue
         for m in _YOE.finditer(line):
-            if _BRAG_CONTEXT.search(line[max(0, m.start() - 20):m.start()]):
+            if _BRAG_CONTEXT.search(line[max(0, m.start() - 22):m.start()]):
                 continue
             count = m.group(1).lower()
             years = int(count) if count.isdigit() else _NUMBER_WORDS[count]

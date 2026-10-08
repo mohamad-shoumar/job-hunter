@@ -26,6 +26,9 @@ from jobhunter.text import fix_mojibake, html_to_text, normalize_words, parse_da
         ("- 6+ years in software engineering with at least 2 years of focused experience building production AI", 6),
         ("Seven (7) years of experience with Python", 7),
         ("Someone years ahead", None),
+        # A company boast at the start of a sentence (#836).
+        ("We build media tools. With more than 10 years of experience in this field and 40 employees", None),
+        ("Candidates with more than 5 years of experience in Python", 5),
     ],
 )
 def test_required_yoe(text, years):

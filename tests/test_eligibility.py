@@ -140,3 +140,12 @@ def test_globally_remote_role_questions_a_city_location():
     # Canonical through Google Jobs: location "Dubai", text says the role is global.
     a = verdict(location_raw="Dubai", description="Location: this is a Globally remote role")
     assert (a.verdict, a.code) == (UNCLEAR, "conflict")
+
+
+def test_quote_shows_the_words_that_matched_in_a_run_on_line():
+    # Turing #1681: the description had no full stops, so the quote used to be
+    # the first 160 characters, which said nothing about location.
+    filler = "Commitment: flexible engagement, minimum 10 hrs/week, up to 40 hrs/week " * 4
+    result = verdict(location_raw="Remote", description=filler + "Location: Candidates must be based in the United States Benefits")
+    assert result.code == "residency_required"
+    assert "must be based in the United States" in result.reasons[0]
