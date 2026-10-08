@@ -25,14 +25,15 @@
     }
   ],
   "serpapi": {
-    "_note": "Google Jobs (includes LinkedIn postings). Needs SERPAPI_API_KEY in .env; skipped without it. One credit per query page per run: 7 queries x 1 page = 7 credits/day.",
+    "_note": "Google Jobs (includes LinkedIn postings). Needs SERPAPI_API_KEY in .env; skipped without it. One credit per query page per run: 8 queries x 1 page = 8 credits/day (~240/month; the Free plan has 250). 2026-10-09: dropped two word-order duplicates of 'python backend engineer', added mid/junior-friendly searches.",
     "engine": "google_jobs",
     "queries": [
       "python backend engineer remote",
-      "backend engineer python remote",
       "software engineer python remote",
       "fastapi engineer remote",
-      "backend developer python remote",
+      "python developer remote",
+      "mid level backend engineer remote",
+      "junior python developer remote",
       "trading systems engineer python",
       "algorithmic trading engineer python"
     ],
