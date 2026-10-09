@@ -205,6 +205,12 @@ def render(day: str, rows: list[sqlite3.Row], sightings: dict[int, list[sqlite3.
             out += [f"**Outreach** (open `jobhunter serve`): {'; '.join(parts) or 'nothing new'}", ""]
             lines = outreach.get("notes", []) + outreach.get("errors", [])
             out += [f"- {_cell(line)}" for line in lines] + ([""] if lines else [])
+        watched = summary.get("boards")
+        if watched and (watched["added"] or watched["errors"]):
+            out += [f"**Boards now watched** (a job there was shortlisted; `jobhunter boards`): "
+                    f"{len(watched['added'])}", ""]
+            out += [f"- {a['board']} ({_cell(a['company'])}): {_cell(a['reason'])}" for a in watched["added"]]
+            out += [f"- {_cell(line)}" for line in watched["errors"]] + [""]
         problems = [(name, e) for name, s in summary["sources"].items() for e in s["errors"]]
         notes = [(name, n) for name, s in summary["sources"].items() for n in s["notes"]]
         if problems:

@@ -20,9 +20,10 @@ from dataclasses import asdict, dataclass, field
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
 
+from . import boards
 from .ai_check import AiChecker, build_checker, check_jobs
 from .classify import classify
-from .config import Filters
+from .config import Filters, OutreachConfig
 from .extract import enrich
 from .http import Http
 from .models import NEEDS_REVIEW, UNCLEAR, Job
@@ -54,6 +55,7 @@ class RunSummary:
     config_notes: list[str] = field(default_factory=list)
     ai_check: dict | None = None
     outreach: dict | None = None
+    boards: dict | None = None
     # Job ids this run touched (new or seen again), and the new ones. Not saved.
     seen_ids: set[int] = field(default_factory=set)
     new_ids: list[int] = field(default_factory=list)
@@ -76,6 +78,7 @@ class RunSummary:
             "config_notes": self.config_notes,
             "ai_check": self.ai_check,
             "outreach": self.outreach,
+            "boards": self.boards,
         }
 
 
@@ -203,20 +206,23 @@ def run(root_paths, sources_config: dict, filters: Filters, only: set[str] | Non
         ai_checker, note = build_checker(root_paths.ai_check_file)
         if note:
             config_notes.append(note)
-    if only:
-        unknown = only - {s.name for s in sources}
-        if unknown:
-            raise SystemExit(f"unknown or disabled source(s): {', '.join(sorted(unknown))}")
-        sources = [s for s in sources if s.name in only]
-    if date_range:
-        since = datetime.combine(date_range[0], time.min).astimezone()  # local midnight
-        for source in sources:
-            source.since = since
+    watch = boards.WatchConfig.from_sources(sources_config)
 
     store = JobStore(root_paths.db_file)
     own_http = http is None
     http = http or Http()
     try:
+        if watch.enabled:
+            boards.add_watched_sources(sources, store, sources_config)
+        if only:
+            unknown = only - {s.name for s in sources}
+            if unknown:
+                raise SystemExit(f"unknown or disabled source(s): {', '.join(sorted(unknown))}")
+            sources = [s for s in sources if s.name in only]
+        if date_range:
+            since = datetime.combine(date_range[0], time.min).astimezone()  # local midnight
+            for source in sources:
+                source.since = since
         run_id = store.start_run(now)
         summary = RunSummary(run_id=run_id, started_at=iso(now), config_notes=config_notes)
         log.info("fetching %d sources: %s", len(sources), ", ".join(s.name for s in sources))
@@ -228,6 +234,15 @@ def run(root_paths, sources_config: dict, filters: Filters, only: set[str] | Non
             days = assign_daily(store, summary, now)
         if ai and ai_checker:
             ai_check_days(store, ai_checker, days, filters, now, summary)
+        if watch.enabled:
+            # After the AI check, so a job it shortlisted counts too. New boards are fetched from the next run.
+            try:
+                summary.boards = boards.watch_shortlisted(
+                    store, http, sources_config, filters, OutreachConfig.load(root_paths.outreach_file), now, watch,
+                ).to_dict()
+            except Exception as exc:
+                log.exception("watch boards step failed")
+                summary.boards = {"added": [], "probed": 0, "notes": [], "errors": [f"boards: {describe_error(exc)}"]}
         if outreach:
             # Date-range runs never spend lookup credits: they would use up the month.
             try:
