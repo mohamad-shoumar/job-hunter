@@ -1,14 +1,18 @@
 {
-  "_about": "AI web check for jobs the rules leave unclear (needs_review). Claude searches the web and must give an exact quote; the code checks the quote is really on the page before the job's status changes. Needs ANTHROPIC_API_KEY in .env; without it the check is skipped with a note. `enabled` controls the daily run only: `jobhunter check` works either way. See src/jobhunter/ai_check.py.",
+  "_about": "AI check for jobs the rules leave unclear (needs_review). The model must give an exact quote; the code checks the quote is really on the page before the job's status changes. `enabled` controls the daily run only: `jobhunter check` works either way. See src/jobhunter/ai_check.py.",
 
   "enabled": true,
-  "_model": "claude-opus-5-5 is the most careful (about $4 in / $20 out per million tokens). claude-sonnet-5 costs about half; claude-haiku-4-5 about a quarter.",
-  "model": "claude-opus-5-5",
-  "_max_jobs_per_run": "A cost cap. The rest wait for the next run or `jobhunter check`.",
+  "_model": "The first step. deepseek-* (DEEPSEEK_API_KEY, about $0.01 a job): code fetches the job's own links and its Greenhouse/Lever/Ashby posting, DeepSeek reads them; it cannot search the web. claude-code: the Claude Code CLI with web search on your Claude login, for every job. claude-* (ANTHROPIC_API_KEY): the API with its own web search, about $0.10-0.30 a job with claude-opus-5-5.",
+  "model": "deepseek-v4-pro",
+  "_web_model": "With a deepseek-* model: jobs it could not settle (no verdict, or its quote not found on a page) go here. claude-code or claude-code:sonnet runs the Claude Code CLI with WebSearch and WebFetch on your Claude login, so no API bill; about a minute a job. Code fetches the page it quotes and checks the quote there. Empty: DeepSeek only.",
+  "web_model": "claude-code",
+  "web_timeout": 420,
+  "_max_jobs_per_run": "A cap per daily run. The rest wait for the next run or `jobhunter check`.",
   "max_jobs_per_run": 25,
   "max_searches_per_job": 4,
+  "_max_fetches_per_job": "Pages code fetches for DeepSeek (and the Claude API may open).",
   "max_fetches_per_job": 3,
-  "_max_page_tokens": "How much of each fetched page is read. Pages are the biggest part of the cost.",
+  "_max_page_tokens": "Claude API only: how much of each fetched page is read.",
   "max_page_tokens": 12000,
-  "workers": 4
+  "workers": 3
 }

@@ -38,6 +38,17 @@ def test_claude_code_runs_with_no_tools_and_none_of_your_settings(monkeypatch):
     assert "--no-session-persistence" in args and "--strict-mcp-config" in args
 
 
+def test_claude_code_gets_only_the_tools_it_is_given(monkeypatch):
+    run = FakeRun(fixture_text("claude_code_result.json"))
+    monkeypatch.setattr(llm, "run_claude_code", run)
+    JsonModel("claude-code", tools="WebSearch,WebFetch").ask("Check.", [{"role": "user", "content": "Hi"}],
+                                                             SCHEMA, Usage(), "{}")
+    args, _ = run.calls[0]
+    assert args[args.index("--tools") + 1] == "WebSearch,WebFetch"
+    assert args[args.index("--allowedTools") + 1] == "WebSearch,WebFetch"  # -p cannot ask, so they are allowed up front
+    assert "--strict-mcp-config" in args and args[args.index("--setting-sources") + 1] == ""
+
+
 def test_a_retry_sends_the_earlier_turns_as_one_prompt(monkeypatch):
     run = FakeRun(fixture_text("claude_code_result.json"))
     monkeypatch.setattr(llm, "run_claude_code", run)

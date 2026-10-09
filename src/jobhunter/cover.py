@@ -152,7 +152,7 @@ def load_letter_facts(profile_path: Path, tags) -> LetterFacts:
         joined = _strip_notes(" ".join(lines))
         if joined and "TODO" not in joined and "answering" not in joined:
             facts.append(joined)
-    for name in ("Skills (confirmed)", "Education", "Certifications"):
+    for name in ("Skills (confirmed)", "Projects", "Education", "Certifications"):
         facts += _bullets(sections.get(name, ""))
 
     basics = my_details(text)

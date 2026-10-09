@@ -5,8 +5,18 @@ company hires from Lebanon ("Remote", no country list), Claude searches the
 web - the company's own posting of the role, its careers page - and records a
 verdict with a short quote and the page it came from.
 
+Two ways to run it (config/ai_check.json):
+- `model` "claude-*": the Anthropic API with its own web search and fetch.
+- `model` "deepseek-*" (no web search): code fetches the job's own links and,
+  for a Greenhouse/Lever/Ashby posting, its public API; DeepSeek reads them and
+  the description. Jobs it cannot settle go to `web_model` "claude-code": the
+  Claude Code CLI with WebSearch/WebFetch, on your Claude login, no API bill.
+  Code then fetches the page it names itself, because what Claude Code read
+  never reaches us.
+
 The quote is then checked in code: it must appear word for word in the job
-description or in text the API returned from a page Claude opened. Only a
+description or in text the API returned from a page Claude opened (or, for
+DeepSeek and Claude Code, a page code fetched). Only a
 verified quote changes a job's status (see classify.apply_ai_check):
 `cannot_hire` rejects it, `can_hire` shortlists it as `likely`. Anything else
 leaves it in needs_review with the finding attached.
@@ -17,22 +27,24 @@ job is checked once unless asked again (`jobhunter check --recheck`).
 
 from __future__ import annotations
 
+import html
 import json
 import logging
 import os
+import re
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, field, fields, replace
 from datetime import datetime
 from pathlib import Path
 
 from .classify import classify
 from .config import Filters
 from .eligibility import assess_eligibility
-from .llm import Usage, error_line, find_quote, forced_tool_choice, pages_read, plain
+from .llm import CLAUDE_CODE, JsonModel, Usage, error_line, find_quote, forced_tool_choice, json_model, pages_read, plain
 from .models import CAN_HIRE, CANNOT_HIRE, UNKNOWN_HIRE, AiCheck, Classification, Job
 from .store import JobStore, row_to_job
-from .text import iso
+from .text import html_to_text, iso
 
 log = logging.getLogger(__name__)
 
@@ -104,6 +116,10 @@ class AiCheckConfig:
 
     enabled: bool = False
     model: str = "claude-opus-5-5"
+    # With a deepseek-* model: the second step for jobs it could not settle ("claude-code", "claude-code:sonnet";
+    # empty: none).
+    web_model: str = ""
+    web_timeout: int = 420
     max_jobs_per_run: int = 25
     max_searches_per_job: int = 4
     max_fetches_per_job: int = 3
@@ -137,6 +153,7 @@ class AiChecker:
     def __init__(self, config: AiCheckConfig, client):
         self.config = config
         self.client = client
+        self.label = config.model
 
     def _tools(self) -> list[dict]:
         return [
@@ -190,11 +207,217 @@ class AiChecker:
         )
 
 
-def build_checker(config_file: Path, require_enabled: bool = True) -> tuple[AiChecker | None, str | None]:
+# --- DeepSeek over pages code fetched, then Claude Code with web search ------------------
+
+ANSWER_SCHEMA = {k: v for k, v in RECORD_VERDICT["input_schema"].items()}
+ANSWER_EXAMPLE = ('{"verdict": "cannot_hire", "reason": "The Greenhouse posting lists Remote - United States only.", '
+                  '"quote": "Location: Remote - United States", "source_url": "https://boards.greenhouse.io/acme/jobs/42"}')
+PAGE_CHARS = 12000
+# Job boards that block scripts (Himalayas answers 403) or need a login: no point fetching them.
+_NO_FETCH_HOSTS = ("himalayas.app", "linkedin.com", "indeed.com", "glassdoor.", "news.ycombinator.com")
+_URL_RE = re.compile(r"""https?://[^\s"'<>)\]]+""")
+_GREENHOUSE = re.compile(r"greenhouse\.io/(?:embed/job_app\?for=)?([\w-]+)/jobs/(\d+)", re.I)
+_LEVER = re.compile(r"jobs\.(eu\.)?lever\.co/([^/?#]+)/([0-9a-f]{8}-[0-9a-f-]{27})", re.I)
+_ASHBY = re.compile(r"jobs\.ashbyhq\.com/([^/?#]+)/([0-9a-f]{8}-[0-9a-f-]{27})", re.I)
+
+PAGES_SYSTEM = SYSTEM.split("Research the web")[0] + """\
+You cannot browse. Below are the job description and the pages code fetched \
+for this job (its own links and, when there is one, the company's posting on \
+its job board). Decide from them only.
+
+Verdicts:""" + SYSTEM.split("Verdicts:")[1].split("Evidence:")[0] + """\
+Evidence:
+- quote: copied character for character from one page below or the job \
+description. A short phrase or one sentence, under 300 characters. Do not \
+paraphrase, shorten with "...", or join separate parts.
+- source_url: the page's URL as given below, or "job description".
+- For unknown, quote and source_url may be empty.
+- reason: one plain sentence.
+"""
+
+WEB_SYSTEM = SYSTEM.replace("Research the web, then call record_verdict once.",
+                            "Research the web with WebSearch and WebFetch, then answer with the JSON verdict.") \
+    .replace("open it with web_fetch, so the quote can be checked against the page text.",
+             "open it with WebFetch. Code fetches that URL again and looks for the quote there, so quote the page's "
+             "own words, never a summary of it.")
+
+
+def _host(url: str) -> str:
+    return re.sub(r"^https?://(www\.)?", "", url).split("/")[0].lower()
+
+
+def posting_api_text(url: str, http) -> str | None:
+    """A Greenhouse, Lever or Ashby posting read through the board's public API: title, location and text.
+
+    Their pages are often built by JavaScript, so a plain fetch of the page has no location line."""
+    if m := _GREENHOUSE.search(url):
+        raw = http.get_json(f"https://boards-api.greenhouse.io/v1/boards/{m.group(1)}/jobs/{m.group(2)}")
+        location = (raw.get("location") or {}).get("name") or ""
+        return f"{raw.get('title') or ''}\nLocation: {location}\n\n{html_to_text(html.unescape(raw.get('content') or ''))}"
+    if m := _LEVER.search(url):
+        api = "api.eu.lever.co" if m.group(1) else "api.lever.co"
+        raw = http.get_json(f"https://{api}/v0/postings/{m.group(2)}/{m.group(3)}")
+        cats = raw.get("categories") or {}
+        places = ", ".join(cats.get("allLocations") or [cats.get("location") or ""])
+        return (f"{raw.get('text') or ''}\nLocation: {places}\nWorkplace: {raw.get('workplaceType') or ''}\n\n"
+                f"{raw.get('descriptionPlain') or ''}\n{raw.get('additionalPlain') or ''}")
+    if m := _ASHBY.search(url):
+        board = http.get_json(f"https://api.ashbyhq.com/posting-api/job-board/{m.group(1)}")
+        raw = next((j for j in board.get("jobs") or [] if str(j.get("id", "")).lower() == m.group(2).lower()), None)
+        if raw is None:
+            return None
+        places = [raw.get("location") or ""] + [s.get("location") or "" for s in raw.get("secondaryLocations") or []]
+        return (f"{raw.get('title') or ''}\nLocation: {', '.join(p for p in places if p)}\n"
+                f"Workplace: {raw.get('workplaceType') or ''}\n\n{raw.get('descriptionPlain') or ''}")
+    return None
+
+
+def fetch_page(url: str, http) -> tuple[str, str] | None:
+    """(readable text, everything the page returned) as code sees it, or None when it cannot be read.
+
+    An ATS posting is read through its board's API. The second part is only for finding a quote: a page
+    often keeps text in embedded data (Recruitee's application questions) that the readable text leaves out."""
+    try:
+        text = posting_api_text(url, http)
+        raw = text
+        if text is None:
+            raw = http.get_text(url)
+            text = html_to_text(raw)
+    except Exception as exc:
+        log.info("ai_check: could not read %s: %s", url, error_line(exc))
+        return None
+    if not text.strip():
+        return None
+    return text.strip(), html.unescape(raw)
+
+
+def _for_quotes(url: str, page: tuple[str, str]) -> list[tuple[str, str]]:
+    text, raw = page
+    return [(url, text)] + ([(url, raw)] if raw != text else [])
+
+
+def job_links(job: Job, limit: int) -> list[str]:
+    """The job's own links, then links in its description: a posting first, job boards that block scripts never."""
+    found = [job.application_url, job.source_url,
+             *(u.rstrip(".,;") for u in _URL_RE.findall(job.description or ""))]
+    links = [u for u in dict.fromkeys(u for u in found if u) if not any(h in _host(u) for h in _NO_FETCH_HOSTS)]
+    links.sort(key=lambda u: not (_GREENHOUSE.search(u) or _LEVER.search(u) or _ASHBY.search(u)))
+    return links[:limit]
+
+
+def _pages_message(job: Job, rule_reason: str, pages: list[tuple[str, str]]) -> str:
+    parts = [_job_message(job, rule_reason)]
+    for url, text in pages:
+        parts += ["", f"--- Page: {url} ---", text[:PAGE_CHARS]]
+    return "\n".join(parts)
+
+
+def _result(answer: dict, pages: list[tuple[str, str]], model: str, now: datetime, usage: Usage,
+            searches: int = 0) -> AiCheck:
+    verdict = answer.get("verdict") if answer.get("verdict") in (CAN_HIRE, CANNOT_HIRE) else UNKNOWN_HIRE
+    quote = " ".join(str(answer.get("quote") or "").split())
+    stated_url = str(answer.get("source_url") or "").strip()
+    found_at = find_quote(quote, pages, stated_url) if verdict != UNKNOWN_HIRE else None
+    return AiCheck(
+        verdict=verdict,
+        reason=" ".join(str(answer.get("reason") or "").split()),
+        quote=quote,
+        source_url=found_at or stated_url,
+        verified=found_at is not None,
+        model=model,
+        checked_at=iso(now),
+        searches=searches,
+        cost_usd=usage.cost(model),
+    )
+
+
+class PagesChecker:
+    """DeepSeek (or any JSON model) reading the description and the pages code fetched for the job."""
+
+    def __init__(self, config: AiCheckConfig, model: JsonModel, http):
+        self.config = config
+        self.model = model
+        self.http = http
+        self.label = config.model
+
+    def check(self, job: Job, now: datetime) -> AiCheck:
+        rule_reason = (assess_eligibility(job).reasons or [""])[0]
+        fetched = {url: page for url in job_links(job, self.config.max_fetches_per_job)
+                   if (page := fetch_page(url, self.http))}
+        usage = Usage()
+        message = _pages_message(job, rule_reason, [(url, text) for url, (text, _) in fetched.items()])
+        answer = self.model.ask(PAGES_SYSTEM, [{"role": "user", "content": message}], ANSWER_SCHEMA, usage,
+                                ANSWER_EXAMPLE, max_tokens=1024)
+        pages = [(JOB_DESCRIPTION, job.description or "")]
+        for url, page in fetched.items():
+            pages += _for_quotes(url, page)
+        return _result(answer, pages, self.config.model, now, usage)
+
+
+class WebChecker:
+    """The Claude Code CLI with WebSearch and WebFetch. What it read never reaches us, so code fetches the page it
+    names and looks for the quote there (or in the description)."""
+
+    def __init__(self, config: AiCheckConfig, model: JsonModel, http):
+        self.config = config
+        self.model = model
+        self.http = http
+        self.label = config.web_model
+
+    def check(self, job: Job, now: datetime) -> AiCheck:
+        rule_reason = (assess_eligibility(job).reasons or [""])[0]
+        usage = Usage()
+        prompt = (_job_message(job, rule_reason) + f"\n\nUse at most {self.config.max_searches_per_job} searches "
+                  f"and {self.config.max_fetches_per_job} page fetches.")
+        answer = self.model.ask(WEB_SYSTEM, [{"role": "user", "content": prompt}], ANSWER_SCHEMA, usage, ANSWER_EXAMPLE)
+        if not answer.get("verdict"):
+            raise RuntimeError("Claude Code gave no verdict")
+        stated_url = str(answer.get("source_url") or "").strip()
+        pages = [(JOB_DESCRIPTION, job.description or "")]
+        if stated_url.startswith("http") and (page := fetch_page(stated_url, self.http)):
+            pages += _for_quotes(stated_url, page)
+        return _result(answer, pages, self.config.web_model, now, usage)
+
+
+class TwoStepChecker:
+    """The cheap check first; the web check only for a job it could not settle with a quote found on a page."""
+
+    def __init__(self, first: PagesChecker, second: WebChecker):
+        self.first = first
+        self.second = second
+        self.config = first.config
+        self.label = f"{first.label}, then {second.label}"
+
+    def check(self, job: Job, now: datetime) -> AiCheck:
+        first = self.first.check(job, now)
+        if first.verified:
+            return first
+        return self.second.check(job, now)  # verified or not, it looked further
+
+
+def build_checker(config_file: Path, require_enabled: bool = True):
     """The checker, or None and (when it matters) a note saying why it is off."""
     config = AiCheckConfig.load(config_file)
     if require_enabled and not config.enabled:
         return None, None
+    if config.model.startswith(("deepseek", CLAUDE_CODE)):
+        from .http import Http
+
+        http = Http(timeout=20, retries=1)
+        first, note = json_model(config.model, "ai_check")
+        if first is None:
+            return None, f"ai_check skipped: {note}"
+        if config.model.startswith(CLAUDE_CODE):  # Claude Code alone: the web step for every job
+            first.tools, first.timeout = "WebSearch,WebFetch", config.web_timeout
+            return WebChecker(replace(config, web_model=config.model), first, http), None
+        checker = PagesChecker(config, first, http)
+        if not config.web_model:
+            return checker, None
+        web, note = json_model(config.web_model, "ai_check web step")
+        if web is None:
+            return checker, f"ai_check: no web step ({note}); DeepSeek only"
+        web.tools, web.timeout = "WebSearch,WebFetch", config.web_timeout
+        return TwoStepChecker(checker, WebChecker(config, web, http)), None
     if not os.environ.get("ANTHROPIC_API_KEY"):
         return None, "ai_check skipped: set ANTHROPIC_API_KEY in .env to turn it on"
     import anthropic  # only needed when the check runs
@@ -239,7 +462,7 @@ def check_jobs(store: JobStore, checker: AiChecker, rows, filters: Filters, now:
 
     on_result(row, check, classification) is called for each finished job.
     """
-    run = CheckRun(model=checker.config.model)
+    run = CheckRun(model=checker.label)
     rows = list(rows)
     if not rows:
         return run

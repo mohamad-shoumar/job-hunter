@@ -103,12 +103,26 @@ The result is one status: **shortlisted** (eligible or likely), **needs review**
 (unclear), or **rejected**.
 
 **4. AI check, only for "needs review".** (`src/jobhunter/ai_check.py`,
-`config/ai_check.json`) When the rules can't tell, Claude searches the web:
-the company's own posting of the role (which often says "Remote - US" where the
-job board said nothing) and its careers page. It must answer with an exact quote
-and the page it came from. The code then looks for that quote, word for word, in
-the job description or in the page text the API returned. Only a found quote
-counts:
+`config/ai_check.json`) When the rules can't tell, a model looks for the
+company's own posting of the role (which often says "Remote - US" where the job
+board said nothing) and its careers page, in two steps:
+
+1. **DeepSeek** (`model`, about $0.003–0.01 a job). It can't search the web, so
+   code fetches the job's own links and links in its description (never
+   Himalayas or LinkedIn, which block scripts), reading a Greenhouse, Lever or
+   Ashby posting through the board's public API. DeepSeek reads those pages and
+   the description.
+2. **Claude Code** (`web_model`, `claude-code`), only for jobs step 1 could not
+   settle: the Claude Code CLI with web search and fetch, signed in with your
+   Claude account, so no API bill (about 30–60 seconds a job). What it read
+   never reaches us, so code fetches the page it names itself.
+
+Either way it must answer with an exact quote and the page it came from, and
+the code looks for that quote, word for word, in the job description or in a
+page code itself fetched (its readable text or the data embedded in it, like
+Recruitee's application questions). `model: "claude-opus-5-5"` instead uses
+the Anthropic API with its own web search (`ANTHROPIC_API_KEY`, about
+$0.10–0.30 a job). Only a found quote counts:
 
 | AI answer | quote found | result |
 | --- | --- | --- |
@@ -118,10 +132,9 @@ counts:
 
 It runs at the end of `jobhunter run` for that day's new "needs review" jobs
 (at most `max_jobs_per_run`), and never on a job the rules already decided. Each
-job is checked once; results are stored, so `reclassify` keeps them. It needs
-`ANTHROPIC_API_KEY` in `.env` and costs roughly $0.10 to $0.30 per job with the
-default model (runs print an estimate). A found quote proves the text exists,
-not that the AI read it right, so the link is always shown.
+job is checked once; results are stored, so `reclassify` keeps them. Waiting
+jobs from earlier days: `jobhunter check --limit 250`. A found quote proves the
+text exists, not that the AI read it right, so the link is always shown.
 
 ## Outreach and tracking
 

@@ -155,7 +155,7 @@ def cmd_check(args) -> int:
         if not rows:
             print("nothing to check")
             return 0
-        print(f"checking {len(rows)} of {waiting} jobs with {checker.config.model}\n")
+        print(f"checking {len(rows)} of {waiting} jobs with {checker.label}\n")
 
         def show(row, check, cls):
             found = "" if check.verified or check.verdict == "unknown" else " (quote not found, not used)"

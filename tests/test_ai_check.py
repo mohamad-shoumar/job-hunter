@@ -4,7 +4,18 @@ import json
 from types import SimpleNamespace
 
 from jobhunter import pipeline
-from jobhunter.ai_check import AiCheckConfig, AiChecker, build_checker, check_jobs, find_quote
+from jobhunter.ai_check import (
+    JOB_DESCRIPTION,
+    AiCheckConfig,
+    AiChecker,
+    PagesChecker,
+    TwoStepChecker,
+    WebChecker,
+    build_checker,
+    check_jobs,
+    find_quote,
+    job_links,
+)
 from jobhunter.classify import classify
 from jobhunter.config import Paths
 from jobhunter.models import (
@@ -206,3 +217,109 @@ def test_no_ai_flag_skips_the_check(tmp_path, filters):
     summary, _ = pipeline.run(Paths(tmp_path), {"himalayas": {"queries": ["backend"]}}, filters, http=http,
                               now=NOW, ai=False, ai_checker=checker(client))
     assert client.calls == [] and summary.ai_check is None
+
+
+# --- DeepSeek over pages code fetched, then Claude Code with web search ----------------------
+
+GH_URL = "https://job-boards.greenhouse.io/acme/jobs/42"
+GH_API = "https://boards-api.greenhouse.io/v1/boards/acme/jobs/42"
+GH_JSON = {"title": "Senior Backend Engineer", "location": {"name": "Remote - United States"},
+           "content": "&lt;p&gt;We build APIs.&lt;/p&gt;"}
+
+
+class FakeModel:
+    """A JsonModel that returns canned answers and keeps what it was asked."""
+
+    def __init__(self, *answers):
+        self.answers = list(answers)
+        self.asked = []
+
+    def ask(self, system, messages, schema, usage, example, max_tokens=4096):
+        self.asked.append(messages[0]["content"])
+        return self.answers.pop(0)
+
+
+def answer(verdict=CANNOT_HIRE, quote="Location: Remote - United States", url=GH_URL):
+    return {"verdict": verdict, "reason": "The posting lists Remote - United States.", "quote": quote, "source_url": url}
+
+
+def deepseek(model, http, **config):
+    return PagesChecker(AiCheckConfig(enabled=True, workers=1, model="deepseek-v4-pro", **config), model, http)
+
+
+def web(model, http):
+    return WebChecker(AiCheckConfig(enabled=True, workers=1, model="deepseek-v4-pro", web_model="claude-code"),
+                      model, http)
+
+
+def test_deepseek_reads_the_posting_through_the_board_api_and_its_quote_is_checked(filters):
+    store = JobStore(":memory:")
+    job_id = stored_unclear_job(store, filters, application_url=GH_URL)
+    http = FakeHttp({GH_API: GH_JSON})
+    model = FakeModel(answer())
+    run = check_jobs(store, deepseek(model, http), [store.get(job_id)], filters, NOW)
+    assert run.checked == 1 and run.model == "deepseek-v4-pro"
+    assert f"--- Page: {GH_URL} ---" in model.asked[0] and "Location: Remote - United States" in model.asked[0]
+    row = store.get(job_id)
+    assert row["status"] == REJECTED and json.loads(row["ai_check_json"])["verified"] is True
+
+
+def test_deepseek_never_fetches_boards_that_block_scripts():
+    job = make_job(application_url="https://himalayas.app/companies/acme/jobs/backend",
+                   source_url="https://www.linkedin.com/jobs/view/1",
+                   description="Apply at https://acme.com/careers/backend. We build APIs.")
+    assert job_links(job, 3) == ["https://acme.com/careers/backend"]
+
+
+def test_a_deepseek_quote_on_no_page_is_not_used(filters):
+    store = JobStore(":memory:")
+    job_id = stored_unclear_job(store, filters, application_url=GH_URL)
+    model = FakeModel(answer(quote="Applicants must live in the United States"))
+    check_jobs(store, deepseek(model, FakeHttp({GH_API: GH_JSON})), [store.get(job_id)], filters, NOW)
+    row = store.get(job_id)
+    assert row["status"] == NEEDS_REVIEW and json.loads(row["ai_check_json"])["verified"] is False
+
+
+def test_claude_code_runs_only_when_deepseek_could_not_settle_it(filters):
+    first = FakeModel(answer(), {"verdict": "unknown", "reason": "Nothing says.", "quote": "", "source_url": ""})
+    second = FakeModel(answer())
+    http = FakeHttp({GH_API: GH_JSON})
+    two = TwoStepChecker(deepseek(first, http), web(second, http))
+    settled = two.check(make_job(application_url=GH_URL), NOW)
+    assert settled.verified and settled.model == "deepseek-v4-pro" and second.asked == []
+
+    unsettled = two.check(make_job(application_url=GH_URL), NOW)
+    assert len(second.asked) == 1 and "Company: Acme" in second.asked[0]
+    # Code fetched the page Claude Code named and found the quote there itself.
+    assert unsettled.verified and unsettled.model == "claude-code" and unsettled.source_url == GH_URL
+
+
+def test_a_claude_code_quote_counts_only_when_code_finds_it_on_the_page(filters):
+    http = FakeHttp({GH_API: GH_JSON, "https://acme.com/careers": RuntimeError("403")})
+    said = WebChecker.check(web(FakeModel(answer(quote="We only hire in the United States",
+                                                 url="https://acme.com/careers")), http), make_job(), NOW)
+    assert said.verdict == CANNOT_HIRE and not said.verified  # the page could not be read: nothing to check against
+
+    from_description = web(FakeModel(answer(quote="We build APIs with Python", url=JOB_DESCRIPTION)), http)
+    assert from_description.check(make_job(), NOW).verified
+
+    # Text a page keeps in embedded data (Recruitee's application questions) still counts: code fetched it.
+    page = ('<html><body><h1>Backend Engineer</h1><p>Remote</p><script type="application/json">'
+            '{"question": "Do you have a Polish business entity that can invoice B2B?"}</script></body></html>')
+    embedded = web(FakeModel(answer(quote="a Polish business entity that can invoice B2B", url="https://acme.com/o/1")),
+                   FakeHttp({"https://acme.com/o/1": page}))
+    assert embedded.check(make_job(), NOW).verified
+
+
+def test_build_checker_with_deepseek(tmp_path, monkeypatch):
+    config = tmp_path / "ai_check.json"
+    config.write_text('{"enabled": true, "model": "deepseek-v4-pro", "web_model": "claude-code"}')
+    checker_, note = build_checker(config)
+    assert checker_ is None and "DEEPSEEK_API_KEY" in note
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test")
+    checker_, note = build_checker(config)  # tests never find the claude program
+    assert isinstance(checker_, PagesChecker) and "no web step" in note
+    monkeypatch.setattr("jobhunter.llm.claude_code_bin", lambda: "/usr/local/bin/claude")
+    checker_, note = build_checker(config)
+    assert isinstance(checker_, TwoStepChecker) and note is None
+    assert checker_.label == "deepseek-v4-pro, then claude-code" and checker_.second.model.tools == "WebSearch,WebFetch"

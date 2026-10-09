@@ -171,11 +171,15 @@ class JsonModel:
     prompt, which JSON mode needs.
     """
 
-    def __init__(self, model: str, claude=None, deepseek_key: str | None = None, http=None):
+    def __init__(self, model: str, claude=None, deepseek_key: str | None = None, http=None, tools: str = "",
+                 timeout: int = CLAUDE_CODE_TIMEOUT):
         self.model = model
         self.claude = claude
         self._key = deepseek_key
         self._http = http
+        # Claude Code only: built-in tools it may use without asking ("WebSearch,WebFetch"); empty means none.
+        self.tools = tools
+        self.timeout = timeout
 
     def ask(self, system: str, messages: list[dict], schema: dict, usage: Usage, example: str,
             max_tokens: int = 4096) -> dict:
@@ -213,16 +217,17 @@ class JsonModel:
             return {}
 
     def _claude_code(self, system: str, messages: list[dict], schema: dict, usage: Usage) -> dict:
-        """One `claude -p` run with no tools and none of your settings, CLAUDE.md or memory.
+        """One `claude -p` run with only `self.tools` and none of your settings, CLAUDE.md or memory.
 
         `-p` takes one prompt, so a retry sends the earlier turns as text."""
         import json
 
         _, _, model = self.model.partition(":")
         args = [claude_code_bin() or "claude", "-p", "--output-format", "json", "--json-schema", json.dumps(schema),
-                "--system-prompt", system, "--tools", "", "--setting-sources", "", "--strict-mcp-config",
+                "--system-prompt", system, "--tools", self.tools, *(["--allowedTools", self.tools] if self.tools else []),
+                "--setting-sources", "", "--strict-mcp-config",
                 "--disable-slash-commands", "--no-session-persistence", *(["--model", model] if model else [])]
-        out = run_claude_code(args, _as_one_prompt(messages), CLAUDE_CODE_TIMEOUT)
+        out = run_claude_code(args, _as_one_prompt(messages), self.timeout)
         data = _json_object(out)
         if data.get("is_error") or not data:
             raise RuntimeError(f"claude -p: {' '.join(str(data.get('result') or out).split())[:300]}")
