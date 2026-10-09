@@ -209,6 +209,62 @@ def test_hackernews_company_drops_urls():
     assert job.company == "WorkHero"
 
 
+def _hn(text):
+    return hackernews.parse_comment({"id": 7, "text": text, "created_at": None})
+
+
+def test_hackernews_place_or_url_field_is_never_the_title():
+    # Trimmed from the October 2026 thread: the second field is a place, the role is later or in the body.
+    albs = _hn("Albs | Freiburg, Germany | ONSITE or HYBRID | Full-time | Member of Technical Staff (Senior &#x2F; Staff)"
+               "<p>Albs is an AI research lab in stealth.")
+    assert [j.title for j in albs] == ["Member of Technical Staff (Senior / Staff)"]
+    assert albs[0].allowed_locations == ["Freiburg, Germany", "ONSITE or HYBRID"]
+
+    yeet = _hn("yeet | Chicago, IL &#x2F; Remote | Full-Time<p>Building a dynamic runtime on top of the Linux BPF "
+               "sub-system. Looking for extremely talented &#x2F; passionate Rust developers &#x2F; Backend Engineers "
+               "with a deep interest in Linux internals, Distributed Systems, Dev Tools, Great Developer Experiences.")
+    assert [j.title for j in yeet] == ["Rust developers", "Backend Engineers"]
+    assert {j.location_raw for j in yeet} == {"Chicago, IL / Remote"}
+    assert [j.source_job_id for j in yeet] == ["7-0", "7-1"]
+
+
+def test_hackernews_reads_a_role_list_from_the_body():
+    sundream = _hn(
+        "Sundream Studio | Multiple Roles | Full-time &#x2F; Contract | NYC &#x2F; Remote"
+        "<p>Sundream Studio is an AI filmmaking app.<p>We’re hiring:"
+        "<p>• AI Video Content Creators — make films, ads, and tutorials with Sundream."
+        "<p>• Software Engineer — build the assistant, generation infrastructure, and editing tools."
+        "<p>• Go-to-Market — help filmmakers discover Sundream."
+        "<p>• Engineering Manager — lead technical execution, grow the engineering team."
+        "<p>Reach out directly at stefan@sundream.studio with the role you’re interested in."
+    )
+    assert [j.title for j in sundream] == ["Software Engineer", "Engineering Manager"]
+    assert sundream[0].location_raw == "NYC / Remote"
+
+    # A place written after a listed role is that job's location; links and salaries are not part of the title.
+    coder = _hn(
+        "Coder | <a href=\"https:&#x2F;&#x2F;coder.com&#x2F;\">https:&#x2F;&#x2F;coder.com&#x2F;</a> | Multiple roles | "
+        "Full-time<p>All positions are fully remote in the countries listed.<p>Engineering"
+        "<p>[1]Senior Software Engineer I (Agentic Engineering) - US"
+        "<p>[2]Staff Software Engineer (AI Governance) - UK&#x2F;Ireland&#x2F;Poland"
+        "<p>- Senior Full Stack Engineer ($150k-$200k) https:&#x2F;&#x2F;jobs.ashbyhq.com&#x2F;coder&#x2F;1"
+    )
+    assert [(j.title, j.location_raw) for j in coder] == [
+        ("Senior Software Engineer I (Agentic Engineering)", "US"),
+        ("Staff Software Engineer (AI Governance)", "UK/Ireland/Poland"),
+        ("Senior Full Stack Engineer", None),
+    ]
+
+
+def test_hackernews_without_any_role_keeps_an_honest_field():
+    clickhouse = _hn("ClickHouse | Remote | Full-time | https:&#x2F;&#x2F;clickhouse.com&#x2F;"
+                     "<p>ClickHouse Labs is an applied research group.")
+    assert [j.title for j in clickhouse] == ["Remote"]  # nothing names a role: rejected as before, not invented
+    apex = _hn("Apex Space | Multiple Roles | Full-Time | Onsite | Los Angeles, CA | apexspace.com"
+               "<p>We're hiring everything from technicians to all sorts of engineers: thermal, mechanical.")
+    assert [j.title for j in apex] == ["Multiple Roles"]
+
+
 def test_nodesk_tolerates_html_entities():
     feed = nodesk.DEFAULT_FEEDS[0]
     result = nodesk.NoDeskSource().fetch(FakeHttp({feed: fixture_text("nodesk.xml")}))
