@@ -1,4 +1,4 @@
-"""Command line: `jobhunter run | serve | contacts | inbox | check | report | reclassify | show | stats | sources`."""
+"""Command line: `jobhunter run | serve | contacts | inbox | check | report | reclassify | show | stats | boards | sources`."""
 
 from __future__ import annotations
 
@@ -101,11 +101,42 @@ def cmd_run(args) -> int:
         for line in o["notes"] + o["errors"]:
             print(f"  {line}")
         print("Open `jobhunter serve` to see contacts and send emails.\n")
+    if summary.boards and (summary.boards["added"] or summary.boards["errors"]):
+        print(f"Boards now watched: {len(summary.boards['added'])}")
+        for added in summary.boards["added"]:
+            print(f"  {added['board']} ({added['company']}): {added['reason']}")
+        for line in summary.boards["errors"]:
+            print(f"  {line}")
+        print()
     store = JobStore(paths.db_file)
     try:
         _print_report_counts(store, report_paths)
     finally:
         store.close()
+    return 0
+
+
+def cmd_boards(args) -> int:
+    """The company boards watched because a job there was shortlisted (boards.py)."""
+    from . import boards
+
+    paths, _, _ = _load(args)
+    store = JobStore(paths.db_file)
+    try:
+        if args.remove:
+            if not boards.remove(store, args.remove, utcnow()):
+                raise SystemExit(f"not watched: {args.remove} (write it as kind:slug, e.g. ashby:dualentry)")
+            print(f"stopped watching {args.remove}; it will not be added again")
+            return 0
+        rows = boards.watched(store, include_removed=args.all)
+    finally:
+        store.close()
+    if not rows:
+        print("no watched boards yet: one is added when a job at a company with a public board is shortlisted")
+    for row in rows:
+        removed = f"  (removed {row['removed_at'][:10]})" if row["removed_at"] else ""
+        print(f"{row['kind'] + ':' + row['slug']:32} {row['company']}  added {row['added_at'][:10]}{removed}")
+        print(f"{'':32} {row['reason']}")
     return 0
 
 
@@ -553,6 +584,11 @@ def main(argv: list[str] | None = None) -> int:
 
     p = sub.add_parser("stats", help="counts by status and source")
     p.set_defaults(func=cmd_stats)
+
+    p = sub.add_parser("boards", help="company job boards watched because a job there was shortlisted")
+    p.add_argument("--remove", metavar="KIND:SLUG", help="stop watching one, e.g. ashby:dualentry (never re-added)")
+    p.add_argument("--all", action="store_true", help="include removed boards")
+    p.set_defaults(func=cmd_boards)
 
     p = sub.add_parser("sources", help="which sources are enabled")
     p.set_defaults(func=cmd_sources)

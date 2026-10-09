@@ -35,6 +35,9 @@ BUILDERS = {
     "nodesk": nodesk.from_config,
 }
 
+# Sections that configure something other than one source (boards.py reads "watch_boards").
+SETTINGS = {"watch_boards"}
+
 # Checked 2026-09-25. Listed here so a config section for them is explained
 # instead of silently ignored.
 NOT_IMPLEMENTED = {
@@ -51,7 +54,7 @@ def build_sources(config: dict) -> tuple[list[Source], list[str]]:
     sources: list[Source] = []
     notes: list[str] = []
     for key, section in config.items():
-        if key.startswith("_"):
+        if key.startswith("_") or key in SETTINGS:
             continue
         if key in BUILDERS:
             source = BUILDERS[key](section)

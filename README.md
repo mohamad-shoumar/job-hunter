@@ -44,6 +44,7 @@ open reports/$(date +%F).md
 | `jobhunter show <id>` | everything stored about one job and why it got its status (`-d` adds the description) |
 | `jobhunter reclassify` | re-apply the rules to every stored job after you edit `config/filters.json`, and rebuild the day files that changed |
 | `jobhunter report --date 2026-09-25` | rebuild one day's file from the database |
+| `jobhunter boards` | company boards watched because a job there was shortlisted (`--remove ashby:acme` stops one for good, `--all` shows removed ones) |
 | `jobhunter stats` / `jobhunter sources` | counts by status and source / which sources are on |
 
 ## Reports
@@ -388,6 +389,25 @@ Checked on 2026-09-25, SerpApi on 2026-09-27.
 
 Board fixes made while testing: Circle.so is on Ashby (`circle`), Kraken moved to
 Ashby (`kraken.com`), and Token Metrics' Lever board no longer exists (disabled).
+
+**Watched boards** (`src/jobhunter/boards.py`). A shortlisted job means its
+company can hire from Lebanon, so after each run the code looks for that
+company's own Greenhouse, Lever or Ashby board and fetches it from the next run
+on, next to the boards in `config/sources.json`. Its new jobs then arrive
+straight from the source, often before a job site reposts them, and with the
+board's exact location line. The board comes from the job's own link
+(`jobs.ashbyhq.com/<slug>/...`), or else from trying slugs made from the company
+name (and its domain): a guessed board is kept only when it lists the
+shortlisted job's title, or (Greenhouse) names the same company, so a slug that
+belongs to someone else is not watched. Each board keeps that evidence, shown
+in the run's output, the day's report and `jobhunter boards`. Job sites and
+agencies (`skip_companies`, "Not a real employer" in the app) and blocked
+companies are never watched; a company with no board found is tried again after
+`retry_after_days` (30); at most `max_probes_per_run` (10) companies are tried
+per run. The list lives in the database (`watched_boards`), not in
+`config/sources.json`, whose `watch_boards` section only holds these settings
+(`"enabled": false` turns it off). A board you remove with `jobhunter boards
+--remove kind:slug` is never added again.
 
 ## Config
 

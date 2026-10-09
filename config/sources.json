@@ -3,6 +3,13 @@
 
   "_greenhouse_boards": "Removed 2026-09-27: these boards' remote roles were US/Canada or single-country only. The greenhouse adapter still exists; add a \"greenhouse_boards\" list back to use it for a company that hires internationally.",
 
+  "watch_boards": {
+    "_note": "After each run, the Greenhouse/Lever/Ashby board of every company with a shortlisted job is found (from the job's own links, else by trying slugs of its name and keeping a board only if it lists the job's title) and fetched from the next run on. Stored in the database, not here: `jobhunter boards` lists them, `jobhunter boards --remove kind:slug` drops one for good. Job sites, agencies and blocked companies are never watched. See src/jobhunter/boards.py.",
+    "enabled": true,
+    "max_probes_per_run": 10,
+    "retry_after_days": 30
+  },
+
   "lever_boards": [
     { "company": "Metabase", "board_token": "metabase" },
     { "company": "Wintermute Trading", "board_token": "wintermute-trading" },
