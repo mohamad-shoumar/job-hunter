@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:tt="https://teamtailor.com/locations">
+  <channel>
+    <title>spiderSilk</title>
+    <description>Current Job Openings</description>
+    <link>https://spidersilk.teamtailor.com/jobs</link>
+    <item>
+      <title>Forward Deployed Engineer - Silkrunner</title>
+      <description>&lt;p&gt;&lt;span&gt;&lt;strong&gt;Who We Are!&lt;br&gt;&lt;br&gt;&lt;/strong&gt;&lt;/span&gt;Back in 2019, spiderSilk was born with a bold idea: build regional, sovereign cybersecurity IP that could stand tall on the global stage.&lt;/p&gt;&lt;p&gt;Our mission? To shake up the way organizations protect their ever-changing digital worlds with continuous, intelligent, and autonomous security that doesn't miss a beat.&lt;/p&gt;&lt;p&gt;We're a global mix of curious minds, problem-solvers, and passionate builders, all united by one goal: making the internet a safer place for everyone. Around here&lt;/p&gt;</description>
+      <pubDate>Wed, 22 Jul 2026 15:37:08 +0400</pubDate>
+      <link>https://spidersilk.teamtailor.com/jobs/8108539-forward-deployed-engineer-silkrunner</link>
+      <remoteStatus>none</remoteStatus>
+      <guid>faa5e6b6-c321-47fe-bf15-ea8ca42f7d7d</guid>
+      <tt:locations>
+        <tt:location>
+          <tt:name></tt:name>
+          <tt:address>United Arab Emirates</tt:address>
+          <tt:zip/>
+          <tt:city>Dubai</tt:city>
+          <tt:country>United Arab Emirates</tt:country>
+        </tt:location>
+      </tt:locations>
+      <tt:department>Engineering</tt:department>
+      <tt:role/>
+    </item><item>
+      <title>Senior Software Engineer (Backend)</title>
+      <description>&lt;p&gt;&lt;strong&gt;Who We Are!&lt;/strong&gt;&lt;/p&gt;&lt;p&gt;Back in 2019, spiderSilk was born with a bold idea: build regional, sovereign cybersecurity IP that could stand tall on the global stage.&lt;/p&gt;&lt;p&gt;Our mission? To shake up the way organizations protect their ever-changing digital worlds with continuous, intelligent, and autonomous security that doesn’t miss a beat.&lt;/p&gt;&lt;p&gt;We’re a global mix of curious minds, problem-solvers, and passionate builders, all united by one goal: making the internet a safer place for everyone. Around here, we thrive on vision, ene&lt;/p&gt;</description>
+      <pubDate>Thu, 02 Oct 2025 15:24:58 +0400</pubDate>
+      <link>https://spidersilk.teamtailor.com/jobs/6554296-senior-software-engineer-backend</link>
+      <remoteStatus>none</remoteStatus>
+      <guid>9528ca8f-a5f7-465e-9815-a92bb734407d</guid>
+      <tt:locations>
+        <tt:location>
+          <tt:name></tt:name>
+          <tt:address>United Arab Emirates</tt:address>
+          <tt:zip/>
+          <tt:city>Dubai</tt:city>
+          <tt:country>United Arab Emirates</tt:country>
+        </tt:location>
+      </tt:locations>
+      <tt:department>Engineering</tt:department>
+      <tt:role/>
+    </item>
+  </channel>
+</rss>

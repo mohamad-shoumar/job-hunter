@@ -1,0 +1,47 @@
+{
+ "meta": {
+  "totalCount": 2
+ },
+ "result": [
+  {
+   "id": "565",
+   "jobOpeningName": "Staff Backend Engineer ",
+   "departmentId": "18707",
+   "departmentLabel": "Basecamp - Engineering",
+   "employmentStatusLabel": "Full-Time",
+   "employmentType": null,
+   "location": {
+    "city": "Metn",
+    "state": "Metn"
+   },
+   "atsLocation": {
+    "country": null,
+    "state": null,
+    "province": null,
+    "city": null
+   },
+   "isRemote": null,
+   "locationType": "2"
+  },
+  {
+   "id": "119",
+   "jobOpeningName": "Account Manager ",
+   "departmentId": "18712",
+   "departmentLabel": "Marketplace - Iraq",
+   "employmentStatusLabel": "Full-Time",
+   "employmentType": null,
+   "location": {
+    "city": "Najaf",
+    "state": "Najaf"
+   },
+   "atsLocation": {
+    "country": null,
+    "state": null,
+    "province": null,
+    "city": null
+   },
+   "isRemote": null,
+   "locationType": "0"
+  }
+ ]
+}

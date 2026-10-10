@@ -32,6 +32,7 @@ from .geo import (
     utc_offsets_allow_lebanon,
 )
 from .models import ELIGIBLE, HYBRID, LIKELY, NOT_ELIGIBLE, ONSITE, UNCLEAR, Assessment, Job
+from .relocation import Relocation, assess_relocation
 
 # --- description scanning ---------------------------------------------------
 
@@ -182,7 +183,8 @@ def _quote(matches: list[PlaceMatch]) -> str:
     return "; ".join(dict.fromkeys(f'"{m.evidence}"' for m in matches))
 
 
-def assess_eligibility(job: Job) -> Assessment:
+def assess_eligibility(job: Job, relocation: Relocation | None = None) -> Assessment:
+    """`relocation`: the countries you would move to (relocation.py). Jobs there may be on-site."""
     field_texts = job.allowed_locations or ([job.location_raw] if job.location_raw else [])
     field_matches = [classify_place(t, field=True) for t in field_texts]
     title_matches = scan_title(job.title)
@@ -191,6 +193,13 @@ def assess_eligibility(job: Job) -> Assessment:
     lebanon = [m for m in everything if m.kind == LEBANON]
     if lebanon:
         return Assessment(ELIGIBLE, [f"Lebanon is listed: {_quote(lebanon)}"], "lebanon_listed")
+
+    # In a country you would move to, on-site is fine; so is "Remote (UAE)", which means living there.
+    # A region that includes Lebanon ("EMEA, Dubai") is still the remote path below.
+    if relocation:
+        place = relocation.place_in(field_texts + [m.evidence for m in title_matches])
+        if place and (job.remote_status in (ONSITE, HYBRID) or not any(m.kind in POSITIVE_KINDS for m in everything)):
+            return assess_relocation(job, place, relocation)
 
     if job.remote_status in (ONSITE, HYBRID):
         where = job.location_raw or ", ".join(job.allowed_locations) or "no location given"

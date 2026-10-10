@@ -1,0 +1,82 @@
+{
+ "id": "744000154064000",
+ "name": "Associate Operations Training & Onboarding - instashop",
+ "uuid": "ea035c61-6963-454c-839a-1cdc61a20ac8",
+ "jobId": "5ba5cd79-d0be-4d80-8187-5ced672a0665",
+ "jobAdId": "93940f7d-bd12-4e08-b7a6-209d4c34637e",
+ "defaultJobAd": true,
+ "refNumber": "REF19342E",
+ "company": {
+  "name": "Delivery Hero",
+  "identifier": "DeliveryHero"
+ },
+ "location": {
+  "city": "Dubai",
+  "region": "Dubai",
+  "country": "ae",
+  "remote": false,
+  "hybrid": false,
+  "latitude": "25.2048493",
+  "longitude": "55.2707828",
+  "fullLocation": "Dubai, Dubai, United Arab Emirates"
+ },
+ "customField": [
+  {
+   "fieldId": "6564ad3fee5f2f5b84045448",
+   "fieldLabel": "Job Family Group",
+   "valueId": "ef2e8d3982de01af01204cd9d1161100",
+   "valueLabel": "Operations"
+  }
+ ],
+ "releasedDate": "2026-10-07T10:32:23.111Z",
+ "creator": {
+  "name": "",
+  "avatarUrl": ""
+ },
+ "postingUrl": "https://jobs.smartrecruiters.com/DeliveryHero/744000154064000-associate-operations-training-onboarding-instashop",
+ "applyUrl": "https://jobs.smartrecruiters.com/DeliveryHero/744000154064000-associate-operations-training-onboarding-instashop?oga=true",
+ "referralUrl": "https://jobs.smartrecruiters.com/external-referrals/company/DeliveryHero/publication/ea035c61-6963-454c-839a-1cdc61a20ac8?dcr_ci=DeliveryHero",
+ "jobAd": {
+  "sections": {
+   "companyDescription": {
+    "title": "Company Description",
+    "text": "<p>instashop, headquartered in Dubai, is the leading online local marketplace in the UAE and Egypt . Since joining the Delivery Hero family in 2020, the global leader in online food delivery and q-commerce, instashop has been setting the standard for excellence and convenience in the region.</p><p>With a dynamic and motivated team fueled by passion and innovation, every day at instashop is an oppo"
+   },
+   "jobDescription": {
+    "title": "Job Description",
+    "text": "<p>As an Associate Operations Training &amp; Onboarding, you will support the delivery and execution of onboarding and training programs for riders, pickers, and operational teams. You will work closely with other teams to ensure new and existing team members receive the required training, complete mandatory requirements, and are ready to perform effectively in their roles.</p><p><strong>Day-to-Da"
+   },
+   "qualifications": {
+    "title": "Qualifications",
+    "text": "<p><strong>Key Qualifications</strong></p><ul><li>Bachelor\u2019s Degree required.&#xa0;</li><li>Minimum 3 years of experience and 1+&#xa0;within Training, L&amp;D or related functions within operations</li><li>Strong communication skills in<strong> </strong>English, Hindi/Urdu both verbal and written</li><li>Experience with e-learning platforms</li><li>Proficiency in MS Office (Word, Excel, PowerPoint"
+   },
+   "additionalInformation": {
+    "title": "Additional Information",
+    "text": ""
+   }
+  }
+ },
+ "active": true,
+ "visibility": "PUBLIC",
+ "industry": {
+  "id": "internet",
+  "label": "Internet"
+ },
+ "function": {
+  "id": "general_business",
+  "label": "General Business"
+ },
+ "experienceLevel": {
+  "id": "associate",
+  "label": "Associate"
+ },
+ "typeOfEmployment": {
+  "id": "permanent",
+  "label": "Full-time"
+ },
+ "language": {
+  "code": "en",
+  "label": "English",
+  "labelNative": "English (US)"
+ }
+}

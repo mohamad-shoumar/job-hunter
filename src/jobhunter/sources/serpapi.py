@@ -11,6 +11,11 @@ The posted age, "Work from home", schedule and salary usually arrive only as
 plain strings in `extensions` (["2 days ago", "82K–111K a year", "Work from
 home", "Full-time"]); `detected_extensions` is often nearly empty (checked
 against a real response, 2026-09-27).
+
+A query is a string, or {"q", "location", "every_days", "day"} to search one
+city ("Dubai,Dubai,United Arab Emirates", a name from serpapi.com/locations.json)
+and to run only on some days, so the monthly credits last: every_days 3 with
+day 0, 1 and 2 runs one of three cities each day.
 """
 
 from __future__ import annotations
@@ -29,7 +34,7 @@ API = "https://serpapi.com/search.json"
 class SerpApiSource(Source):
     name = "serpapi"
 
-    def __init__(self, queries: list[str], pages_per_query: int = 1, engine: str = "google_jobs", params: dict | None = None):
+    def __init__(self, queries: list, pages_per_query: int = 1, engine: str = "google_jobs", params: dict | None = None):
         self.queries = queries
         self.pages_per_query = pages_per_query
         self.engine = engine
@@ -42,10 +47,16 @@ class SerpApiSource(Source):
             result.notes.append("SERPAPI_API_KEY is not set; source skipped")
             return result
         now = utcnow()
-        for query in self.queries:
+        for entry in self.queries:
+            entry = entry if isinstance(entry, dict) else {"q": entry}
+            every = int(entry.get("every_days") or 1)
+            if now.date().toordinal() % every != int(entry.get("day") or 0) % every:
+                continue
+            query = entry["q"]
+            extra = {"location": entry["location"]} if entry.get("location") else {}
             token = None
             for page in range(self.pages_per_query):
-                params = {"engine": self.engine, "q": query, "hl": "en", "api_key": api_key, **self.params}
+                params = {"engine": self.engine, "q": query, "hl": "en", "api_key": api_key, **self.params, **extra}
                 if token:
                     params["next_page_token"] = token
                 try:

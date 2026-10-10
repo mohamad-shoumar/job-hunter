@@ -1,0 +1,117 @@
+{
+ "offset": 0,
+ "limit": 100,
+ "totalFound": 2,
+ "content": [
+  {
+   "id": "744000104669132",
+   "name": "Senior Software Engineer- Backend",
+   "uuid": "a5fccd5b-ded7-4f87-844b-15495354983d",
+   "jobAdId": "e09b3eb6-19d1-481e-9c50-726113a802ad",
+   "defaultJobAd": true,
+   "refNumber": "REF9113Y",
+   "company": {
+    "identifier": "DeliveryHero",
+    "name": "Delivery Hero"
+   },
+   "releasedDate": "2026-01-21T11:39:04.916Z",
+   "location": {
+    "city": "Dubai",
+    "region": "Dubai",
+    "country": "ae",
+    "remote": false,
+    "hybrid": false,
+    "latitude": "25.2048493",
+    "longitude": "55.2707828",
+    "fullLocation": "Dubai, Dubai, United Arab Emirates"
+   },
+   "industry": {
+    "id": "internet",
+    "label": "Internet"
+   },
+   "department": {},
+   "function": {
+    "id": "information_technology",
+    "label": "Information Technology"
+   },
+   "typeOfEmployment": {
+    "id": "permanent",
+    "label": "Full-time"
+   },
+   "experienceLevel": {
+    "id": "associate",
+    "label": "Associate"
+   },
+   "customField": [
+    {
+     "fieldId": "6564ae9ddd552072c3a97453",
+     "fieldLabel": "Time Type",
+     "valueId": "421938a4e1d40118e396324490147300",
+     "valueLabel": "Full time"
+    }
+   ],
+   "visibility": "PUBLIC",
+   "ref": "https://api.smartrecruiters.com/v1/companies/deliveryhero/postings/744000104669132",
+   "language": {
+    "code": "en",
+    "label": "English",
+    "labelNative": "English (US)"
+   }
+  },
+  {
+   "id": "744000154064000",
+   "name": "Associate Operations Training & Onboarding - instashop",
+   "uuid": "ea035c61-6963-454c-839a-1cdc61a20ac8",
+   "jobAdId": "93940f7d-bd12-4e08-b7a6-209d4c34637e",
+   "defaultJobAd": true,
+   "refNumber": "REF19342E",
+   "company": {
+    "identifier": "DeliveryHero",
+    "name": "Delivery Hero"
+   },
+   "releasedDate": "2026-10-07T10:32:23.111Z",
+   "location": {
+    "city": "Dubai",
+    "region": "Dubai",
+    "country": "ae",
+    "remote": false,
+    "hybrid": false,
+    "latitude": "25.2048493",
+    "longitude": "55.2707828",
+    "fullLocation": "Dubai, Dubai, United Arab Emirates"
+   },
+   "industry": {
+    "id": "internet",
+    "label": "Internet"
+   },
+   "department": {},
+   "function": {
+    "id": "general_business",
+    "label": "General Business"
+   },
+   "typeOfEmployment": {
+    "id": "permanent",
+    "label": "Full-time"
+   },
+   "experienceLevel": {
+    "id": "associate",
+    "label": "Associate"
+   },
+   "customField": [
+    {
+     "fieldId": "6564ae9ddd552072c3a97453",
+     "fieldLabel": "Time Type",
+     "valueId": "421938a4e1d40118e396324490147300",
+     "valueLabel": "Full time"
+    }
+   ],
+   "visibility": "PUBLIC",
+   "ref": "https://api.smartrecruiters.com/v1/companies/deliveryhero/postings/744000154064000",
+   "language": {
+    "code": "en",
+    "label": "English",
+    "labelNative": "English (US)"
+   }
+  }
+ ]
+}

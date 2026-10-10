@@ -384,3 +384,20 @@ def test_getro_isolates_a_broken_board():
     result = source.fetch(http)
     assert result.errors == ["Gone (1) 'x': HTTP 500 from https://api.getro.com/api/v2/collections/1/search/jobs"]
     assert len(result.jobs) == 3
+
+
+def test_serpapi_city_queries_run_on_their_day_with_their_location(monkeypatch):
+    monkeypatch.setenv("SERPAPI_API_KEY", "secret")
+    from jobhunter.text import utcnow
+
+    today = utcnow().date().toordinal() % 3
+    queries = ["python remote"] + [
+        {"q": "backend engineer", "location": city, "every_days": 3, "day": day}
+        for day, city in enumerate(["Dubai,Dubai,United Arab Emirates", "Abu Dhabi,Abu Dhabi,United Arab Emirates",
+                                    "Doha,Doha Municipality,Qatar"])
+    ]
+    http = FakeHttp({serpapi.API: {"jobs_results": []}})
+    serpapi.SerpApiSource(queries).fetch(http)
+    sent = [(p["q"], p.get("location")) for _, p in http.calls]
+    city = queries[1 + today]["location"]
+    assert sent == [("python remote", None), ("backend engineer", city)]

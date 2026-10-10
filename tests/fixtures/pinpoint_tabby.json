@@ -1,0 +1,104 @@
+{
+ "data": [
+  {
+   "id": "570514",
+   "benefits": "<ul><li><!--block-->Full-time B2B contract</li><li><!--block-->Fully remote setup</li><li><!--block-->Up to 20% tax allowance</li><li><!--block-->22 paid leave days annually</li><li><!--block-->Stock options (ESOP) in a fast-scaling, pre-IPO company</li><li><!--block-->Flexi benefits you can use for wellness, travel, or learning</li><li><!--block-->Work alongside a high-performing, international e",
+   "benefits_header": "What we offer:",
+   "compensation": null,
+   "compensation_minimum": null,
+   "compensation_maximum": null,
+   "compensation_currency": null,
+   "compensation_frequency": null,
+   "compensation_visible": true,
+   "deadline_at": null,
+   "description": "<div><!--block--><strong>Tabby </strong>creates financial freedom in the way people shop, earn and save by reshaping their relationship with money. Over 25 million users choose Tabby to stay in control of their spending and make the most out of their money.<br><br>The company\u2019s flagship offering allows shoppers to split their payments online and in-store with no interest or fees. Over 70,000 globa",
+   "employment_type": "full_time",
+   "employment_type_text": "Full Time",
+   "key_responsibilities": "<ul><li><!--block-->Development Features store and other future data services;</li><li><!--block-->Development EL / ELT / ETL pipelines;</li><li><!--block-->Integration new tools for data processing and data storing;</li></ul>",
+   "key_responsibilities_header": "Key Responsibilities:",
+   "reporting_to": null,
+   "skills_knowledge_expertise": "<ul><li><!--block-->3-5 years of experience as Data Engineer, ML Engineer, Backend Engineer;&nbsp;</li><li><!--block-->Experience in developing high-load and scalable data processing and storage systems;</li><li><!--block-->Good knowledge and background in event driving systems and streaming pipelines;</li><li><!--block-->Python + best practice for Python;</li><li><!--block-->SQL + best practice f",
+   "skills_knowledge_expertise_header": "Skills, Knowledge & Expertise:",
+   "title": "Senior Data Engineer ",
+   "url": "https://tabby.pinpointhq.com/en/postings/8afc0d43-fc8e-4daf-9854-745aea71ae6d",
+   "path": "/en/postings/8afc0d43-fc8e-4daf-9854-745aea71ae6d",
+   "workplace_type": "remote",
+   "workplace_type_text": "Fully remote",
+   "job": {
+    "id": "572768",
+    "requisition_id": null,
+    "department": {
+     "id": "31997",
+     "name": "Data Platform & ML"
+    },
+    "division": {
+     "id": "2373",
+     "name": "Engineering"
+    },
+    "structure_custom_group_one": {
+     "id": "5976",
+     "name": "Tabby",
+     "title": "Brand"
+    }
+   },
+   "location": {
+    "id": "25231",
+    "city": "Belgrade",
+    "name": "Remote",
+    "postal_code": "/",
+    "province": "/",
+    "street_address": "/"
+   }
+  },
+  {
+   "id": "566430",
+   "benefits": null,
+   "benefits_header": "Job Benefits",
+   "compensation": null,
+   "compensation_minimum": null,
+   "compensation_maximum": null,
+   "compensation_currency": null,
+   "compensation_frequency": null,
+   "compensation_visible": true,
+   "deadline_at": null,
+   "description": "<h2><!--block--><strong>About the Role</strong></h2><div><!--block-->At Tabby, the LLM (Large Language Model) Agent handles most transactional contacts. What reaches a human is the hard part: judgment, research, empathy, and landing on a resolution the customer accepts as fair.</div><div><!--block--><br>This role owns how well we do that. You define what a good customer conversation looks like and",
+   "employment_type": "full_time",
+   "employment_type_text": "Full Time",
+   "key_responsibilities": "<div><!--block--><strong>Customer Centricity Standard</strong></div><ul><li><!--block-->Define what a good customer conversation looks like and keep it to a short set of criteria.</li><li><!--block-->Evaluate on a single judgement per interaction: did it meet the standard, and if not, which of three to five reasons explains it.</li><li><!--block-->Keep the standard current as products, policies, a",
+   "key_responsibilities_header": "Key Responsibilities",
+   "reporting_to": null,
+   "skills_knowledge_expertise": "<ul><li><!--block-->Experience coaching people to win customers over, in telesales, retail, hospitality, or service recovery.</li><li><!--block-->Not so much a checklist owner. Rather a sales coach. We have the product that we have to sell - the agents must be fluent in making the customers satisfied with the outcome regardless of excuses.</li><li><!--block-->Data fluent. You can take a large data",
+   "skills_knowledge_expertise_header": "Skills, Knowledge & Expertise",
+   "title": "Senior Manager, Customer Centricity",
+   "url": "https://tabby.pinpointhq.com/en/postings/6b2e9e8a-bc09-45b1-b97a-40d5074e23b5",
+   "path": "/en/postings/6b2e9e8a-bc09-45b1-b97a-40d5074e23b5",
+   "workplace_type": "onsite",
+   "workplace_type_text": "Onsite",
+   "job": {
+    "id": "569095",
+    "requisition_id": "3112",
+    "department": {
+     "id": "49986",
+     "name": "Training and Quality"
+    },
+    "division": {
+     "id": "2430",
+     "name": "Customer Experience"
+    },
+    "structure_custom_group_one": {
+     "id": "5976",
+     "name": "Tabby",
+     "title": "Brand"
+    }
+   },
+   "location": {
+    "id": "25429",
+    "city": "Dubai",
+    "name": "UAE",
+    "postal_code": "",
+    "province": "United Arab Emirates",
+    "street_address": ""
+   }
+  }
+ ]
+}

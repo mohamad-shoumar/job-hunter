@@ -10,6 +10,7 @@ from pathlib import Path
 
 from .agency import AgencyRules
 from .identity import company_key
+from .relocation import Relocation
 from .text import normalize_words
 
 
@@ -114,6 +115,10 @@ class Filters:
     blocked_companies: dict[str, tuple[str, str]] = field(default_factory=dict)
     # Staffing agencies and talent marketplaces (agency.py): rejected with what matched.
     agencies: AgencyRules = field(default_factory=AgencyRules)
+    # A company's own careers page keeps a job listed while it is open, often for months.
+    max_posting_age_days_company_boards: int | None = None
+    # Countries you would move to (relocation.py): jobs there may be on-site. None: remote only.
+    relocation: Relocation | None = None
 
     @classmethod
     def from_dict(cls, data: dict) -> Filters:
@@ -133,6 +138,8 @@ class Filters:
             blocked_companies={company_key(b["name"]): (b["name"], b.get("why", ""))
                                for b in data.get("blocked_companies", []) if company_key(b["name"])},
             agencies=AgencyRules.from_dict(data.get("agencies")),
+            relocation=Relocation.from_dict(data.get("relocation")),
+            max_posting_age_days_company_boards=data.get("max_posting_age_days_company_boards"),
         )
 
     @classmethod

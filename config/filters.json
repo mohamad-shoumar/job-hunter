@@ -2,6 +2,8 @@
   "_about": "Deterministic job filters. Title keywords match whole words on a normalized title: lowercase, no accents, 'back-end'/'back end' -> 'backend', 'full-stack' -> 'fullstack', 'front-end' -> 'frontend', 'Sr.' -> 'senior', plurals of engineer/developer folded. After editing, run `jobhunter reclassify` to re-apply to stored jobs.",
 
   "max_posting_age_days": 30,
+  "_max_posting_age_days_company_boards": "For a company's own careers page (Greenhouse, Lever, Ashby, Teamtailor, BambooHR, SmartRecruiters, Pinpoint, custom pages): a job still listed there is open, and companies leave real openings up for months. Job sites re-list stale jobs, so they keep max_posting_age_days.",
+  "max_posting_age_days_company_boards": 90,
   "reject_if_required_yoe_at_least": 6,
   "stretch_yoe_at_least": 5,
   "dedupe_window_days": 60,
@@ -37,7 +39,44 @@
     "not_agencies": []
   },
 
-  "_title_include":"A title must contain at least one of these.",
+  "_relocation": "Countries you would move to. A job there may be on-site or hybrid (elsewhere only remote counts); 'Remote (UAE)' counts too, since it means living there. Rejected only when the posting wants nationals or people already there (title_local_only, local_only; quoted), or pays under RELOCATION_MIN_MONTHLY_USD in .env. sponsor: the sentence is quoted as a good sign. ask_about: quoted as a note, not a rejection. Matched as whole words, any case. From research 2026-10-10 (docs/research).",
+  "relocation": {
+    "countries": "the UAE or Qatar",
+    "places": [
+      "United Arab Emirates", "UAE", "U.A.E", "Emirates", "Dubai", "Abu Dhabi", "Sharjah", "Ajman", "Ras Al Khaimah",
+      "Al Ain", "Qatar", "Doha", "Lusail"
+    ],
+    "title_local_only": [
+      "UAE National", "UAE Nationals", "Emirati", "Emiratis", "Qatari", "Qataris", "National only", "Nationals only"
+    ],
+    "local_only": [
+      "UAE nationals only", "open to UAE nationals", "for UAE nationals", "Emirati nationals only", "Emiratis only",
+      "Emirati candidates only", "Qatari nationals only", "open to Qatari nationals", "for Qatari nationals",
+      "Qataris only", "children of Qatari mothers", "family book", "UAE residents only", "Qatar residents only",
+      "currently residing in the UAE", "currently residing in UAE", "currently based in the UAE",
+      "currently based in UAE", "currently residing in Qatar", "currently based in Qatar", "must be in the UAE",
+      "must be residing in the UAE", "must be residing in Qatar", "transferable visa", "transferrable visa",
+      "transferable residence visa", "own visa", "own sponsorship", "visa holders only", "valid UAE residence visa",
+      "valid Qatar residence permit", "no visa sponsorship", "no sponsorship", "do not sponsor", "does not sponsor",
+      "not able to sponsor", "unable to sponsor", "cannot sponsor", "will not sponsor", "not offer visa sponsorship",
+      "visa sponsorship is not available", "sponsorship is not available", "local hire only", "local candidates only",
+      "locals only", "NOC from current employer"
+    ],
+    "sponsor": [
+      "visa sponsorship", "visa provided", "visa will be provided", "employment visa provided", "we sponsor", "will sponsor",
+      "relocation package", "relocation support", "relocation assistance", "relocation allowance",
+      "relocation bonus", "relocate to Dubai", "relocate to Abu Dhabi", "relocate to Doha", "relocation to Dubai",
+      "relocation to Abu Dhabi", "relocation to Doha", "open to international candidates", "candidates from abroad",
+      "international applicants"
+    ],
+    "ask_about": [
+      "immediate joiner", "immediate joiners", "join immediately", "available immediately", "immediately available",
+      "join within 2 weeks", "local candidates preferred", "preference for local", "preference will be given",
+      "priority to UAE nationals", "UAE nationals preferred", "Emiratis preferred", "visit visa"
+    ]
+  },
+
+  "_title_include": "A title must contain at least one of these.",
   "title_include": [
     "backend", "software engineer", "software engineering", "software developer", "software development engineer", "web developer",
     "python", "fastapi", "django", "flask",

@@ -61,7 +61,7 @@ def no_real_keys(monkeypatch):
     """Tests never reach Hunter, Claude or Gmail, even when the shell has the keys set, and never run the
     Claude Code CLI, even where it is installed. Your MY_* details are cleared too, so the fixtures' own apply."""
     for name in ("HUNTER_API_KEY", "ANTHROPIC_API_KEY", "DEEPSEEK_API_KEY", "GMAIL_ADDRESS", "GMAIL_APP_PASSWORD",
-                 "SERPAPI_API_KEY", "CLAUDE_CODE_BIN", *MY_DETAILS.values()):
+                 "SERPAPI_API_KEY", "CLAUDE_CODE_BIN", "RELOCATION_MIN_MONTHLY_USD", *MY_DETAILS.values()):
         monkeypatch.delenv(name, raising=False)
 
     def no_claude_code(*args, **kwargs):

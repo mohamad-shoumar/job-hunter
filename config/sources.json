@@ -10,6 +10,39 @@
     "retry_after_days": 30
   },
 
+  "_gulf_boards": "Companies in the UAE, Qatar and Lebanon, on their own careers systems (checked 2026-10-10, docs/research). Their jobs are mostly on-site: the relocation rules in config/filters.json decide. Saudi-only companies are left out.",
+  "greenhouse_boards": [
+    { "company": "Careem", "board_token": "careem" },
+    { "company": "Tamara", "board_token": "tamara" },
+    { "company": "AI71", "board_token": "ai71jobs" },
+    { "company": "Bybit", "board_token": "bybit" },
+    { "company": "OKX", "board_token": "okx" }
+  ],
+  "teamtailor_boards": [
+    { "company": "Property Finder", "board_token": "propertyfinder" },
+    { "company": "Mumzworld", "board_token": "mumzworld" },
+    { "company": "Tap Payments", "board_token": "tappayments" },
+    { "company": "spiderSilk", "board_token": "spidersilk" },
+    { "company": "Calo", "site": "careers.calo.app" },
+    { "company": "Qashio", "site": "careers.qashio.com" },
+    { "company": "ClearGrid", "site": "careers.cleargrid.co" },
+    { "company": "Stake", "site": "careers.getstake.com" },
+    { "company": "Sarwa", "site": "careers.sarwa.co" },
+    { "company": "Pemo", "site": "careers.pemo.io" },
+    { "company": "Wego", "site": "careers.wego.com" }
+  ],
+  "bamboohr_boards": [
+    { "company": "Toters", "board_token": "toters" }
+  ],
+  "smartrecruiters_boards": [
+    { "company": "Delivery Hero (talabat, InstaShop)", "board_token": "deliveryhero", "countries": ["ae", "qa"] },
+    { "company": "Namshi", "board_token": "Namshi" },
+    { "company": "Kamkalima", "board_token": "Kamkalima" }
+  ],
+  "pinpoint_boards": [
+    { "company": "Tabby", "board_token": "tabby" }
+  ],
+
   "lever_boards": [
     { "company": "Metabase", "board_token": "metabase" },
     { "company": "Wintermute Trading", "board_token": "wintermute-trading" },
@@ -20,7 +53,10 @@
     { "company": "TradingHub", "board_token": "TRADINGHUB" },
     { "company": "Wincent", "board_token": "wincent" },
     { "company": "Circle.so", "board_token": "circle", "_note": "Moved from greenhouse 'circleso' (404). Verified: the Ashby 'circle' board is Circle.so." },
-    { "company": "Kraken", "board_token": "kraken.com", "_note": "Moved from lever 'kraken123' (empty board). Kraken's jobs are on Ashby now." }
+    { "company": "Kraken", "board_token": "kraken.com", "_note": "Moved from lever 'kraken123' (empty board). Kraken's jobs are on Ashby now." },
+    { "company": "Ziina", "board_token": "ziina" },
+    { "company": "Qlub", "board_token": "qlub" },
+    { "company": "Lean Technologies", "board_token": "LeanTech" }
   ],
   "custom_pages": [
     {
@@ -49,7 +85,7 @@
     ]
   },
   "serpapi": {
-    "_note": "Google Jobs (includes LinkedIn postings). Needs SERPAPI_API_KEY in .env; skipped without it. One credit per query page per run: 8 queries x 1 page = 8 credits/day (~240/month; the Free plan has 250). 2026-10-09: dropped two word-order duplicates of 'python backend engineer', added mid/junior-friendly searches.",
+    "_note": "Google Jobs (includes LinkedIn postings). Needs SERPAPI_API_KEY in .env; skipped without it. One credit per query page per run. 7 daily queries + 1 Gulf city a day (Dubai, Abu Dhabi, Doha in turn: every_days 3, day 0/1/2) = 8 credits/day, ~240/month (the Free plan has 250). 2026-10-09: dropped two word-order duplicates of 'python backend engineer', added mid/junior-friendly searches. 2026-10-10: 'junior python developer remote' replaced by the city searches (location names from serpapi.com/locations.json).",
     "engine": "google_jobs",
     "queries": [
       "python backend engineer remote",
@@ -57,9 +93,11 @@
       "fastapi engineer remote",
       "python developer remote",
       "mid level backend engineer remote",
-      "junior python developer remote",
       "trading systems engineer python",
-      "algorithmic trading engineer python"
+      "algorithmic trading engineer python",
+      { "q": "software engineer python", "location": "Dubai,Dubai,United Arab Emirates", "every_days": 3, "day": 0 },
+      { "q": "software engineer python", "location": "Abu Dhabi,Abu Dhabi,United Arab Emirates", "every_days": 3, "day": 1 },
+      { "q": "software engineer python", "location": "Doha,Doha Municipality,Qatar", "every_days": 3, "day": 2 }
     ],
     "pages_per_query": 1
   },

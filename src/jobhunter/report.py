@@ -21,6 +21,7 @@ _ELIGIBILITY_ORDER = {ELIGIBLE: 0, LIKELY: 1}
 # Rejection groups, in report order: (code, heading, explanation).
 _REJECT_GROUPS = [
     ("blocked_company", "Company on your blocked list", "`blocked_companies` in `config/filters.json`."),
+    ("agency", "Staffing agency or talent marketplace", "`agencies` in `config/filters.json`; what matched is quoted."),
     ("title_excluded", "Title has an excluded word",
      "The word is in `title_exclude` or `title_exclude_single_role` in `config/filters.json`."),
     ("other_stack", "Role built on another language",
@@ -29,7 +30,10 @@ _REJECT_GROUPS = [
      "The title has none of the `title_include` keywords in `config/filters.json` "
      "(backend, software engineer, python, AI engineer, full stack, ...)."),
     ("too_senior", "Asks for too many years", "At or above `reject_if_required_yoe_at_least`."),
-    ("not_remote", "Not remote", "Onsite or hybrid."),
+    ("not_remote", "Not remote", "Onsite or hybrid, outside the countries you would move to."),
+    ("local_only", "Only for nationals or people already there",
+     "A country you would move to, but the posting wants nationals or a visa you already hold. Quoted."),
+    ("below_relocation_pay", "Pays under your floor for moving", "`RELOCATION_MIN_MONTHLY_USD` in `.env`."),
     ("location_restricted", "Location does not include Lebanon", "The places the posting allows."),
     ("residency_required", "Description requires living elsewhere", "Quoted from the description."),
     ("timezone_restricted", "Time zones exclude Lebanon", "Lebanon is UTC+2 / UTC+3."),

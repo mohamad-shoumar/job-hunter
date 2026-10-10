@@ -188,7 +188,9 @@ def extract_skills(text: str) -> list[str]:
 
 # --- salary -----------------------------------------------------------------
 
-_CURRENCY = r"[$€£]|USD|EUR|GBP|CAD|AUD|CHF|AED|SGD|SAR"
+_CURRENCY = r"[$€£]|USD|EUR|GBP|CAD|AUD|CHF|AED|SGD|SAR|QAR"
+# Gulf pay is stated per month: "AED 20,000 - 30,000" is monthly, a yearly one is six figures.
+_MONTHLY_BY_DEFAULT = {"AED", "QAR", "SAR"}
 _AMOUNT = r"\d{1,3}(?:[,.\s]\d{3})*(?:\.\d+)?\s*[kK]?"
 _SALARY = re.compile(
     rf"(?P<cur>{_CURRENCY})\s?(?P<a>{_AMOUNT})\s*(?:-|–|—|to)\s*(?:{_CURRENCY})?\s?(?P<b>{_AMOUNT})"
@@ -221,6 +223,8 @@ def extract_salary(text: str) -> dict | None:
     if re.search(r"hour|hr", tail):
         period = "hour"
     elif re.search(r"month|\bmo\b", tail):
+        period = "month"
+    elif m.group("cur") in _MONTHLY_BY_DEFAULT and high < 100000:
         period = "month"
     elif high >= 10000:
         period = "year"

@@ -382,7 +382,8 @@ sites a job was seen on.
 
 ## Sources
 
-Checked on 2026-09-25, SerpApi on 2026-09-27.
+Checked on 2026-09-25, SerpApi on 2026-09-27, the investor and Gulf boards on 2026-10-10
+(research notes: `docs/research/2026-10-10-job-sources.md`).
 
 | source | how | notes |
 | --- | --- | --- |
@@ -394,11 +395,25 @@ Checked on 2026-09-25, SerpApi on 2026-09-27.
 | Hacker News | Algolia API | latest "Who is hiring?" thread, one job per role |
 | NoDesk | RSS | engineering feed, ~10 jobs |
 | Company careers pages | HTML | reads schema.org JobPosting data when the page has it |
-| Google Jobs (SerpApi) | API, key in `.env` | covers LinkedIn postings legally. Free plan: 250 searches/month; 7 queries a day uses ~210. Most results land in "needs review": Google shows remote jobs as "Anywhere" and the reposting sites rarely say who can apply |
-| Greenhouse | removed | the configured boards only had US/Canada or single-country remote roles; the adapter is kept for a company that hires internationally |
+| Google Jobs (SerpApi) | API, key in `.env` | covers LinkedIn postings legally. Free plan: 250 searches/month; 7 queries a day plus one Gulf city a day (Dubai, Abu Dhabi, Doha in turn) uses ~240. Most remote results land in "needs review": Google shows remote jobs as "Anywhere" and the reposting sites rarely say who can apply |
+| Investor job boards (Getro) | public search API | General Catalyst, Accel, Point Nine (remote jobs) and Hub71, MEVP, BECO Capital (UAE, Qatar, Lebanon): only the funds' own portfolio companies, so no agencies. No descriptions in the API |
+| Greenhouse, Teamtailor, BambooHR, SmartRecruiters, Pinpoint | public ATS APIs / RSS | companies in the UAE, Qatar and Lebanon (Careem, talabat, Property Finder, Calo, Qashio, Toters, Tabby, ...). Mostly on-site: the `relocation` rules decide. Pinpoint gives no dates, so Tabby's jobs go to "needs review" |
 | HiringCafe | not built | blocks automated requests (HTTP 403) |
 | Remote100k | not built | HTML only, no feed |
-| LinkedIn, Wellfound, Work at a Startup | not built | bot walls, login, or terms forbid scraping |
+| LinkedIn, Wellfound, Work at a Startup | not built | bot walls, login, or terms forbid scraping (LinkedIn's guest search works, but you chose not to risk it, 2026-10-10) |
+| Bayt, GulfTalent, NaukriGulf | not built | block scripts or forbid them in robots.txt, and mostly recruiters |
+
+**Agencies.** Staffing agencies and talent marketplaces (Jobs for Humanity, Toptal,
+Proxify, micro1, ...) are rejected with what matched: a name, a word in the company
+name ("Staffing"), or a sentence only an agency writes ("on behalf of our client").
+See `agencies` in `config/filters.json`.
+
+**Moving to the UAE or Qatar.** `relocation` in `config/filters.json`: a job there may
+be on-site. It is rejected only when it wants nationals or a visa you already hold
+("UAE Nationals only", "transferable visa"), or pays under `RELOCATION_MIN_MONTHLY_USD`
+(in `.env`). An offer of a visa or relocation is quoted; "immediate joiner" is noted.
+A company's own careers page keeps jobs up to `max_posting_age_days_company_boards`
+(90) days, since real openings stay listed for months.
 
 Board fixes made while testing: Circle.so is on Ashby (`circle`), Kraken moved to
 Ashby (`kraken.com`), and Token Metrics' Lever board no longer exists (disabled).

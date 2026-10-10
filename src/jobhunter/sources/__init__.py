@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from . import (
     ashby,
+    bamboohr,
     custom_page,
     getro,
     greenhouse,
@@ -15,9 +16,12 @@ from . import (
     himalayas,
     lever,
     nodesk,
+    pinpoint,
     remoteok,
     remotive,
     serpapi,
+    smartrecruiters,
+    teamtailor,
     weworkremotely,
 )
 from .base import Source, SourceResult
@@ -35,6 +39,10 @@ BUILDERS = {
     "hackernews": hackernews.from_config,
     "nodesk": nodesk.from_config,
     "getro": getro.from_config,
+    "teamtailor_boards": teamtailor.from_config,
+    "bamboohr_boards": bamboohr.from_config,
+    "smartrecruiters_boards": smartrecruiters.from_config,
+    "pinpoint_boards": pinpoint.from_config,
 }
 
 # Sections that configure something other than one source (boards.py reads "watch_boards").
