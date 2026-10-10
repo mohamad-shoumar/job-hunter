@@ -74,13 +74,13 @@ def test_a_greenhouse_board_that_names_the_company_is_watched(filters):
 def test_job_sites_agencies_and_blocked_companies_are_never_watched(filters):
     store = JobStore(":memory:")
     link = "https://jobs.ashbyhq.com/{}/5eca795c-48dd-496a-be23-2181068a545{}"
-    shortlisted(store, filters, company="Proxify AB", application_url=link.format("proxify", 1), source_job_id="1")
+    shortlisted(store, filters, company="Talentuch", application_url=link.format("talentuch", 1), source_job_id="1")
     shortlisted(store, filters, company="Board Co", application_url=link.format("boardco", 2), source_job_id="2")
     shortlisted(store, filters, company="Acme", application_url=link.format("acme", 3), source_job_id="3")
     store.conn.execute("INSERT INTO companies (key, name, is_job_board) VALUES ('board', 'Board Co', 1)")
     # Blocked after it was shortlisted (before `reclassify` rejects it).
     filters.blocked_companies = Filters.from_dict({"blocked_companies": [{"name": "Acme"}]}).blocked_companies
-    run = watch(store, FakeHttp({}), filters, outreach=OutreachConfig(skip_companies=["Proxify"]))
+    run = watch(store, FakeHttp({}), filters, outreach=OutreachConfig(skip_companies=["Talentuch"]))
     assert run.added == []
 
 

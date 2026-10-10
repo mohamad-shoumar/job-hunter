@@ -57,11 +57,15 @@ def classify(job: Job, filters: Filters, now: datetime, check_age: bool = True) 
     relevance, score = assess_relevance(job, filters)
 
     # Hacker News names come as "WorkHero https://workhero.pro": the link is not part of the name.
-    blocked = filters.blocked_companies.get(company_key(re.sub(r"https?://\S+", " ", job.company or "")))
+    company = re.sub(r"https?://\S+", " ", job.company or "").strip()
+    blocked = filters.blocked_companies.get(company_key(company))
     if blocked:
         name, why = blocked
         reason = f'Company is on your blocked list: "{name}"' + (f" ({why})" if why else "")
         return Classification(REJECTED, eligibility, relevance, score, reason, "blocked_company")
+    agency = filters.agencies.check(company, job.description)
+    if agency:
+        return Classification(REJECTED, eligibility, relevance, score, agency, "agency")
 
     # Age is measured at discovery, so re-running the rules later does not
     # reject jobs that were fresh when they were found.

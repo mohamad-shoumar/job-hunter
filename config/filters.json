@@ -13,7 +13,31 @@
     {"name": "WorkHero", "why": "international engineering roles closed; the rest are US-only"}
   ],
 
-  "_title_include": "A title must contain at least one of these.",
+  "_agencies": "Staffing agencies and talent marketplaces: they repost other companies' jobs, sell vetted developers or pay per task. Rejected (code agency) with what matched: a name below, a whole word in the company name, or a phrase in the posting. not_agencies: real companies a name word would catch. Checked against the stored jobs 2026-10-10: 'our clients', 'talent pool' and 'talent network' are left out because real companies (Zscaler, Percona, GitLab) use them.",
+  "agencies": {
+    "names": [
+      "Jobs for Humanity", "EWOR", "Xperteez Technology", "G2i", "micro1", "Turing", "Proxify", "Alignerr",
+      "Toptal", "remote quest jobs", "remotepromsp", "TechBiz Global", "Talent Journey", "XKTalent Inc. - Rimutee",
+      "Arc.dev", "Crossover", "Andela", "Mercor", "Outlier", "DataAnnotation", "BairesDev", "Lemon.io", "Gun.io",
+      "Braintrust", "Revelo", "Terminal.io", "Hired", "Jobgether", "ZeinCrew", "Vermillion Analytics",
+      "SupportYourApp", "Qureos", "OpenTrain AI", "Vetto", "A.Team", "Remotebase", "RemoteHub", "Workana",
+      "DistantJob", "Akkodis", "Opinov8", "Growe Talents", "EasySoftGroup", "SynergisticIT", "Ampcus",
+      "Embedded Shishya", "Oxford Knight", "Allshore Talent", "Careerswift"
+    ],
+    "name_words": [
+      "talent", "talents", "recruiter", "recruiters", "recruiting", "recruitment", "staffing",
+      "headhunter", "headhunters", "headhunting", "outsourcing", "hiring solutions", "talent platform"
+    ],
+    "description_phrases": [
+      "on behalf of our client", "on behalf of a client", "on behalf of my client", "a client of ours",
+      "our client is a", "our client is an", "our client is looking", "our client is seeking", "our client is hiring",
+      "my client is", "paid per task", "join our talent network and", "we connect top developers",
+      "we match top developers", "top 3% of"
+    ],
+    "not_agencies": []
+  },
+
+  "_title_include":"A title must contain at least one of these.",
   "title_include": [
     "backend", "software engineer", "software engineering", "software developer", "software development engineer", "web developer",
     "python", "fastapi", "django", "flask",

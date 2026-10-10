@@ -8,6 +8,7 @@ import re
 from dataclasses import dataclass, field, fields
 from pathlib import Path
 
+from .agency import AgencyRules
 from .identity import company_key
 from .text import normalize_words
 
@@ -111,6 +112,8 @@ class Filters:
     fit_weights: dict[str, int]
     # company_key -> (name as written, why): these companies are rejected outright.
     blocked_companies: dict[str, tuple[str, str]] = field(default_factory=dict)
+    # Staffing agencies and talent marketplaces (agency.py): rejected with what matched.
+    agencies: AgencyRules = field(default_factory=AgencyRules)
 
     @classmethod
     def from_dict(cls, data: dict) -> Filters:
@@ -129,6 +132,7 @@ class Filters:
             fit_weights={k.lower(): int(v) for k, v in data.get("fit_weights", {}).items()},
             blocked_companies={company_key(b["name"]): (b["name"], b.get("why", ""))
                                for b in data.get("blocked_companies", []) if company_key(b["name"])},
+            agencies=AgencyRules.from_dict(data.get("agencies")),
         )
 
     @classmethod

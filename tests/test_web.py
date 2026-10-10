@@ -42,7 +42,7 @@ def home(tmp_path, filters):
     shutil.copytree(FIXTURES / "profile", tmp_path / "profile")
     store = JobStore(tmp_path / "data" / "jobs.sqlite")
     store_job(store, filters, company="Acme", description="We build APIs with Python. https://acme.io")
-    store_job(store, filters, source_job_id="2", company="Proxify AB", title="Python Developer")
+    store_job(store, filters, source_job_id="2", company="Talentuch", title="Python Developer")
     store.commit()
     store.close()
     return tmp_path
@@ -78,7 +78,7 @@ def test_changes_need_the_token_json_and_the_right_host(client):
 
 def test_list_and_detail(client):
     jobs = client.get("/api/jobs?view=shortlisted").json()["jobs"]
-    assert {j["company"]: j["job_board"] for j in jobs} == {"Acme": False, "Proxify AB": True}
+    assert {j["company"]: j["job_board"] for j in jobs} == {"Acme": False, "Talentuch": True}
     detail = client.get("/api/jobs/1").json()
     assert detail["company"]["suggested_domain"] == "acme.io"
     assert detail["company"]["why"].startswith("Size unknown") and detail["application"] is None
