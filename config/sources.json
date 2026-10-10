@@ -31,6 +31,23 @@
       "default_workplace_type": "remote"
     }
   ],
+  "getro": {
+    "_note": "Investor (VC) job boards on Getro: only the companies each fund invested in, so no agencies. No descriptions (the API has none). Remote jobs from the big funds; jobs in the UAE, Qatar or Lebanon from the Gulf ones. An id is in a board's page source: \"network\":{\"id\":...}. Checked 2026-10-10.",
+    "enabled": true,
+    "queries": ["python", "backend", "software engineer", "ai engineer", "full stack", "forward deployed"],
+    "max_pages": 2,
+    "boards": [
+      { "name": "General Catalyst", "collection_id": 222, "filters": { "work_mode": ["remote"] } },
+      { "name": "Accel", "collection_id": 8672, "filters": { "work_mode": ["remote"] } },
+      { "name": "Point Nine", "collection_id": 1680, "filters": { "work_mode": ["remote"] } },
+      { "name": "Hub71", "collection_id": 9266, "queries": ["engineer", "developer"],
+        "filters": { "searchable_locations": ["United Arab Emirates", "Qatar", "Lebanon"] } },
+      { "name": "MEVP", "collection_id": 1034, "queries": ["engineer", "developer"],
+        "filters": { "searchable_locations": ["United Arab Emirates", "Qatar", "Lebanon"] } },
+      { "name": "BECO Capital", "collection_id": 10883, "queries": ["engineer", "developer"],
+        "filters": { "searchable_locations": ["United Arab Emirates", "Qatar", "Lebanon"] } }
+    ]
+  },
   "serpapi": {
     "_note": "Google Jobs (includes LinkedIn postings). Needs SERPAPI_API_KEY in .env; skipped without it. One credit per query page per run: 8 queries x 1 page = 8 credits/day (~240/month; the Free plan has 250). 2026-10-09: dropped two word-order duplicates of 'python backend engineer', added mid/junior-friendly searches.",
     "engine": "google_jobs",

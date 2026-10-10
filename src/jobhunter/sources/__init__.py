@@ -9,6 +9,7 @@ from __future__ import annotations
 from . import (
     ashby,
     custom_page,
+    getro,
     greenhouse,
     hackernews,
     himalayas,
@@ -33,6 +34,7 @@ BUILDERS = {
     "weworkremotely": weworkremotely.from_config,
     "hackernews": hackernews.from_config,
     "nodesk": nodesk.from_config,
+    "getro": getro.from_config,
 }
 
 # Sections that configure something other than one source (boards.py reads "watch_boards").

@@ -28,10 +28,17 @@ class Http:
         )
 
     def get(self, url: str, params: dict | None = None) -> httpx.Response:
+        return self._send("GET", url, params=params)
+
+    def post_json(self, url: str, body: dict, headers: dict | None = None):
+        """POST a JSON body, return the JSON answer. For search APIs that only take POST (Getro)."""
+        return self._send("POST", url, json=body, headers=headers).json()
+
+    def _send(self, method: str, url: str, **kwargs) -> httpx.Response:
         for attempt in range(self.retries + 1):
             final = attempt == self.retries
             try:
-                response = self._client.get(url, params=params)
+                response = self._client.request(method, url, **kwargs)
             except httpx.TransportError:
                 if final:
                     raise

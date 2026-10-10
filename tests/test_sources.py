@@ -347,3 +347,40 @@ def test_build_sources_explains_unused_sections():
     assert [s.name for s in sources] == ["greenhouse"] and len(sources[0].boards) == 1
     assert any(n.startswith("hiringcafe: not implemented") for n in notes)
     assert "mystery: unknown config section, ignored" in notes
+
+
+def test_getro_reads_investor_boards_with_their_own_filters():
+    from jobhunter.sources import getro
+
+    url = getro.API.format(id=9266)
+    bodies = []
+
+    def search(body):
+        bodies.append(body)
+        return fixture_json("getro_search.json") if body["query"] == "engineer" else {"results": {"jobs": []}}
+
+    board = {"name": "Hub71", "collection_id": 9266, "filters": {"searchable_locations": ["United Arab Emirates"]}}
+    result = getro.GetroSource([board], ["engineer", "python"]).fetch(FakeHttp({url: search}))
+    assert [b["query"] for b in bodies] == ["engineer", "python"]
+    assert bodies[0]["filters"] == {"searchable_locations": ["United Arab Emirates"]} and bodies[0]["page"] == 0
+    qashio, sentinel, worldremit = result.jobs
+    assert (qashio.company, qashio.title) == ("Qashio", "Full-stack Engineer (AI-native)")
+    assert qashio.remote_status == "onsite" and qashio.allowed_locations == ["Dubai - United Arab Emirates"]
+    assert qashio.application_url == "https://careers.qashio.com/jobs/8357928-full-stack-engineer-ai-native"
+    assert qashio.posted_at.year == 2026 and "Next.js" in qashio.tags and qashio.salary_min is None
+    # "Remote" next to a country is the work mode, not a place to live.
+    assert sentinel.remote_status == REMOTE and sentinel.allowed_locations == ["United States"]
+    assert (sentinel.salary_min, sentinel.salary_max, sentinel.salary_currency, sentinel.salary_period) == (
+        156000, 215000, "USD", "year")
+    assert worldremit.allowed_locations == ["United Kingdom"] and worldremit.salary_currency is None
+
+
+def test_getro_isolates_a_broken_board():
+    from jobhunter.sources import getro
+
+    bad, ok = getro.API.format(id=1), getro.API.format(id=9266)
+    http = FakeHttp({bad: http_error(bad, 500), ok: fixture_json("getro_search.json")})
+    source = getro.GetroSource([{"name": "Gone", "collection_id": 1}, {"name": "Hub71", "collection_id": 9266}], ["x"])
+    result = source.fetch(http)
+    assert result.errors == ["Gone (1) 'x': HTTP 500 from https://api.getro.com/api/v2/collections/1/search/jobs"]
+    assert len(result.jobs) == 3

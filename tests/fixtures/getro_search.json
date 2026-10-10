@@ -1,0 +1,156 @@
+{
+ "results": {
+  "jobs": [
+   {
+    "compensation_public": true,
+    "featured": false,
+    "compensation_amount_max_cents": null,
+    "searchable_locations": [
+     "Dubai - United Arab Emirates",
+     "United Arab Emirates",
+     "Asia"
+    ],
+    "created_at": 1789044605,
+    "weight": 0,
+    "compensation_amount_min_cents": null,
+    "source": "career_page",
+    "title": "Full-stack Engineer (AI-native)",
+    "work_mode": "on_site",
+    "url": "https://careers.qashio.com/jobs/8357928-full-stack-engineer-ai-native",
+    "skills": [
+     "Full Stack Software Engineering",
+     "Next.js",
+     "Node.Js",
+     "NoSQL",
+     "RESTful API",
+     "Microservices",
+     "Secure Coding"
+    ],
+    "compensation_offers_equity": null,
+    "compensation_currency": null,
+    "compensation_period": "period_not_defined",
+    "organization": {
+     "stage": "other",
+     "logo_url": "https://cdn.getro.com/companies/ad568134-16cc-4e7e-80b9-5638c056f1a5-1761013741",
+     "topics": [],
+     "name": "Qashio",
+     "head_count": 3,
+     "id": 87684,
+     "industry_tags": [
+      "Accounting",
+      "Accounts Payable",
+      "Dashboard"
+     ],
+     "slug": "qashio"
+    },
+    "locations": [
+     "Dubai - United Arab Emirates"
+    ],
+    "has_description": true,
+    "slug": "92764742-full-stack-engineer-ai-native",
+    "seniority": "mid_senior",
+    "id": 92764742
+   },
+   {
+    "compensation_public": true,
+    "featured": false,
+    "compensation_amount_max_cents": 21500000,
+    "searchable_locations": [
+     "United States",
+     "North America",
+     "Remote"
+    ],
+    "created_at": 1786107722,
+    "weight": 0,
+    "compensation_amount_min_cents": 15600000,
+    "source": "career_page",
+    "title": "Staff Endpoint Software Engineer, (Python, Windows/Mac/OS Internals)",
+    "work_mode": "remote",
+    "url": "https://boards.greenhouse.io/sentinellabs/jobs/7834099003",
+    "skills": [
+     "Node.Js",
+     "Mac OS",
+     "Problem Solving",
+     "Browser Extension"
+    ],
+    "compensation_offers_equity": true,
+    "compensation_currency": "USD",
+    "compensation_period": "year",
+    "organization": {
+     "stage": "ipo",
+     "logo_url": "https://cdn.getro.com/companies/5610ba29-eccc-41ff-9262-53fdc44c0721-1761875287",
+     "topics": [],
+     "name": "SentinelOne",
+     "head_count": 5,
+     "id": 11268,
+     "industry_tags": [
+      "Artificial Intelligence (AI)",
+      "Cloud Security",
+      "Cyber Security"
+     ],
+     "slug": "sentinelone"
+    },
+    "locations": [
+     "United States",
+     "Remote"
+    ],
+    "has_description": true,
+    "slug": "89125274-staff-endpoint-software-engineer-python-windows-mac-os-internals",
+    "seniority": "mid_senior",
+    "id": 89125274
+   },
+   {
+    "compensation_public": true,
+    "featured": false,
+    "compensation_amount_max_cents": null,
+    "searchable_locations": [
+     "Remote",
+     "United Kingdom",
+     "Europe"
+    ],
+    "created_at": 1791201624,
+    "weight": 0,
+    "compensation_amount_min_cents": null,
+    "source": "career_page",
+    "title": "Senior Backend Engineer (Python/Kotlin)",
+    "work_mode": "remote",
+    "url": "https://zepz.careers.hibob.com/jobs/a6dfff55-5672-4e2a-914a-7287f2726b4e",
+    "skills": [
+     "Kotlin",
+     "Spring Boot",
+     "Grafana",
+     "Kubernetes",
+     "Debugging",
+     "Production Support",
+     "Collaboration"
+    ],
+    "compensation_offers_equity": null,
+    "compensation_currency": null,
+    "compensation_period": "period_not_defined",
+    "organization": {
+     "stage": "other",
+     "logo_url": "https://cdn.getro.com/companies/3cd987ee-886c-4986-aa29-fe60d5412d86-1761356086",
+     "topics": [],
+     "name": "WorldRemit",
+     "head_count": 4,
+     "id": 186946,
+     "industry_tags": [
+      "Apps",
+      "Banking",
+      "Finance"
+     ],
+     "slug": "worldremit-2"
+    },
+    "locations": [
+     "Remote",
+     "United Kingdom"
+    ],
+    "has_description": true,
+    "slug": "95845027-senior-backend-engineer-python-kotlin",
+    "seniority": "senior",
+    "id": 95845027
+   }
+  ],
+  "count": 3
+ }
+}
