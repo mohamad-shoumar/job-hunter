@@ -13,7 +13,8 @@ from .base import Source, SourceResult, describe_error, enabled_entries
 
 LIST = "https://{token}.bamboohr.com/careers/list"
 DETAIL = "https://{token}.bamboohr.com/careers/{id}/detail"
-# BambooHR's locationType: 0 in an office, 1 remote, 2 hybrid.
+# BambooHR's locationType, read from its careers page, not documented: 0 in an office, 1 remote, 2 hybrid.
+# Toters' are 0 and 2; Lebanon listed decides those either way.
 _LOCATION_TYPE = {"0": ONSITE, "1": REMOTE, "2": HYBRID}
 
 

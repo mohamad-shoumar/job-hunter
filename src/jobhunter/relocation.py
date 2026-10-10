@@ -4,8 +4,9 @@ Everywhere else an on-site or hybrid job is rejected. Here it is judged on what
 the posting says, each verdict quoting it:
 
   rejected  only for nationals or people already in the country ("UAE
-            Nationals only", "transferable visa", "no visa sponsorship"), or
-            the stated pay is under your floor for moving
+            Nationals only", "transferable visa", "no visa sponsorship", or
+            an offer phrase in a sentence that refuses it: "we do not provide
+            visa sponsorship"), or the stated pay is under your floor for moving
   likely    otherwise; with the sentence that offers a visa or relocation when
             there is one, and the sentence to ask about ("immediate joiner")
             as a note
@@ -30,6 +31,8 @@ from .text import normalize_words
 
 # Both currencies are pegged to the dollar, so these never change.
 USD_PER = {"USD": 1.0, "AED": 1 / 3.6725, "QAR": 1 / 3.64}
+# "We do not provide visa sponsorship": an offer phrase in a sentence that refuses it.
+_NEGATION = re.compile(r"\b(?:no|not|without|unable|cannot|can't|won't|don't|doesn't|isn't|aren't)\b", re.I)
 _MONTHS = {"month": 1, "year": 12}
 
 
@@ -113,6 +116,9 @@ def assess_relocation(job: Job, place: str, rules: Relocation) -> Assessment:
         mode = {ONSITE: "On-site", HYBRID: "Hybrid"}.get(job.remote_status, "Based")
         where = f'{mode} in "{place}"'
     sponsor = rules.sponsor.search(text) if rules.sponsor else None
+    if sponsor and _NEGATION.search(_sentence(text, sponsor)):
+        return Assessment(NOT_ELIGIBLE, [f'Only for people already in the country: "{_sentence(text, sponsor)}"'],
+                          "local_only")
     if sponsor:
         reasons = [f'{where}, a country you would move to; the posting offers: "{_sentence(text, sponsor)}"']
         code = "relocation_offered"

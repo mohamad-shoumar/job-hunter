@@ -118,7 +118,7 @@ Company boards (verified, job count that day):
 
 ## UAE and Qatar: pay, hiring from abroad, interviews (2026-10-10)
 
-The target: UAE or Qatar only, at least USD 5,000/month (AED ~18,400 / QAR ~18,200), remote interviews only.
+The target: UAE or Qatar only, pay at or above the floor set in `.env` (`RELOCATION_MIN_MONTHLY_USD`), remote interviews only.
 
 - Pay (no income tax). Dubai/Abu Dhabi mid level: Levels.fyi median ~AED 26k/mo (P25 ~19k);
   recruiter guide (Talent Arabia 2026) median AED 18k (12k-28k). Senior AED 25k-38k.

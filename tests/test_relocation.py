@@ -10,7 +10,7 @@ from .conftest import NOW, ROOT, make_job
 
 @pytest.fixture
 def floor_filters(monkeypatch):
-    monkeypatch.setenv("RELOCATION_MIN_MONTHLY_USD", "5000")
+    monkeypatch.setenv("RELOCATION_MIN_MONTHLY_USD", "4200")
     return Filters.load(ROOT / "config" / "filters.json")
 
 
@@ -78,9 +78,9 @@ def test_wanting_someone_already_there_is_a_note_not_a_rejection(filters):
 
 def test_pay_under_the_floor_for_moving_is_rejected(floor_filters):
     low = _classify(floor_filters, remote_status=ONSITE, allowed_locations=["Dubai"],
-                    description="Python APIs. Salary: AED 12,000 - 15,000 plus housing.")
+                    description="Python APIs. Salary: AED 10,000 - 14,000 plus housing.")
     assert low.reject_code == "below_relocation_pay"
-    assert low.reject_reason == 'Pays "AED 12,000 - 15,000", about $4,084 a month, under your $5,000 for moving'
+    assert low.reject_reason == 'Pays "AED 10,000 - 14,000", about $3,812 a month, under your $4,200 for moving'
     ok = _classify(floor_filters, remote_status=ONSITE, allowed_locations=["Dubai"],
                    description="Python APIs. Salary: AED 20,000 - 28,000 plus housing.")
     assert ok.status == SHORTLISTED and ok.eligibility.reasons[-1] == "Pay: about $7,624 a month"
@@ -99,3 +99,11 @@ def test_gulf_pay_without_a_period_is_monthly():
     yearly = make_job(description="Package: AED 240,000 - 300,000.")
     enrich(yearly)
     assert yearly.salary_period == "year"
+
+
+def test_a_sentence_that_refuses_sponsorship_is_not_an_offer(filters):
+    for sentence in ("We do not provide visa sponsorship for this role.", "There is no relocation package."):
+        result = _classify(filters, remote_status=ONSITE, allowed_locations=["Dubai"],
+                           description=f"Python APIs.\n{sentence}")
+        assert result.reject_code == "local_only", sentence
+        assert result.reject_reason == f'Only for people already in the country: "{sentence}"'
