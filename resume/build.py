@@ -10,6 +10,7 @@
   python3 build.py versions/X.md       that version -> output/<Last>_X.pdf
 
 Lines starting with // are notes: they are kept in the text file but never printed.
+[GitHub](https://github.com/you/repo) prints "GitHub" as a link.
 
 Your name and contact lines come from MY_NAME, MY_EMAIL, MY_PHONE, MY_LINKEDIN, MY_GITHUB
 and MY_LOCATION in the project's .env (they win over "# Name" and "email: ..." lines here),
@@ -106,8 +107,9 @@ def owner_last_name(lines):
 
 
 def esc(text):
-    # Escape HTML, then allow **bold** in the text file.
-    return re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", html.escape(text))
+    # Escape HTML, then allow **bold** and [label](url) links in the text file.
+    text = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", html.escape(text))
+    return re.sub(r"\[([^\]]+)\]\(([^)\s]+)\)", lambda m: f'<a href="{link(m.group(2))}">{m.group(1)}</a>', text)
 
 
 def build_html(lines, force_compact=False):
