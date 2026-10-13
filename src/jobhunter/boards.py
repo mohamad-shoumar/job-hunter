@@ -32,7 +32,7 @@ from datetime import datetime, timedelta
 
 from .config import Filters, OutreachConfig
 from .identity import company_key, title_key
-from .models import SHORTLISTED
+from .models import SHORTLISTED, VISA_LIST
 from .sources import ashby, greenhouse, lever
 from .sources.base import Source
 from .store import JobStore
@@ -237,7 +237,9 @@ def watch_shortlisted(store: JobStore, http, sources_config: dict, filters: Filt
     retry_before = now - timedelta(days=config.retry_after_days)
     probes = {r["company_key"]: parse_datetime(r["probed_at"])
               for r in store.conn.execute("SELECT * FROM board_probes")}
-    rows = store.conn.execute("SELECT * FROM jobs WHERE status = ? ORDER BY id DESC", (SHORTLISTED,)).fetchall()
+    # A job on the visa list counts too: the company sponsors visas, so its next jobs abroad are wanted.
+    rows = store.conn.execute("SELECT * FROM jobs WHERE status IN (?, ?) ORDER BY id DESC",
+                              (SHORTLISTED, VISA_LIST)).fetchall()
     done: set[str] = set()
     for job in rows:
         key = company_key(re.sub(r"https?://\S+", " ", job["company"] or ""))

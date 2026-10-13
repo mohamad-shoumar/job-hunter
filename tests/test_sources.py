@@ -401,3 +401,44 @@ def test_serpapi_city_queries_run_on_their_day_with_their_location(monkeypatch):
     sent = [(p["q"], p.get("location")) for _, p in http.calls]
     city = queries[1 + today]["location"]
     assert sent == [("python remote", None), ("backend engineer", city)]
+
+
+def test_arbeitnow_country_from_the_site_and_twice_escaped_descriptions():
+    from jobhunter.sources import arbeitnow
+
+    data = fixture_json("arbeitnow.json")
+    jobs = {j.company: j for j in (arbeitnow.parse_job(raw) for raw in data["data"])}
+    assert jobs["sumup"].location_raw == "Berlin, Germany" and jobs["sumup"].allowed_locations == ["Berlin, Germany"]
+    assert jobs["Deliveroo"].location_raw == "London, England, United Kingdom"  # already says the country
+    assert jobs["Blocktech"].location_raw == "Amsterdam, Netherlands"
+    # A remote job's country is unknown: arbeitnow.com is not "remote for people in Germany".
+    assert jobs["Kairos Project"].remote_status == REMOTE and jobs["Kairos Project"].allowed_locations == []
+    # sumup's description came escaped twice: it reads as text, not as "<p>" tags.
+    assert "<p>" not in jobs["sumup"].description and "&lt;" not in jobs["sumup"].description
+    assert "The MarTech team builds the marketing" in jobs["sumup"].description
+    assert jobs["Terraquantum"].posted_at.isoformat().startswith("2026-10-07")
+
+
+def test_arbeitnow_keeps_wanted_titles_and_stops_at_the_look_back():
+    from datetime import datetime, timezone
+
+    from jobhunter.sources import arbeitnow
+
+    data = fixture_json("arbeitnow.json")
+    pages = []
+
+    def respond(params):
+        pages.append(params)
+        page = dict(data)
+        if params["page"] > 1:  # older jobs further down
+            page["data"] = [dict(raw, created_at=raw["created_at"] - 30 * 86400) for raw in data["data"]]
+        return page
+
+    url = arbeitnow.API.format(site="https://www.arbeitnow.com")
+    source = arbeitnow.ArbeitnowSource([{"site": "https://www.arbeitnow.com", "visa_sponsorship": True}],
+                                       ["backend", "python", "software"], max_pages=5)
+    source.since = datetime(2026, 10, 1, tzinfo=timezone.utc)
+    result = source.fetch(FakeHttp({url: respond}))
+    assert [p["page"] for p in pages] == [1, 2] and pages[0]["visa_sponsorship"] == "true"
+    titles = {j.title for j in result.jobs}
+    assert "Recruiter" not in titles and "Senior Backend Engineer - MarTech" in titles

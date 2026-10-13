@@ -7,6 +7,7 @@ from_config(section) function, then add it to BUILDERS.
 from __future__ import annotations
 
 from . import (
+    arbeitnow,
     ashby,
     bamboohr,
     custom_page,
@@ -43,6 +44,7 @@ BUILDERS = {
     "bamboohr_boards": bamboohr.from_config,
     "smartrecruiters_boards": smartrecruiters.from_config,
     "pinpoint_boards": pinpoint.from_config,
+    "arbeitnow": arbeitnow.from_config,
 }
 
 # Sections that configure something other than one source (boards.py reads "watch_boards").

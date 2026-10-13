@@ -128,3 +128,17 @@ def test_today_stats_and_status(client):
     assert [j["id"] for j in today["new_jobs"]] == [2]
     status = client.get("/api/status").json()
     assert status["gmail"] and not status["hunter"] and status["caps"]["total"] == 15
+
+
+def test_the_visa_list_is_its_own_view(client, home, filters):
+    from jobhunter.models import ONSITE
+
+    store = JobStore(home / "data" / "jobs.sqlite")
+    store_job(store, filters, source_job_id="3", company="Wheely", remote_status=ONSITE, allowed_locations=["London"],
+              description="Python.\nUK visa sponsorship is available.")
+    store.commit()
+    store.close()
+    visa = client.get("/api/jobs?view=visa_list").json()["jobs"]
+    assert [j["company"] for j in visa] == ["Wheely"] and visa[0]["status"] == "visa_list"
+    # Not in the shortlist, so not in "To apply" either.
+    assert "Wheely" not in {j["company"] for j in client.get("/api/jobs?view=shortlisted").json()["jobs"]}

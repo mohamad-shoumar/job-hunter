@@ -464,7 +464,8 @@ class JobStore:
 
     def unreported(self) -> list[sqlite3.Row]:
         return self.conn.execute(
-            "SELECT * FROM jobs WHERE reported_at IS NULL AND status IN ('shortlisted', 'needs_review') ORDER BY id"
+            "SELECT * FROM jobs WHERE reported_at IS NULL AND status IN ('shortlisted', 'needs_review', 'visa_list') "
+            "ORDER BY id"
         ).fetchall()
 
     def mark_reported(self, job_ids: list[int], now: datetime) -> None:

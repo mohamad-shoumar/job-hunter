@@ -20,7 +20,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
 
-from . import boards
+from . import boards, sponsors
 from .ai_check import AiChecker, build_checker, check_jobs
 from .classify import classify
 from .config import Filters, OutreachConfig
@@ -192,6 +192,17 @@ def ai_check_days(store: JobStore, checker: AiChecker, days: list[str], filters:
     summary.ai_check = result.to_dict()
 
 
+def refresh_sponsors(root_paths, filters: Filters, http: Http, now: datetime, summary: RunSummary) -> None:
+    """Download the government sponsor lists older than refresh_days (sponsors.py), before jobs are classified."""
+    folder = root_paths.sponsors_dir
+    due = sponsors.stale(folder, filters.visa.refresh_days, now)
+    if due:
+        done, errors = sponsors.update(http, folder, now, due)
+        summary.config_notes += [f"sponsor lists: {line}" for line in done + errors]
+    if due or filters.visa.registers is None:
+        filters.visa.registers = sponsors.Registers.load(folder)
+
+
 def run(root_paths, sources_config: dict, filters: Filters, only: set[str] | None = None,
         report: bool = True, http: Http | None = None, now: datetime | None = None,
         date_range: tuple[date, date] | None = None, ai: bool = True,
@@ -225,6 +236,8 @@ def run(root_paths, sources_config: dict, filters: Filters, only: set[str] | Non
                 source.since = since
         run_id = store.start_run(now)
         summary = RunSummary(run_id=run_id, started_at=iso(now), config_notes=config_notes)
+        if filters.visa and only is None:
+            refresh_sponsors(root_paths, filters, http, now, summary)
         log.info("fetching %d sources: %s", len(sources), ", ".join(s.name for s in sources))
         results = fetch_all(sources, http)
         ingest(store, results, filters, run_id, now, summary)

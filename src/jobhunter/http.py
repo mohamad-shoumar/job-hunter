@@ -57,6 +57,10 @@ class Http:
     def get_text(self, url: str, params: dict | None = None) -> str:
         return self.get(url, params).text
 
+    def get_bytes(self, url: str, params: dict | None = None) -> bytes:
+        """For files (a spreadsheet)."""
+        return self.get(url, params).content
+
     def close(self) -> None:
         self._client.close()
 

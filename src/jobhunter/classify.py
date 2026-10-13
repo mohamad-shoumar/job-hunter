@@ -24,6 +24,8 @@ from .models import (
     SHORTLISTED,
     UNCLEAR,
     UNKNOWN_HIRE,
+    VISA_LIST,
+    VISA_SPONSOR,
     AiCheck,
     Assessment,
     Classification,
@@ -56,7 +58,7 @@ def apply_ai_check(rule: Assessment, check: AiCheck) -> Assessment:
 def classify(job: Job, filters: Filters, now: datetime, check_age: bool = True) -> Classification:
     """check_age=False for a job inside an explicitly requested date range:
     asking for "Sep 1 - Sep 7" means those postings are wanted, however old."""
-    eligibility = assess_eligibility(job, filters.relocation)
+    eligibility = assess_eligibility(job, filters.relocation, filters.visa)
     if eligibility.verdict == UNCLEAR and job.ai_check:
         eligibility = apply_ai_check(eligibility, job.ai_check)
     relevance, score = assess_relevance(job, filters)
@@ -88,6 +90,12 @@ def classify(job: Job, filters: Filters, now: datetime, check_age: bool = True) 
         return Classification(REJECTED, eligibility, relevance, score, relevance.reasons[0], relevance.code)
     if eligibility.verdict == NOT_ELIGIBLE:
         return Classification(REJECTED, eligibility, relevance, score, eligibility.reasons[0], eligibility.code)
+    if eligibility.verdict == VISA_SPONSOR:
+        # A list of its own, apart from the remote jobs. An unknown posting date is a note there.
+        if not job.posted_at:
+            relevance = Assessment(relevance.verdict, [*relevance.reasons, "No posting date, so its age is unknown"],
+                                   relevance.code)
+        return Classification(VISA_LIST, eligibility, relevance, score)
     status = SHORTLISTED if eligibility.verdict in (ELIGIBLE, LIKELY) else NEEDS_REVIEW
     if status == SHORTLISTED and not job.posted_at:
         # An unknown age is not a fresh one: some sources re-list months-old jobs undated.

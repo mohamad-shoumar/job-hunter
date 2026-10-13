@@ -49,10 +49,13 @@ open reports/$(date +%F).md
 
 ## Reports
 
-One file per day: `reports/2026-09-27.md`. It has three parts:
+One file per day: `reports/2026-09-27.md`. It has four parts:
 
 - **Shortlisted** and **Needs review**, each job with the reason it can (or might)
   hire from Lebanon, its fit, salary, dates and apply link.
+- **Visa list**, jobs abroad (the EU and UK) at employers that sponsor a work
+  visa, each with the quoted evidence. Kept apart from the remote jobs: see
+  "Moving abroad on a work visa" below.
 - **Rejected**, every rejected job listed under the rule that rejected it, with
   the exact word, place or quote: `Title contains "manager"`,
   `Restricted to "Remote - US"`, `Asks for 10+ years of experience`. Jobs
@@ -101,7 +104,7 @@ sorting). A posting that mentions Python is a `match`; without Python it is a
 rejected, so the first run is not flooded with months-old listings.
 
 The result is one status: **shortlisted** (eligible or likely), **needs review**
-(unclear), or **rejected**.
+(unclear), **visa list** (a job abroad that sponsors a visa, below), or **rejected**.
 
 **4. AI check, only for "needs review".** (`src/jobhunter/ai_check.py`,
 `config/ai_check.json`) When the rules can't tell, a model looks for the
@@ -402,6 +405,8 @@ Checked on 2026-09-25, SerpApi on 2026-09-27, the investor and Gulf boards on 20
 | Remote100k | not built | HTML only, no feed |
 | LinkedIn, Wellfound, Work at a Startup | not built | bot walls, login, or terms forbid scraping (LinkedIn's guest search works, but you chose not to risk it, 2026-10-10) |
 | Bayt, GulfTalent, NaukriGulf | not built | block scripts or forbid them in robots.txt, and mostly recruiters |
+| Arbeitnow | public API | jobs in Germany, the Netherlands and the UK, for the visa list. Its visa flag is per company (flagged postings say "we do not provide visa sponsorship" too), so it only trims the NL and UK feeds; the posting's words decide. Only titles with one of `queries` are kept |
+| Relocate.me, visasponsor.jobs, Welcome to the Jungle/Otta, DevITjobs, Landing.jobs, Duunitori | not built | checked 2026-10-13 for the visa list: too few jobs, no visa field, or terms forbid scripts (`docs/research/2026-10-13-eu-visa-sponsorship.md`) |
 
 **Agencies.** Staffing agencies and talent marketplaces (Jobs for Humanity, Toptal,
 Proxify, micro1, ...) are rejected with what matched: a name, a word in the company
@@ -412,6 +417,38 @@ See `agencies` in `config/filters.json`.
 be on-site. It is rejected only when it wants nationals or a visa you already hold
 ("UAE Nationals only", "transferable visa"), or pays under `RELOCATION_MIN_MONTHLY_USD`
 (in `.env`). An offer of a visa or relocation is quoted; "immediate joiner" is noted.
+**Moving abroad on a work visa** (`src/jobhunter/visa.py`, `src/jobhunter/sponsors.py`,
+`visa_list` in `config/filters.json`). A target role in the Netherlands, Germany,
+Finland, the UK, Ireland, Spain or Italy (on-site, hybrid, or remote only for people
+living there) goes to a separate **visa list**, never the shortlist: it is its own
+section in the report and its own view in `jobhunter serve` (Jobs → "Visa list"),
+it is not in "To apply", and the daily run makes no CV, cover letter or contact
+lookup for it (the buttons in the app still work; move it to Saved to track it).
+It gets there only with quoted evidence:
+
+| code | evidence | example |
+| --- | --- | --- |
+| visa_offered | the posting offers a visa, or a Hacker News header says VISA | "Relocation support, including visa sponsorship and allowance" |
+| relocation_offered | it offers help moving but names no visa (weaker: ask) | "For internationals: all-in relocation package" |
+| visa_register | the company is on its country's government sponsor list | "Monzo Bank Ltd, London, Worker (A rating), Skilled Worker" |
+
+Rejected, quoted: the posting refuses ("We are unable to provide visa
+sponsorship") or wants a right to work you don't have (`no_sponsor`); it asks for
+a language your profile does not list, or is written in one (`language_required`:
+"Fluent German (C1)"); or nothing says it sponsors (`no_visa_evidence`). A remote
+job open to Lebanon stays a remote job, and a remote role only for people living
+there needs the posting itself to offer a visa.
+
+The government lists: the UK register of licensed sponsors (Skilled Worker rows, updated
+every working day), the Dutch IND register of recognised sponsors (needed to sponsor a
+highly skilled migrant), and Ireland's list of companies issued employment permits this
+year and last. Germany, Finland, Spain and Italy keep none (a Blue Card needs no licensed
+employer), so there the posting must say it. `jobhunter sponsors --update` downloads them
+to `data/sponsors/`; the daily run refreshes them every `refresh_days` (7); `jobhunter
+sponsors --company Monzo --place London` looks one up. A one-word name ("Cursor") counts on
+the UK list only when the list's town is in the job's location ("Cursor Ltd, Lincoln" is
+not Cursor in London).
+
 A company's own careers page keeps jobs up to `max_posting_age_days_company_boards`
 (90) days, since real openings stay listed for months.
 

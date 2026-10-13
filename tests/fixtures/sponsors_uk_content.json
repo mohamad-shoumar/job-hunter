@@ -1,0 +1,15 @@
+{
+ "_trimmed": "GOV.UK Content API answer for the sponsor register, fetched 2026-10-13: only the fields sponsors.py reads.",
+ "base_path": "/government/publications/register-of-licensed-sponsors-workers",
+ "public_updated_at": "2026-10-13T09:40:26+01:00",
+ "details": {
+  "attachments": [
+   {
+    "title": "Register of Worker and Temporary Worker licensed sponsors",
+    "content_type": "text/csv",
+    "url": "https://assets.publishing.service.gov.uk/media/6acdecb2a57ddfe32196ab6b/SP_-_Worker_and_Temporary_Worker_Web_Register_-_2026-10-13.csv",
+    "filename": "SP_-_Worker_and_Temporary_Worker_Web_Register_-_2026-10-13.csv"
+   }
+  ]
+ }
+}

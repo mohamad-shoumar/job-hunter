@@ -1,4 +1,5 @@
-"""Command line: `jobhunter run | serve | contacts | inbox | check | report | reclassify | show | stats | boards | sources`."""
+"""Command line: `jobhunter run | serve | contacts | inbox | check | report | reclassify | show | stats | boards |
+sources | sponsors`."""
 
 from __future__ import annotations
 
@@ -31,7 +32,12 @@ def _load(args) -> tuple[Paths, dict, Filters]:
         # Your profile is not in git: a fresh copy of the project starts from the example.
         print(f"No {paths.profile_file.relative_to(paths.root)} yet, so no CVs, cover letters or emails: copy "
               "profile/master_profile.example.md there and fill it in.", file=sys.stderr)
-    return paths, load_json(paths.sources_file), Filters.load(paths.filters_file)
+    filters = Filters.load(paths.filters_file)
+    if filters.visa:
+        from .sponsors import Registers
+
+        filters.visa.registers = Registers.load(paths.sponsors_dir)
+    return paths, load_json(paths.sources_file), filters
 
 
 def _date(value: str) -> date:
@@ -60,7 +66,8 @@ def _date_range(args) -> tuple[date, date] | None:
 def _print_report_counts(store: JobStore, report_paths: list[Path]) -> None:
     for path in report_paths:
         c = Counter(row["status"] for row in store.jobs_for_report(path.stem))
-        print(f"{path}   {c['shortlisted']} shortlisted, {c['needs_review']} need review, {c['rejected']} rejected")
+        print(f"{path}   {c['shortlisted']} shortlisted, {c['needs_review']} need review, "
+              f"{c['visa_list']} on the visa list, {c['rejected']} rejected")
 
 
 def cmd_run(args) -> int:
@@ -137,6 +144,37 @@ def cmd_boards(args) -> int:
         removed = f"  (removed {row['removed_at'][:10]})" if row["removed_at"] else ""
         print(f"{row['kind'] + ':' + row['slug']:32} {row['company']}  added {row['added_at'][:10]}{removed}")
         print(f"{'':32} {row['reason']}")
+    return 0
+
+
+def cmd_sponsors(args) -> int:
+    """The government lists of visa sponsors the visa list checks companies against (sponsors.py)."""
+    from . import sponsors
+    from .http import Http
+
+    paths, _, filters = _load(args)
+    if args.update:
+        with Http(timeout=120) as http:
+            done, errors = sponsors.update(http, paths.sponsors_dir, utcnow())
+        for line in done + errors:
+            print(line)
+        print("run `jobhunter reclassify` to re-check stored jobs against them")
+        return 1 if errors and not done else 0
+    registers = filters.visa.registers if filters.visa else None
+    if args.company:
+        if not registers or not registers.index:
+            raise SystemExit("no lists downloaded yet: run `jobhunter sponsors --update`")
+        for country, name in sponsors.LISTS.items():
+            row = registers.find(country, args.company, [args.place or ""])
+            print(f"{country}: {row.quote() if row else 'not found'}  ({name})")
+        return 0
+    for country, name in sponsors.LISTS.items():
+        meta = registers.meta.get(country) if registers else None
+        if meta:
+            print(f"{country}: {meta['rows']:,} employers, {name}; updated {meta.get('updated') or '?'}, "
+                  f"fetched {(meta.get('fetched_at') or '?')[:10]}")
+        else:
+            print(f"{country}: not downloaded ({name}); run `jobhunter sponsors --update`")
     return 0
 
 
@@ -246,7 +284,7 @@ def cmd_reclassify(args) -> int:
         print(f"{count:5}  {change}")
     for path in rebuilt:
         print(f"rebuilt {path}")
-    print("jobs that became shortlisted/needs_review and were never reported go into the next daily report")
+    print("jobs that became shortlisted/needs_review/visa_list and were never reported go into the next daily report")
     return 0
 
 
@@ -592,6 +630,14 @@ def main(argv: list[str] | None = None) -> int:
 
     p = sub.add_parser("sources", help="which sources are enabled")
     p.set_defaults(func=cmd_sources)
+
+    p = sub.add_parser("sponsors", help="government lists of visa sponsors (UK, NL, IE) for the visa list",
+                       description="Without options: what is downloaded. The daily run refreshes them every "
+                                   "refresh_days (visa_list in config/filters.json).")
+    p.add_argument("--update", action="store_true", help="download the lists now")
+    p.add_argument("--company", help="look a company up in each list")
+    p.add_argument("--place", help="with --company: the job's town, for one-word names (e.g. London)")
+    p.set_defaults(func=cmd_sponsors)
 
     args = parser.parse_args(argv)
     logging.basicConfig(

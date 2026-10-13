@@ -12,6 +12,7 @@ from .agency import AgencyRules
 from .identity import company_key
 from .relocation import Relocation
 from .text import normalize_words
+from .visa import VisaRules
 
 
 @dataclass(frozen=True)
@@ -41,6 +42,10 @@ class Paths:
     @property
     def db_file(self) -> Path:
         return self.root / "data" / "jobs.sqlite"
+
+    @property
+    def sponsors_dir(self) -> Path:
+        return self.root / "data" / "sponsors"
 
     @property
     def reports_dir(self) -> Path:
@@ -119,6 +124,8 @@ class Filters:
     max_posting_age_days_company_boards: int | None = None
     # Countries you would move to (relocation.py): jobs there may be on-site. None: remote only.
     relocation: Relocation | None = None
+    # Countries you would move to on a work visa (visa.py): their jobs go to the separate visa list.
+    visa: VisaRules | None = None
 
     @classmethod
     def from_dict(cls, data: dict) -> Filters:
@@ -139,6 +146,7 @@ class Filters:
                                for b in data.get("blocked_companies", []) if company_key(b["name"])},
             agencies=AgencyRules.from_dict(data.get("agencies")),
             relocation=Relocation.from_dict(data.get("relocation")),
+            visa=VisaRules.from_dict(data.get("visa_list")),
             max_posting_age_days_company_boards=data.get("max_posting_age_days_company_boards"),
         )
 

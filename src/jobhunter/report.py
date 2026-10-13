@@ -13,7 +13,7 @@ import sqlite3
 from datetime import date, datetime
 from pathlib import Path
 
-from .models import ELIGIBLE, LIKELY, NEEDS_REVIEW, REJECTED, SHORTLISTED
+from .models import ELIGIBLE, LIKELY, NEEDS_REVIEW, REJECTED, SHORTLISTED, VISA_LIST
 from .store import JobStore
 
 _ELIGIBILITY_ORDER = {ELIGIBLE: 0, LIKELY: 1}
@@ -37,6 +37,12 @@ _REJECT_GROUPS = [
     ("location_restricted", "Location does not include Lebanon", "The places the posting allows."),
     ("residency_required", "Description requires living elsewhere", "Quoted from the description."),
     ("timezone_restricted", "Time zones exclude Lebanon", "Lebanon is UTC+2 / UTC+3."),
+    ("no_sponsor", "Abroad: does not sponsor a visa",
+     "In a country you would move to on a work visa, but the posting refuses or wants a right to work. Quoted."),
+    ("language_required", "Abroad: needs a language you don't speak",
+     "Asks for, or is written in, one of `languages` in the `visa_list` section of `config/filters.json`. Quoted."),
+    ("no_visa_evidence", "Abroad: no sign it sponsors a visa",
+     "The posting does not offer one, and the company is not on its country's sponsor list (or there is none)."),
     ("ai_cannot_hire", "AI check: cannot hire from Lebanon",
      "The rules could not tell, so Claude searched the web. Its quote was found word for word on the linked page; "
      "open the link if the job looks worth it."),
@@ -87,9 +93,10 @@ def _job_block(n: int, row: sqlite3.Row, sightings: list[sqlite3.Row], prepared:
     details.append(f"posted {row['posted_at'][:10]}" if row["posted_at"] else "no posting date")
     details.append(f"found {row['first_seen'][:10]}")
     seen_on = ", ".join(dict.fromkeys(f"[{s['source']}]({s['source_url']})" for s in sightings if s["source_url"]))
+    label = "Visa" if row["status"] == VISA_LIST else "Can hire from Lebanon"
     lines = [
         f"### {n}. {row['title']} — {row['company']}",
-        f"- **Can hire from Lebanon:** {row['eligibility']} — {reasons[0] if reasons else ''}",
+        f"- **{label}:** {row['eligibility']} — {reasons[0] if reasons else ''}",
     ]
     lines += [f"  - {r}" for r in reasons[1:]]
     lines.append(f"- **Fit:** {row['fit_score']} · {'; '.join(relevance)}" + (f" · {', '.join(skills[:10])}" if skills else ""))
@@ -160,10 +167,12 @@ def render(day: str, rows: list[sqlite3.Row], sightings: dict[int, list[sqlite3.
 
     shortlisted = sorted((r for r in rows if r["status"] == SHORTLISTED), key=_sort_key)
     review = sorted((r for r in rows if r["status"] == NEEDS_REVIEW), key=_sort_key)
+    visa = sorted((r for r in rows if r["status"] == VISA_LIST), key=_sort_key)
     rejected = [r for r in rows if r["status"] == REJECTED]
 
     out = [f"# Jobs — {date.fromisoformat(day):%A %d %B %Y}", ""]
-    out += [f"{len(shortlisted)} shortlisted · {len(review)} need review · {len(rejected)} rejected", ""]
+    out += [f"{len(shortlisted)} shortlisted · {len(review)} need review · {len(visa)} on the visa list · "
+            f"{len(rejected)} rejected", ""]
     stamp = f"Updated {generated_at.astimezone():%Y-%m-%d %H:%M}"
     if summary:
         stamp += f" by run {summary['run_id']}"
@@ -176,6 +185,11 @@ def render(day: str, rows: list[sqlite3.Row], sightings: dict[int, list[sqlite3.
     out += [f"## Needs review ({len(review)})", ""]
     out += ["A target role, but the posting does not say clearly whether Lebanon is allowed, or has no posting date. Check before applying.", ""]
     out += [block(i, r) for i, r in enumerate(review, 1)] or ["_None._", ""]
+
+    out += [f"## Visa list ({len(visa)})", ""]
+    out += ["Abroad (the EU or UK): a target role at an employer that offers a visa in the posting, or is on its "
+            "country's government sponsor list. Kept apart from the remote jobs above.", ""]
+    out += [block(i, r) for i, r in enumerate(visa, 1)] or ["_None._", ""]
 
     out += _rejected_section(rejected, max_age)
 
@@ -234,5 +248,5 @@ def write_report(store: JobStore, reports_dir: Path, day: str, summary: dict | N
     reports_dir.mkdir(parents=True, exist_ok=True)
     path = reports_dir / f"{day}.md"
     path.write_text(text)
-    store.mark_reported([r["id"] for r in rows if r["status"] in (SHORTLISTED, NEEDS_REVIEW)], now)
+    store.mark_reported([r["id"] for r in rows if r["status"] in (SHORTLISTED, NEEDS_REVIEW, VISA_LIST)], now)
     return path

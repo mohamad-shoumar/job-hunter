@@ -29,7 +29,8 @@ def test_an_onsite_job_in_dubai_is_shortlisted_with_what_to_ask(filters):
 
 
 def test_onsite_elsewhere_is_still_rejected(filters):
-    for place in ("Riyadh, Saudi Arabia", "Kuwait City", "London"):
+    # London, Berlin and the rest of the visa list's countries are judged by visa.py (test_visa.py).
+    for place in ("Riyadh, Saudi Arabia", "Kuwait City", "Paris, France"):
         result = _classify(filters, remote_status=ONSITE, allowed_locations=[place])
         assert result.reject_code == "not_remote", place
 

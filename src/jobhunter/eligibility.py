@@ -33,6 +33,7 @@ from .geo import (
 )
 from .models import ELIGIBLE, HYBRID, LIKELY, NOT_ELIGIBLE, ONSITE, UNCLEAR, Assessment, Job
 from .relocation import Relocation, assess_relocation
+from .visa import VisaRules, assess_visa
 
 # --- description scanning ---------------------------------------------------
 
@@ -183,8 +184,11 @@ def _quote(matches: list[PlaceMatch]) -> str:
     return "; ".join(dict.fromkeys(f'"{m.evidence}"' for m in matches))
 
 
-def assess_eligibility(job: Job, relocation: Relocation | None = None) -> Assessment:
-    """`relocation`: the countries you would move to (relocation.py). Jobs there may be on-site."""
+def assess_eligibility(job: Job, relocation: Relocation | None = None, visa: VisaRules | None = None) -> Assessment:
+    """`relocation`: the countries you would move to (relocation.py). Jobs there may be on-site.
+
+    `visa`: the countries you would move to on a work visa (visa.py): judged on sponsorship evidence.
+    """
     field_texts = job.allowed_locations or ([job.location_raw] if job.location_raw else [])
     field_matches = [classify_place(t, field=True) for t in field_texts]
     title_matches = scan_title(job.title)
@@ -200,11 +204,26 @@ def assess_eligibility(job: Job, relocation: Relocation | None = None) -> Assess
         place = relocation.place_in(field_texts + [m.evidence for m in title_matches])
         if place and (job.remote_status in (ONSITE, HYBRID) or not any(m.kind in POSITIVE_KINDS for m in everything)):
             return assess_relocation(job, place, relocation)
+    # On-site or hybrid in a country you would need a work visa for ("London"): the visa list decides.
+    found = visa.place_in(field_texts + [m.evidence for m in title_matches]) if visa else None
+    if found and job.remote_status in (ONSITE, HYBRID):
+        return assess_visa(job, *found, visa)
 
     if job.remote_status in (ONSITE, HYBRID):
         where = job.location_raw or ", ".join(job.allowed_locations) or "no location given"
         return Assessment(NOT_ELIGIBLE, [f'Not remote ({job.remote_status}): "{where}"'], "not_remote")
 
+    remote = _assess_remote(job, field_texts, field_matches, title_matches)
+    # A remote job open to Lebanon stays one ("Berlin / REMOTE (CET ±3)"). Only one limited to
+    # people living there ("Remote (UK)") means moving, so the visa list decides.
+    if found and remote.verdict == NOT_ELIGIBLE:
+        return assess_visa(job, *found, visa)
+    return remote
+
+
+def _assess_remote(job: Job, field_texts: list[str], field_matches: list[PlaceMatch],
+                   title_matches: list[PlaceMatch]) -> Assessment:
+    """A remote job (or one that does not say): can someone living in Lebanon be hired?"""
     tz_conflict = None
     if job.allowed_utc_offsets and not utc_offsets_allow_lebanon(job.allowed_utc_offsets):
         offsets = ", ".join(f"UTC{o:+g}" for o in sorted(set(job.allowed_utc_offsets)))

@@ -75,6 +75,7 @@ function emailBadge(status) {
 function statusChip(status, eligibility) {
   if (status === "shortlisted") return `<span class="chip good">shortlisted · ${esc(eligibility)}</span>`;
   if (status === "needs_review") return `<span class="chip warn">needs review</span>`;
+  if (status === "visa_list") return `<span class="chip info">visa list · ${esc(eligibility === "visa_sponsor" ? "sponsors visas" : eligibility)}</span>`;
   return `<span class="chip bad">${esc(status)}</span>`;
 }
 
@@ -126,6 +127,7 @@ async function renderJobs() {
           <option value="shortlisted">Shortlisted</option>
           <option value="active">Shortlisted + needs review</option>
           <option value="needs_review">Needs review</option>
+          <option value="visa_list">Visa list (EU/UK, sponsors visas)</option>
           <option value="tracked">Tracked (saved and after)</option>
           <option value="closed">Closed</option>
           <option value="rejected">Rejected (in a report)</option>
@@ -264,7 +266,7 @@ function whySection(d) {
   return `
     <div class="section">
       <h3>Why it's here</h3>
-      <div><b>Can hire from Lebanon: ${esc(j.eligibility)}</b></div>
+      <div><b>${j.status === "visa_list" ? "Visa" : "Can hire from Lebanon"}: ${esc(j.eligibility)}</b></div>
       <ul class="small">${j.eligibility_reasons.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>
       ${ai ? `<div class="small"><b>AI check:</b> ${esc(ai.verdict)}${ai.verified ? "" : " (quote not verified)"} · ${esc(ai.reason)}
         ${ai.quote ? `<div class="quote">“${esc(ai.quote)}” ${ai.source_url ? `<a href="${esc(ai.source_url)}" target="_blank" rel="noopener">source</a>` : ""}</div>` : ""}</div>` : ""}

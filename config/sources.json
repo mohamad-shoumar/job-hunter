@@ -84,6 +84,20 @@
         "filters": { "searchable_locations": ["United Arab Emirates", "Qatar", "Lebanon"] } }
     ]
   },
+  "arbeitnow": {
+    "_note": "Jobs in Germany, the Netherlands and the UK, for the visa list (visa.py). Public API, no key; asks for a link back (the report links each job's Arbeitnow page). visa_sponsorship=true is set per company, not per job, so it only trims NL and UK; Germany is fetched whole and the posting's words decide. Only titles with one of `queries` are kept (most jobs are other roles, and every fetched job is stored). Each site is read newest first until a page reaches jobs older than lookback_hours. ~11 requests a run. Checked 2026-10-13 (docs/research).",
+    "enabled": true,
+    "lookback_hours": 36,
+    "max_pages": 10,
+    "queries": ["python", "backend", "back end", "software", "fullstack", "ai engineer", "api", "web developer",
+                "platform engineer", "django", "fastapi", "forward deployed", "solutions engineer", "product engineer",
+                "integration engineer", "integrations engineer", "automation engineer", "applied ai"],
+    "sites": [
+      { "site": "https://www.arbeitnow.nl", "visa_sponsorship": true },
+      { "site": "https://www.arbeitnow.co.uk", "visa_sponsorship": true },
+      { "site": "https://www.arbeitnow.com" }
+    ]
+  },
   "serpapi": {
     "_note": "Google Jobs (includes LinkedIn postings). Needs SERPAPI_API_KEY in .env; skipped without it. One credit per query page per run. 7 daily queries + 1 Gulf city a day (Dubai, Abu Dhabi, Doha in turn: every_days 3, day 0/1/2) = 8 credits/day, ~240/month (the Free plan has 250). 2026-10-09: dropped two word-order duplicates of 'python backend engineer', added mid/junior-friendly searches. 2026-10-10: 'junior python developer remote' replaced by the city searches (location names from serpapi.com/locations.json).",
     "engine": "google_jobs",

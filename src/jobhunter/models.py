@@ -23,6 +23,8 @@ ELIGIBLE = "eligible"  # the posting says so: worldwide, or Lebanon listed
 LIKELY = "likely"  # a region or time zone that includes Lebanon (EMEA, UTC+2)
 UNCLEAR = "unclear"  # remote, but nothing decisive either way
 NOT_ELIGIBLE = "rejected"
+# In a country you would move to on a work visa (visa.py), with evidence the employer sponsors one.
+VISA_SPONSOR = "visa_sponsor"
 
 # Is this a role worth applying to? (relevance)
 MATCH = "match"  # target title and Python in the posting
@@ -38,6 +40,8 @@ UNKNOWN_HIRE = "unknown"
 SHORTLISTED = "shortlisted"
 NEEDS_REVIEW = "needs_review"
 REJECTED = "rejected"
+# The separate list of jobs abroad that sponsor a work visa (visa.py): not in the shortlist or "To apply".
+VISA_LIST = "visa_list"
 
 
 @dataclass
