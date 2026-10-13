@@ -145,9 +145,19 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
     the original bullet and rejects any new number, technology, seniority word or name, with a
     readable reason for each. I'm proud of it because it makes an AI feature trustworthy without
     trusting the AI."
-  - **Open questions** ("Why this role?", "A feature you're proud of", "Tell us about a challenge"):
-    write 3-6 confident sentences built on the best-matching CV bullet for this posting. Tie it to
-    what the company does, and don't make up anything that isn't in the CV.
+  - **Current salary / current benefits:** the profile's "Current salary" and "Current benefits"
+    lines, in the form's currency.
+  - **Open questions:** answer the question that was asked, the way the user would type it: 2-4
+    short sentences, plain words, no pitch. The user found answers that cite a CV achievement in
+    every reply "too AI".
+    - Technical questions ("How would you design / debug / explain ..."): answer straight, with no
+      CV references.
+    - Experience questions ("A feature you're proud of", "Tell us about a challenge", "Why this
+      role?"): one fact from the CV at most, said simply, never invented.
+    - Opinion questions ("What excites you ...", "Favorite ..."): the profile can't answer these.
+      Leave them empty for the user and say so in the report.
+    - Avoid pitch phrases such as "My rule of thumb is", "What excites me is", "That is how I work
+      today", and avoid stacking numbers (115+, 370+, 800+) into one answer.
 - **Unsure about a field?** Pick the most reasonable answer, note it for the report, keep going.
 - **Stuck?** If a page freezes, an upload fails or a button doesn't respond, reload and try again
   (up to 2 retries per step). If it still fails, leave the tab as it is, note it and go to the next
