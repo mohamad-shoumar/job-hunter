@@ -147,15 +147,15 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
     trusting the AI."
   - **Current salary / current benefits:** the profile's "Current salary" and "Current benefits"
     lines, in the form's currency.
-  - **Open questions:** answer the question that was asked, the way the user would type it: 2-4
-    short sentences, plain words, no pitch. The user found answers that cite a CV achievement in
-    every reply "too AI".
-    - Technical questions ("How would you design / debug / explain ..."): answer straight, with no
-      CV references.
-    - Experience questions ("A feature you're proud of", "Tell us about a challenge", "Why this
-      role?"): one fact from the CV at most, said simply, never invented.
-    - Opinion questions ("What excites you ...", "Favorite ..."): the profile can't answer these.
-      Leave them empty for the user and say so in the report.
+  - **Open questions:** be objective. Answer the question itself, on its merits, the way an
+    engineer would explain it: 2-4 short sentences, plain words, no pitch. Don't bend the answer
+    toward the user's experience. The user found answers that fit a CV achievement into every
+    reply "too AI".
+    - Use a CV bullet or achievement only where it makes sense: the question asks about the
+      user's experience ("What experience do you have ...", "Tell us about a challenge"), or a
+      real example actually makes the point clearer. Otherwise leave the CV out. Never invent.
+    - Personal-opinion questions ("What excites you ...", "Favorite ..."): the profile can't
+      answer these. Leave them empty for the user and say so in the report.
     - Avoid pitch phrases such as "My rule of thumb is", "What excites me is", "That is how I work
       today", and avoid stacking numbers (115+, 370+, 800+) into one answer.
 - **Unsure about a field?** Pick the most reasonable answer, note it for the report, keep going.
