@@ -66,12 +66,18 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
   don't pay. Search for the same role on the company's own careers page or its job board (Greenhouse,
   Lever, Ashby, Workable, BambooHR, LinkedIn) and apply there. Match the title, and the location if
   one is given.
-- If the role can't be found anywhere or is closed, note that for the report and move to the next job.
-  Don't change the job's stage.
+- If the role can't be found anywhere or is closed, skip it (below) and move to the next job.
 - If the company can't hire from Lebanon (residence required in another country, US-only), skip it
   and say so in the report. If the user wants that company never shortlisted again, add it to
   `blocked_companies` in `config/filters.json` with a short `why`, then run
   `.venv/bin/jobhunter reclassify`.
+- **Skipping a job:** press the red **Skip** button at the top of the job's card in the app. It
+  moves the job to Closed with the reason "skipped", so it leaves To apply. Don't drag the card to
+  the Closed column: that opens a "Why closed?" pop-up that blocks the browser tools. Skip every
+  job you can't apply to: closed or not found, location rules, a site that refuses applicants from
+  Lebanon, only on job aggregators, or a sign-up you can't do (except Proxify, below). A job whose
+  form you filled but the user must finish (a CAPTCHA, a field only they can answer) stays in To
+  apply.
 
 ### 3. Fill the form
 - Upload the tailored CV PDF wherever a resume is asked for. If `find`/`read_page` can't see the
@@ -178,5 +184,6 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
 ## At the end
 
 Report one line per job: company, role, where you applied (the URL of the tab left open), CV used,
-salary entered, anything you guessed or skipped, and the email status (drafted / no contact /
-needs edit). The user then goes through the open tabs and presses Apply, and presses Send in the app.
+salary entered, anything you guessed, and the email status (drafted / no contact /
+needs edit). List the jobs you skipped (pressed Skip) separately, one line each with the reason.
+The user then goes through the open tabs and presses Apply, and presses Send in the app.
