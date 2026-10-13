@@ -12,9 +12,10 @@
 Lines starting with // are notes: they are kept in the text file but never printed.
 [GitHub](https://github.com/you/repo) prints "GitHub" as a link.
 
-Your name and contact lines come from MY_NAME, MY_EMAIL, MY_PHONE, MY_LINKEDIN, MY_GITHUB
-and MY_LOCATION in the project's .env (they win over "# Name" and "email: ..." lines here),
-so resume.md needs none of them. <Last> is the last word of your name.
+Your name and contact lines come from MY_NAME, MY_EMAIL, MY_PHONE, MY_LINKEDIN, MY_GITHUB,
+MY_PORTFOLIO and MY_LOCATION in the project's .env (they win over "# Name" and "email: ..."
+lines here), so resume.md needs none of them. <Last> is the last word of your name.
+A portfolio prints as its address without https:// (example.com), so it reads on paper too.
 
 The bullets live in the profile (PROFILE), each tagged: [core] is always printed,
 anything else only for jobs with that tag (see "Tailoring rules" there). `sync`
@@ -42,7 +43,7 @@ PROFILE = HERE.parent / "profile" / "master_profile.md"
 ENV_FILE = HERE.parent / ".env"
 # The header lines filled from .env: "# Name", then "email: ..." and the rest.
 MY_DETAILS = {"name": "MY_NAME", "email": "MY_EMAIL", "phone": "MY_PHONE", "linkedin": "MY_LINKEDIN",
-              "github": "MY_GITHUB", "location": "MY_LOCATION"}
+              "github": "MY_GITHUB", "portfolio": "MY_PORTFOLIO", "location": "MY_LOCATION"}
 TRACKER_COLUMNS = ["Company", "Role", "Resume file", "Created", "Applied", "Status", "Notes"]
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
@@ -184,6 +185,10 @@ def build_html(lines, force_compact=False):
     for key, label in (("linkedin", "LinkedIn"), ("github", "GitHub")):
         if key in info:
             contact.append(f'<a href="{html.escape(link(info[key]))}">{label}</a>')
+    if "portfolio" in info:
+        url = link(info["portfolio"])
+        shown = re.sub(r"^https?://(www\.)?", "", url).rstrip("/")
+        contact.append(f'<a href="{html.escape(url)}">{html.escape(shown)}</a>')
     if "location" in info:
         contact.append(html.escape(info["location"]))
 
