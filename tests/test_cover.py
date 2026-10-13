@@ -254,7 +254,7 @@ def test_a_long_letter_or_two_overused_words_are_sent_back_then_noted(filters):
                                     "facts": [5]}]}
     w = writer(long, GOOD)
     _, _, attempts = w.write(job_row(store, filters), "Acme", FACTS, ["Kafka"])
-    assert attempts == 2 and "words; keep it to 150-250" in w.model.claude.calls[1]["messages"][-1]["content"]
+    assert attempts == 2 and "words; keep it to 90-170" in w.model.claude.calls[1]["messages"][-1]["content"]
 
     worded = {**GOOD, "closing": "The platform was robust. Deploys were seamless."}
     letter, _, attempts = writer(worded, worded).write(job_row(store, filters, source_job_id="2"), "Acme", FACTS, [])

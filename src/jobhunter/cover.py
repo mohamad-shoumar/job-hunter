@@ -60,9 +60,10 @@ from .text import iso
 
 MAX_POSTING_CHARS = 6000
 MAX_GAPS = 1
-MAX_PARAGRAPHS = 3
+SHORT_WORDS = 6  # more than one sentence shorter than this reads as punch lines
+MAX_PARAGRAPHS = 2
 # A letter outside this range still prints, with a note; a longer one is sent back once first.
-MIN_WORDS, MAX_WORDS = 120, 300
+MIN_WORDS, MAX_WORDS = 90, 220
 GUIDELINES_FILE = Path(__file__).resolve().parents[2] / "config" / "cover_letter_guidelines.md"
 # A gap is not named when your facts have work this close to it ("CI/CD" next to "quality gates").
 _CLOSE_TO = {
@@ -414,6 +415,10 @@ class Letter:
         """Sent back once with the problems; what is left after that is only noted."""
         whole = []
         once = list(dict.fromkeys(w for part in self.parts() for c in part if not c.problems for w in c.at_most_one))
+        short = [c.text for part in self.parts() for c in part if not c.problems and _words_of(c.text) < SHORT_WORDS]
+        if len(short) > 1:
+            whole.append(f"has {len(short)} sentences under {SHORT_WORDS} words ({_join([repr(s) for s in short], 'and')}); "
+                         "join them into normal sentences, keep at most one")
         if len(once) > 1:
             listed = _join([f'"{w}"' for w in once], "and")
             whole.append(f'uses {listed}; use at most one word from the "Use at most one" list')
@@ -423,7 +428,7 @@ class Letter:
     @property
     def to_fix(self) -> list[str]:
         """Everything the model is told when its answer is sent back."""
-        long = [f"the letter is {self.words} words; keep it to 150-250, never over {MAX_WORDS}"] \
+        long = [f"the letter is {self.words} words; keep it to 90-170, never over {MAX_WORDS}"] \
             if self.words > MAX_WORDS else []
         return self.problems + long + self.style_issues
 
@@ -531,15 +536,16 @@ and checks every sentence you write against the engineer's numbered facts.
 
 Return:
 - opening: 1 or 2 sentences.
-- paragraphs: 1 or 2 body paragraphs. facts: the numbers of the facts each \
-paragraph uses. "Asked for and in the facts" helps you pick the main story; you \
-do not need to name every item.
+- paragraphs: 1 body paragraph, or 2 when the second makes a different point \
+the posting asks for. facts: the numbers of the facts each paragraph uses. \
+"Asked for and in the facts" helps you pick the one main story; do not try to \
+mention them all.
 - gaps: 0 or {MAX_GAPS} tool or skill the posting requires that is not in the \
 facts, written exactly as the posting writes it ("Asked for, not in the facts" \
 lists some). Code adds one plain sentence saying the engineer has not worked \
 with it, and drops a gap that the posting names only once outside the title, or \
 that is close to work in the facts. Never mention a gap yourself.
-- closing: 1 or 2 sentences.
+- closing: 0 or 1 sentence; an empty string is fine.
 - notes: 1 to 3 short lines for the engineer (see "Notes to the engineer").
 
 Hard rules. Code removes a sentence that breaks one:
@@ -563,7 +569,7 @@ How the letter should read:
 def system_prompt(style: Style) -> str:
     """The rules code checks, then the guidelines file's part for the writer."""
     if not style.text:
-        return SYSTEM + "Plain, specific, confident words. 150 to 250 words in all. No buzzwords, no dashes.\n"
+        return SYSTEM + "Plain words, like a short email. 90 to 170 words in all. No buzzwords, no dashes.\n"
     return SYSTEM + style.text + "\n"
 
 SCHEMA = {
@@ -646,7 +652,7 @@ def letter_title(title: str) -> str:
 
 
 def body_of(letter: Letter, gap_text: str) -> list[str]:
-    """The letter's paragraphs: what survived the check, the gap sentence, and a plain closing when it is empty.
+    """The letter's paragraphs: what survived the check, the gap sentence, and the closing (none when it is empty).
 
     No opening survived: the first body paragraph opens the letter. A stock "I'm applying for ..." line
     would only repeat the header."""
@@ -655,7 +661,7 @@ def body_of(letter: Letter, gap_text: str) -> list[str]:
     gap = gap_sentence(letter.gaps, gap_text)
     if gap:
         body = body[:-1] + [f"{body[-1]} {gap}"] if body else [gap]
-    closing = " ".join(c.text for c in letter.closing) or "Thanks for reading."
+    closing = " ".join(c.text for c in letter.closing)
     return [p for p in (opening, *body, closing) if p]
 
 
@@ -732,7 +738,7 @@ def cover_for_job(store: JobStore, job_id: int, writer: CoverWriter, profile_pat
     words = _words_of(" ".join(body))
     notes = list(letter.notes)
     if not MIN_WORDS <= words <= MAX_WORDS:
-        notes.append(f"It is {words} words; 150-250 reads best")
+        notes.append(f"It is {words} words; 90-170 reads best")
     if not writer.style.text:
         notes.append("Written without config/cover_letter_guidelines.md (not found), so only the fact rules applied")
     meta = {

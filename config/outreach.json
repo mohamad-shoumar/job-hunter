@@ -65,7 +65,7 @@
   "auto_cover": true,
   "max_covers_per_run": 5,
   "_cover_gap_text": "The sentence about what the posting asks for and your profile does not have (the model picks at most 1, and code keeps it only when the posting names it in the title or twice and your facts have nothing close; code writes this sentence, so it never claims them). {gaps} is the list, {them} is 'it' or 'them'.",
-  "cover_gap_text": "I haven't worked with {gaps} yet, and I'd make learning {them} an early priority.",
+  "cover_gap_text": "I haven't worked with {gaps} yet.",
 
   "_catch_up_days": "The daily run also tailors CVs and writes cover letters for shortlisted jobs filed this many days back that still have none (e.g. one that failed on a network error at wake-up), within the same per-run caps. 0 turns this off.",
   "catch_up_days": 7
