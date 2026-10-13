@@ -101,7 +101,7 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
   City field needs the suggestion clicked ("Beirut, Beyrouth, Lebanon"). Jobs for Humanity adds a
   "Preliminary questions" page after Next: industries Financial services + Computers and
   information technology, function Engineering, 3 - 5 years, the floor bracket for monthly salary
-  (3,000 - 3,500), languages English only (the profile's languages line is TODO), visa No,
+  (3,000 - 3,500), languages from the profile's "Spoken languages" line, visa No,
   gender and community "Prefer not to say/answer", disability left empty, privacy box ticked.
 - **LinkedIn Easy Apply** (the user is already signed in to LinkedIn in Chrome):
   - Use it only when the LinkedIn job page shows an **Easy Apply** button. A plain **Apply** button
@@ -127,6 +127,8 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
     or another specific country, answer truthfully from the profile (contractor / EOR, no visa
     needed for remote work). Sponsorship needed? No, when the role is remote.
   - **Location / time zone / notice:** from the profile's "Work authorization and logistics" section.
+    If the form's notice options don't include 2 weeks / 14 days, pick the next shorter one
+    (10 days, not 20).
   - **Disability, medical needs, accommodations or adjustments:** No / none needed.
   - **Gender, race, veteran and other voluntary questions:** "Prefer not to say" / "Decline to
     self-identify" when that option exists.
