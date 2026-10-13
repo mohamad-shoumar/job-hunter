@@ -142,3 +142,6 @@ def test_the_visa_list_is_its_own_view(client, home, filters):
     assert [j["company"] for j in visa] == ["Wheely"] and visa[0]["status"] == "visa_list"
     # Not in the shortlist, so not in "To apply" either.
     assert "Wheely" not in {j["company"] for j in client.get("/api/jobs?view=shortlisted").json()["jobs"]}
+    today = client.get("/api/today").json()
+    assert [j["company"] for j in today["new_visa_jobs"]] == ["Wheely"]
+    assert "Wheely" not in {j["company"] for j in today["new_jobs"]}

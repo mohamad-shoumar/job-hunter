@@ -277,6 +277,15 @@ def today(store: JobStore, now: datetime, config: OutreachConfig) -> dict:
         """,
         (week_ago,),
     ).fetchall()
+    new_visa = store.conn.execute(
+        """
+        SELECT j.id, j.title, j.company, j.status, j.fit_score, j.report_date FROM jobs j
+        LEFT JOIN applications a ON a.job_id = j.id
+        WHERE (a.job_id IS NULL OR a.stage = 'new') AND j.status = 'visa_list' AND j.first_seen >= ?
+        ORDER BY j.fit_score DESC, j.id DESC
+        """,
+        (week_ago,),
+    ).fetchall()
     ghosted = store.conn.execute(
         "SELECT e.job_id, e.at, j.title, j.company FROM events e JOIN jobs j ON j.id = e.job_id "
         "WHERE e.kind = 'ghosted' AND e.at >= ? ORDER BY e.at DESC", (week_ago,),
@@ -289,6 +298,7 @@ def today(store: JobStore, now: datetime, config: OutreachConfig) -> dict:
         "replies": [dict(r) for r in replies],
         "follow_ups_due": [dict(r) for r in due],
         "new_jobs": [dict(r) for r in new_jobs],
+        "new_visa_jobs": [dict(r) for r in new_visa],
         "ghosted": [dict(r) for r in ghosted],
         "unsure_sends": [dict(r) for r in unsure],
         "sends_today": sends_today(store, now),

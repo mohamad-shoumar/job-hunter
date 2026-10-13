@@ -113,8 +113,10 @@ def test_relocation_help_without_a_visa_is_listed_as_weaker(filters):
     result = _classify(filters, allowed_locations=["Amsterdam, Netherlands"], description=text)
     assert result.status == VISA_LIST and result.eligibility.code == "relocation_offered"
     assert "offers help moving, not a visa by name (ask)" in result.eligibility.reasons[0]
-    # "No relocation support" offers nothing.
+    # "No relocation support" offers nothing, and neither does a list of perks that "may include" it.
     assert read_posting("We offer no relocation support.").relocation == []
+    assert read_posting("Benefits vary by country and may include healthcare coverage, parental leave, "
+                        "relocation support, wellness programs.").relocation == []
 
 
 def test_nothing_about_visas_rejects_with_what_was_checked(filters):
@@ -205,9 +207,11 @@ def test_a_hacker_news_visa_header(filters):
 
 
 def test_places_elsewhere_with_the_same_name_are_not_abroad(filters):
-    for place in ("Dublin, OH", "London, Ontario, Canada", "Cambridge, MA"):
+    for place in ("Dublin, OH", "London, Ontario, Canada", "Cambridge, MA", "Rome, GA"):
         result = _classify(filters, allowed_locations=[place])
         assert result.reject_code == "not_remote", place
+    # DE is Germany, not Delaware.
+    assert filters.visa.place_in(["Berlin, DE"])[1].code == "de"
 
 
 def test_remote_for_people_living_there_needs_a_visa_too(filters):

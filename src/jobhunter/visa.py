@@ -68,6 +68,7 @@ _RELOCATION = re.compile(
     r"|\b(?:pay|cover)\s+(?:for\s+)?(?:your\s+)?relocation\b",
     re.I,
 )
+_MAYBE = re.compile(r"\bmay\s+include\b|\bvar(?:y|ies)\s+by\b", re.I)
 # A refusal: a negation with "sponsor..." or with a visa being supported/provided/offered.
 _VISA_HELP = re.compile(r"\bvisas?\b[^.;:]{0,40}\b(?:support|supported|provide|provided|offer|offered|available|assist)", re.I)
 # A right to work you must already have. Alone it rejects; next to an offer it is a note.
@@ -150,9 +151,10 @@ class VisaRules:
         return None
 
 
+# Only the codes of states that have a town named like one of the places (Dublin OH, Berlin NH,
+# Rome GA, Reading PA, London ON, Amsterdam NY, Munich ND, ...). Never DE: "Berlin, DE" is Germany.
 _ELSEWHERE = re.compile(
-    r",\s*(?:AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|"
-    r"ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|ON|QC|BC|AB)\b"
+    r",\s*(?:AL|AR|CA|CO|CT|GA|KY|MA|MD|ME|MI|MN|MS|MT|ND|NH|NY|OH|PA|SC|TN|TX|VA|WI|ON)\b"
     r"|(?i:\b(?:united\s+states|usa|u\.s\.a?|canada|ohio|california|massachusetts|ontario|georgia|texas|"
     r"new\s+hampshire|connecticut|virginia|indiana|kentucky|australia|new\s+zealand|south\s+africa|india)\b)"
 )
@@ -197,7 +199,8 @@ def read_posting(text: str) -> Posting:
         # "Legally authorized to work in the Netherlands, or eligible for sponsorship" asks for nothing.
         elif _NEEDS_PERMIT.search(sentence) and not _SPONSOR_WORD.search(sentence):
             found.permits.append(sentence)
-        elif any(_RELOCATION.search(c) and not _NEGATION.search(c) for c in clauses):
+        # "Benefits vary by country and may include ... relocation support": a list of perks, not an offer.
+        elif not _MAYBE.search(sentence) and any(_RELOCATION.search(c) and not _NEGATION.search(c) for c in clauses):
             found.relocation.append(sentence)
     return found
 

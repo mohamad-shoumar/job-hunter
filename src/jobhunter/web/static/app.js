@@ -633,6 +633,8 @@ async function renderToday() {
       ${card("Follow-ups due", t.follow_ups_due.map((r) => item(r, `<div class="small muted">to ${esc(r.email || "?")} · follow-up ${r.follow_ups + 1} · due ${esc(day(r.next_follow_up_at))}</div>`)), "Nothing due.")}
       ${card("New shortlisted to triage", t.new_jobs.map((r) => item(r, ` <span class="chip">fit ${r.fit_score}</span>
         <span class="row" style="margin-top:4px"><button class="btn small" data-quick="saved" data-id="${r.id}">Save</button><button class="btn small danger" data-quick="skipped" data-id="${r.id}">Skip</button></span>`)), "All caught up.")}
+      ${card("New on the visa list (EU/UK)", (t.new_visa_jobs || []).map((r) => item(r, ` <span class="chip">fit ${r.fit_score}</span>
+        <span class="row" style="margin-top:4px"><button class="btn small" data-quick="saved" data-id="${r.id}">Save</button><button class="btn small danger" data-quick="skipped" data-id="${r.id}">Skip</button></span>`)), "None this week.")}
       ${t.unsure_sends.length ? card("Sends to double-check", t.unsure_sends.map((r) => item(r, `<div class="small muted">Gmail didn't confirm ${esc(r.subject)}: Check inbox resolves it.</div>`)), "") : ""}
       ${card("Ghosted this week", t.ghosted.map((r) => item(r, `<div class="small muted">closed ${esc(day(r.at))}</div>`)), "None.")}
       <div class="card"><h2>Today</h2><div class="big">${t.sends_today.total}<span class="muted small"> / ${t.caps.total} emails sent</span></div>
