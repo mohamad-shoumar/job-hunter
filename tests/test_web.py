@@ -145,3 +145,29 @@ def test_the_visa_list_is_its_own_view(client, home, filters):
     today = client.get("/api/today").json()
     assert [j["company"] for j in today["new_visa_jobs"]] == ["Wheely"]
     assert "Wheely" not in {j["company"] for j in today["new_jobs"]}
+
+
+def test_filter_by_years_asked_and_date_added(client, home, filters):
+    store = JobStore(home / "data" / "jobs.sqlite")
+    store_job(store, filters, source_job_id="3", company="Twoyears", required_yoe=2)
+    four = store_job(store, filters, source_job_id="4", company="Fouryears", required_yoe=4)
+    store.set_report_date([four], "2026-09-20")  # added 6 days before NOW (2026-09-25)
+    store.commit()
+    store.close()
+
+    def companies(query):
+        return {j["company"] for j in client.get(f"/api/jobs?view=shortlisted&{query}").json()["jobs"]}
+
+    everyone = {"Acme", "Talentuch", "Twoyears", "Fouryears"}
+    assert companies("") == everyone
+    # A job that doesn't say how many years is kept: unknown is not too many.
+    assert companies("yoe=3") == everyone - {"Fouryears"}
+    assert companies("yoe=1") == {"Acme", "Talentuch"}
+    assert companies("yoe=none") == {"Acme", "Talentuch"}
+    assert companies("days=1") == everyone - {"Fouryears"}
+    assert companies("days=7") == everyone
+    assert companies("yoe=4&days=1") == {"Acme", "Talentuch", "Twoyears"}
+    rows = {j["company"]: j for j in client.get("/api/jobs?view=shortlisted").json()["jobs"]}
+    assert rows["Twoyears"]["required_yoe"] == 2 and rows["Acme"]["required_yoe"] is None
+    assert client.get("/api/jobs?yoe=lots").status_code == 400
+    assert client.get("/api/jobs?days=-1").status_code == 400

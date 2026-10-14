@@ -21,6 +21,7 @@ import hmac
 import json
 import os
 import sqlite3
+from datetime import timedelta
 from pathlib import Path
 from typing import Callable
 
@@ -42,6 +43,7 @@ from ..contacts import (
 from ..hunter import Hunter, HunterError
 from ..llm import CLAUDE_CODE, anthropic_client, error_line, key_note
 from ..mailer import GmailInbox, MailAccount, SendError, SmtpSender, check_inbox, mail_account, outgoing, send_for_job
+from ..pipeline import local_day
 from ..pitch import PitchWriter, build_writer, cv_for, cv_options, draft_for_job, edit_draft, load_profile, reassemble, word_count
 from ..report import _salary
 from ..store import JobStore
@@ -205,7 +207,7 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
         }
 
     @app.get("/api/jobs")
-    def jobs(view: str = "active", q: str = "", store: JobStore = Depends(db)):
+    def jobs(view: str = "active", q: str = "", yoe: str = "", days: int = 0, store: JobStore = Depends(db)):
         where = {
             "active": "j.status IN ('shortlisted', 'needs_review') AND COALESCE(a.stage, 'new') != 'closed'",
             "shortlisted": "j.status = 'shortlisted' AND COALESCE(a.stage, 'new') != 'closed'",
@@ -221,6 +223,21 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
         if q.strip():
             where += " AND (j.title LIKE ? OR j.company LIKE ?)"
             params += [f"%{q.strip()}%"] * 2
+        # Years asked: "3" keeps jobs asking up to 3 and jobs that don't say (unknown is not too many);
+        # "none" keeps only the ones that don't say.
+        if yoe == "none":
+            where += " AND j.required_yoe IS NULL"
+        elif yoe.isdigit():
+            where += " AND (j.required_yoe IS NULL OR j.required_yoe <= ?)"
+            params.append(int(yoe))
+        elif yoe:
+            raise tracking.TrackingError(f"unknown years filter {yoe!r}")
+        # Date added: the same day the list is grouped by; days=1 is today only.
+        if days < 0:
+            raise tracking.TrackingError(f"days must be 0 (any time) or more, not {days}")
+        if days:
+            where += " AND COALESCE(j.report_date, substr(j.first_seen, 1, 10)) >= ?"
+            params.append((local_day(now()) - timedelta(days=days - 1)).isoformat())
         rows = store.conn.execute(
             f"""
             SELECT j.*, a.stage, a.closed_reason, a.body IS NOT NULL AS has_draft, a.draft_blocked,
@@ -486,7 +503,7 @@ def _job_summary(store: JobStore, row: sqlite3.Row, config: OutreachConfig) -> d
     return {
         "id": row["id"], "title": row["title"], "company": company, "status": row["status"],
         "eligibility": row["eligibility"], "reason": reasons[0] if reasons else "", "fit": row["fit_score"],
-        "salary": _salary(row), "posted_at": row["posted_at"], "first_seen": row["first_seen"],
+        "required_yoe": row["required_yoe"], "salary": _salary(row), "posted_at": row["posted_at"], "first_seen": row["first_seen"],
         "report_date": row["report_date"], "source": row["source"],
         "apply_url": row["application_url"] or row["source_url"],
         "stage": row["stage"] or "new", "closed_reason": row["closed_reason"], "has_draft": bool(row["has_draft"]),

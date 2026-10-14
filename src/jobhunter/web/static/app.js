@@ -4,7 +4,7 @@
 // carries the token the server put into the page.
 
 const TOKEN = document.querySelector('meta[name="jh-token"]').content;
-const state = { tab: "today", view: "shortlisted", q: "", jobs: [], jobId: null, detail: null, status: null };
+const state = { tab: "today", view: "shortlisted", q: "", yoe: "", days: "0", jobs: [], jobId: null, detail: null, status: null };
 
 // --- helpers -------------------------------------------------------------------
 
@@ -132,12 +132,31 @@ async function renderJobs() {
           <option value="closed">Closed</option>
           <option value="rejected">Rejected (in a report)</option>
         </select>
+        <select id="yoe" title="Years of experience the posting asks for">
+          <option value="">Any years asked</option>
+          <option value="2">Up to 2 years (or not stated)</option>
+          <option value="3">Up to 3 years (or not stated)</option>
+          <option value="4">Up to 4 years (or not stated)</option>
+          <option value="none">Years not stated</option>
+        </select>
+        <select id="days" title="When the job was added to your list">
+          <option value="0">Added any time</option>
+          <option value="1">Added today</option>
+          <option value="3">Added in the last 3 days</option>
+          <option value="7">Added in the last 7 days</option>
+          <option value="14">Added in the last 14 days</option>
+          <option value="30">Added in the last 30 days</option>
+        </select>
         <input type="search" id="q" placeholder="Search title or company">
       </div>
       <div class="list" id="jobs-list"><div class="empty">Loading…</div></div>`;
     $("#view").value = state.view;
     $("#q").value = state.q;
+    $("#yoe").value = state.yoe;
+    $("#days").value = state.days;
     $("#view").addEventListener("change", (e) => { state.view = e.target.value; loadJobs(); });
+    $("#yoe").addEventListener("change", (e) => { state.yoe = e.target.value; loadJobs(); });
+    $("#days").addEventListener("change", (e) => { state.days = e.target.value; loadJobs(); });
     let timer;
     $("#q").addEventListener("input", (e) => { clearTimeout(timer); timer = setTimeout(() => { state.q = e.target.value; loadJobs(); }, 250); });
   }
@@ -145,11 +164,16 @@ async function renderJobs() {
 }
 
 async function loadJobs() {
-  const data = await api(`/api/jobs?view=${encodeURIComponent(state.view)}&q=${encodeURIComponent(state.q)}`);
+  const query = new URLSearchParams({ view: state.view, q: state.q, yoe: state.yoe, days: state.days });
+  const data = await api(`/api/jobs?${query}`);
   state.jobs = data.jobs;
   const list = $("#jobs-list");
   if (!list) return;
-  if (!data.jobs.length) { list.innerHTML = `<div class="empty">No jobs here.</div>`; return; }
+  if (!data.jobs.length) {
+    const filtered = state.yoe || state.days !== "0" || state.q;
+    list.innerHTML = `<div class="empty">${filtered ? "No jobs match these filters." : "No jobs here."}</div>`;
+    return;
+  }
   let lastDay = null;
   list.innerHTML = data.jobs.map((j) => {
     const d = j.report_date || (j.first_seen || "").slice(0, 10);
@@ -178,6 +202,7 @@ function jobRow(j) {
       </div>
       <div class="job-side">
         <span class="chip" title="Fit score from your skills">fit ${j.fit}</span>
+        ${j.required_yoe ? `<span class="small" title="Years of experience the posting asks for">${j.required_yoe}+ yrs</span>` : ""}
         ${j.salary ? `<span class="small">${esc(j.salary)}</span>` : ""}
         <span class="small muted">${j.posted_at ? "posted " + esc(day(j.posted_at)) : "found " + esc(day(j.first_seen))}</span>
       </div>
