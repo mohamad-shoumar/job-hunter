@@ -134,8 +134,9 @@ async function renderJobs() {
         </select>
         <select id="yoe" title="Years of experience the posting asks for">
           <option value="">Any years asked</option>
-          <option value="0-3">0-3 years</option>
-          <option value="3+">3+ years</option>
+          <option value="lt3">Under 3 years</option>
+          <option value="3-4">3 to 4 years</option>
+          <option value="4-5">4 to 5 years</option>
           <option value="5+">5+ years</option>
           <option value="none">Years not mentioned</option>
         </select>

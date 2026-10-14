@@ -155,7 +155,8 @@ def test_filter_by_years_asked_and_date_posted(client, home, filters):
     store = JobStore(home / "data" / "jobs.sqlite")
     store_job(store, filters, source_job_id="3", company="Twoyears", required_yoe=2)
     store_job(store, filters, source_job_id="4", company="Threeyears", required_yoe=3)
-    store_job(store, filters, source_job_id="5", company="Fiveyears", required_yoe=5,
+    store_job(store, filters, source_job_id="5", company="Fouryears", required_yoe=4)
+    store_job(store, filters, source_job_id="6", company="Fiveyears", required_yoe=5,
               posted_at=NOW - timedelta(days=6))  # found today, but posted 6 days ago
     store.commit()
     store.close()
@@ -164,17 +165,18 @@ def test_filter_by_years_asked_and_date_posted(client, home, filters):
         return {j["company"] for j in client.get(f"/api/jobs?view=shortlisted&{query}").json()["jobs"]}
 
     unstated = {"Acme", "Talentuch"}
-    everyone = unstated | {"Twoyears", "Threeyears", "Fiveyears"}
+    everyone = unstated | {"Twoyears", "Threeyears", "Fouryears", "Fiveyears"}
     assert companies("") == everyone
-    # Strict: a job that doesn't say how many years is only under "not mentioned".
-    assert companies("yoe=0-3") == {"Twoyears", "Threeyears"}
-    assert companies("yoe=3%2B") == {"Threeyears", "Fiveyears"}
+    # Brackets that don't overlap; a job that doesn't say how many years is only under "not mentioned".
+    assert companies("yoe=lt3") == {"Twoyears"}
+    assert companies("yoe=3-4") == {"Threeyears"}
+    assert companies("yoe=4-5") == {"Fouryears"}
     assert companies("yoe=5%2B") == {"Fiveyears"}
     assert companies("yoe=none") == unstated
     # The date the row shows: when it was posted, not when it was found.
     assert companies("days=1") == everyone - {"Fiveyears"}
     assert companies("days=7") == everyone
-    assert companies("yoe=3%2B&days=3") == {"Threeyears"}
+    assert companies("yoe=5%2B&days=3") == set()
     rows = {j["company"]: j for j in client.get("/api/jobs?view=shortlisted").json()["jobs"]}
     assert rows["Twoyears"]["required_yoe"] == 2 and rows["Acme"]["required_yoe"] is None
     assert client.get("/api/jobs?yoe=3").status_code == 400

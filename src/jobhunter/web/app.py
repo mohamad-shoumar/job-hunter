@@ -223,8 +223,9 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
         if q.strip():
             where += " AND (j.title LIKE ? OR j.company LIKE ?)"
             params += [f"%{q.strip()}%"] * 2
-        # Years asked, strictly: a job that doesn't say is only in "none".
-        years = {"0-3": "j.required_yoe <= 3", "3+": "j.required_yoe >= 3", "5+": "j.required_yoe >= 5",
+        # Years asked, in brackets that don't overlap: a job that doesn't say is only in "none".
+        years = {"lt3": "j.required_yoe < 3", "3-4": "j.required_yoe >= 3 AND j.required_yoe < 4",
+                 "4-5": "j.required_yoe >= 4 AND j.required_yoe < 5", "5+": "j.required_yoe >= 5",
                  "none": "j.required_yoe IS NULL"}
         if yoe and yoe not in years:
             raise tracking.TrackingError(f"unknown years filter {yoe!r}")
