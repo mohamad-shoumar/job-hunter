@@ -21,7 +21,7 @@ import hmac
 import json
 import os
 import sqlite3
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 from pathlib import Path
 from typing import Callable
 
@@ -47,7 +47,7 @@ from ..pipeline import local_day
 from ..pitch import PitchWriter, build_writer, cv_for, cv_options, draft_for_job, edit_draft, load_profile, reassemble, word_count
 from ..report import _salary
 from ..store import JobStore
-from ..text import parse_datetime, utcnow
+from ..text import iso, parse_datetime, utcnow
 
 STATIC = Path(__file__).parent / "static"
 _MUTATING = {"POST", "PUT", "PATCH", "DELETE"}
@@ -223,21 +223,20 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
         if q.strip():
             where += " AND (j.title LIKE ? OR j.company LIKE ?)"
             params += [f"%{q.strip()}%"] * 2
-        # Years asked: "3" keeps jobs asking up to 3 and jobs that don't say (unknown is not too many);
-        # "none" keeps only the ones that don't say.
-        if yoe == "none":
-            where += " AND j.required_yoe IS NULL"
-        elif yoe.isdigit():
-            where += " AND (j.required_yoe IS NULL OR j.required_yoe <= ?)"
-            params.append(int(yoe))
-        elif yoe:
+        # Years asked, strictly: a job that doesn't say is only in "none".
+        years = {"0-3": "j.required_yoe <= 3", "3+": "j.required_yoe >= 3", "5+": "j.required_yoe >= 5",
+                 "none": "j.required_yoe IS NULL"}
+        if yoe and yoe not in years:
             raise tracking.TrackingError(f"unknown years filter {yoe!r}")
-        # Date added: the same day the list is grouped by; days=1 is today only.
+        if yoe:
+            where += f" AND {years[yoe]}"
+        # Posted: the date the row shows (when the job was posted, or when it was found if the source
+        # gives none), from local midnight; days=1 is today only.
         if days < 0:
             raise tracking.TrackingError(f"days must be 0 (any time) or more, not {days}")
         if days:
-            where += " AND COALESCE(j.report_date, substr(j.first_seen, 1, 10)) >= ?"
-            params.append((local_day(now()) - timedelta(days=days - 1)).isoformat())
+            where += " AND COALESCE(j.posted_at, j.first_seen) >= ?"
+            params.append(iso(datetime.combine(local_day(now()) - timedelta(days=days - 1), time.min).astimezone()))
         rows = store.conn.execute(
             f"""
             SELECT j.*, a.stage, a.closed_reason, a.body IS NOT NULL AS has_draft, a.draft_blocked,

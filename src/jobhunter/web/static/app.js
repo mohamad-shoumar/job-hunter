@@ -134,18 +134,18 @@ async function renderJobs() {
         </select>
         <select id="yoe" title="Years of experience the posting asks for">
           <option value="">Any years asked</option>
-          <option value="2">Up to 2 years (or not stated)</option>
-          <option value="3">Up to 3 years (or not stated)</option>
-          <option value="4">Up to 4 years (or not stated)</option>
-          <option value="none">Years not stated</option>
+          <option value="0-3">0-3 years</option>
+          <option value="3+">3+ years</option>
+          <option value="5+">5+ years</option>
+          <option value="none">Years not mentioned</option>
         </select>
-        <select id="days" title="When the job was added to your list">
-          <option value="0">Added any time</option>
-          <option value="1">Added today</option>
-          <option value="3">Added in the last 3 days</option>
-          <option value="7">Added in the last 7 days</option>
-          <option value="14">Added in the last 14 days</option>
-          <option value="30">Added in the last 30 days</option>
+        <select id="days" title="When the job was posted (or found, if the site gives no date)">
+          <option value="0">Posted any time</option>
+          <option value="1">Posted today</option>
+          <option value="3">Posted in the last 3 days</option>
+          <option value="7">Posted in the last 7 days</option>
+          <option value="14">Posted in the last 14 days</option>
+          <option value="30">Posted in the last 30 days</option>
         </select>
         <input type="search" id="q" placeholder="Search title or company">
       </div>

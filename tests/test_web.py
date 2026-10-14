@@ -147,27 +147,35 @@ def test_the_visa_list_is_its_own_view(client, home, filters):
     assert "Wheely" not in {j["company"] for j in today["new_jobs"]}
 
 
-def test_filter_by_years_asked_and_date_added(client, home, filters):
+def test_filter_by_years_asked_and_date_posted(client, home, filters):
+    from datetime import timedelta
+
+    from .conftest import NOW
+
     store = JobStore(home / "data" / "jobs.sqlite")
     store_job(store, filters, source_job_id="3", company="Twoyears", required_yoe=2)
-    four = store_job(store, filters, source_job_id="4", company="Fouryears", required_yoe=4)
-    store.set_report_date([four], "2026-09-20")  # added 6 days before NOW (2026-09-25)
+    store_job(store, filters, source_job_id="4", company="Threeyears", required_yoe=3)
+    store_job(store, filters, source_job_id="5", company="Fiveyears", required_yoe=5,
+              posted_at=NOW - timedelta(days=6))  # found today, but posted 6 days ago
     store.commit()
     store.close()
 
     def companies(query):
         return {j["company"] for j in client.get(f"/api/jobs?view=shortlisted&{query}").json()["jobs"]}
 
-    everyone = {"Acme", "Talentuch", "Twoyears", "Fouryears"}
+    unstated = {"Acme", "Talentuch"}
+    everyone = unstated | {"Twoyears", "Threeyears", "Fiveyears"}
     assert companies("") == everyone
-    # A job that doesn't say how many years is kept: unknown is not too many.
-    assert companies("yoe=3") == everyone - {"Fouryears"}
-    assert companies("yoe=1") == {"Acme", "Talentuch"}
-    assert companies("yoe=none") == {"Acme", "Talentuch"}
-    assert companies("days=1") == everyone - {"Fouryears"}
+    # Strict: a job that doesn't say how many years is only under "not mentioned".
+    assert companies("yoe=0-3") == {"Twoyears", "Threeyears"}
+    assert companies("yoe=3%2B") == {"Threeyears", "Fiveyears"}
+    assert companies("yoe=5%2B") == {"Fiveyears"}
+    assert companies("yoe=none") == unstated
+    # The date the row shows: when it was posted, not when it was found.
+    assert companies("days=1") == everyone - {"Fiveyears"}
     assert companies("days=7") == everyone
-    assert companies("yoe=4&days=1") == {"Acme", "Talentuch", "Twoyears"}
+    assert companies("yoe=3%2B&days=3") == {"Threeyears"}
     rows = {j["company"]: j for j in client.get("/api/jobs?view=shortlisted").json()["jobs"]}
     assert rows["Twoyears"]["required_yoe"] == 2 and rows["Acme"]["required_yoe"] is None
-    assert client.get("/api/jobs?yoe=lots").status_code == 400
+    assert client.get("/api/jobs?yoe=3").status_code == 400
     assert client.get("/api/jobs?days=-1").status_code == 400
