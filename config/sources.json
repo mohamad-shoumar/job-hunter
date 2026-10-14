@@ -81,7 +81,24 @@
       { "name": "MEVP", "collection_id": 1034, "queries": ["engineer", "developer"],
         "filters": { "searchable_locations": ["United Arab Emirates", "Qatar", "Lebanon"] } },
       { "name": "BECO Capital", "collection_id": 10883, "queries": ["engineer", "developer"],
-        "filters": { "searchable_locations": ["United Arab Emirates", "Qatar", "Lebanon"] } }
+        "filters": { "searchable_locations": ["United Arab Emirates", "Qatar", "Lebanon"] } },
+      { "_note": "European funds and the big ones' EU jobs, for the visa list (checked 2026-10-13). Only the UK, the Netherlands and Ireland: Getro gives no posting text, so a job gets on the list only through those countries' sponsor registers; one that does makes its company's own board watched, and that board's postings have the text.",
+        "name": "Index Ventures (UK, NL, IE)", "collection_id": 1629, "queries": ["python", "backend"],
+        "filters": { "searchable_locations": ["United Kingdom", "Netherlands", "Ireland"] } },
+      { "name": "Atomico (UK, NL, IE)", "collection_id": 36986, "queries": ["python", "backend"],
+        "filters": { "searchable_locations": ["United Kingdom", "Netherlands", "Ireland"] } },
+      { "name": "Creandum (UK, NL, IE)", "collection_id": 53552, "queries": ["python", "backend"],
+        "filters": { "searchable_locations": ["United Kingdom", "Netherlands", "Ireland"] } },
+      { "name": "Seedcamp (UK, NL, IE)", "collection_id": 4186, "queries": ["python", "backend"],
+        "filters": { "searchable_locations": ["United Kingdom", "Netherlands", "Ireland"] } },
+      { "name": "Speedinvest (UK, NL, IE)", "collection_id": 947, "queries": ["python", "backend"],
+        "filters": { "searchable_locations": ["United Kingdom", "Netherlands", "Ireland"] } },
+      { "name": "Accel (UK, NL, IE)", "collection_id": 8672, "queries": ["python", "backend"],
+        "filters": { "searchable_locations": ["United Kingdom", "Netherlands", "Ireland"] } },
+      { "name": "General Catalyst (UK, NL, IE)", "collection_id": 222, "queries": ["python", "backend"],
+        "filters": { "searchable_locations": ["United Kingdom", "Netherlands", "Ireland"] } },
+      { "name": "Point Nine (UK, NL, IE)", "collection_id": 1680, "queries": ["python", "backend"],
+        "filters": { "searchable_locations": ["United Kingdom", "Netherlands", "Ireland"] } }
     ]
   },
   "arbeitnow": {
@@ -97,6 +114,14 @@
       { "site": "https://www.arbeitnow.co.uk", "visa_sponsorship": true },
       { "site": "https://www.arbeitnow.com" }
     ]
+  },
+  "workable": {
+    "_note": "Workable's public job search: every company on Workable, by country, for the visa list (visa.py). Full descriptions. 20 a page, sorted by relevance, so day_range keeps it to recent postings. One search per query and country: up to queries x countries x max_pages requests (about 21-42). Checked 2026-10-13: 57 of 805 target roles in the seven countries reached the visa list (docs/research).",
+    "enabled": true,
+    "day_range": 3,
+    "max_pages": 2,
+    "queries": ["python", "backend", "software engineer"],
+    "countries": ["United Kingdom", "Netherlands", "Ireland", "Germany", "Spain", "Italy", "Finland"]
   },
   "serpapi": {
     "_note": "Google Jobs (includes LinkedIn postings). Needs SERPAPI_API_KEY in .env; skipped without it. One credit per query page per run. 7 daily queries + 1 Gulf city a day (Dubai, Abu Dhabi, Doha in turn: every_days 3, day 0/1/2) = 8 credits/day, ~240/month (the Free plan has 250). 2026-10-09: dropped two word-order duplicates of 'python backend engineer', added mid/junior-friendly searches. 2026-10-10: 'junior python developer remote' replaced by the city searches (location names from serpapi.com/locations.json).",

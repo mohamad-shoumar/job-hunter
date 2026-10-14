@@ -1,0 +1,113 @@
+{
+ "_trimmed": "jobs.workable.com/api/v1/jobs?query=python&location=..., fetched 2026-10-13: 3 real jobs, long texts cut.",
+ "title": "python jobs",
+ "totalSize": 3,
+ "jobs": [
+  {
+   "department": "IT",
+   "id": "17672760-d26d-4ac8-af44-db2115b53145",
+   "title": "Senior Backend Python Developer - Relocation to Cyprus",
+   "state": "published",
+   "description": "<p><strong>The role is about:</strong></p><p>We are expanding our engineering capabilities and looking for a Senior Backend Engineer to join our growing team.</p><p>In this role, you will play a key part in designing and building scalable, high-performance backend systems, contributing to the development of robust services that support a range of internal and customer-facing products. You will work in a fast-paced environment where system performance, scalability, and reliability are critical.</p><p>Location: <strong>Onsite (employment contract with relocation support)</strong></p><p>Reporting to: Group CTO </p><p><strong>What you will do:\u202f\u202f</strong></p><ul><li>Design and implement scalable Python microservices in a distributed architecture.</li><li>Build and optimize high-performance backend systems, ensuring scalability and reliability under high load.</li><li>Integrate and manage third-party APIs and external services.</li><li>Collaborate with cross-functional teams to define technical solutions and system design approaches.</li><li>Work with AWS services (e.g. Lambda, cloud infrastructure) to architect and deploy solutions.</li><li>Improve and maintain CI/CD pipelines and deployment processes in collaboration with DevOps.</li><li>Lead and contribute to code reviews, ensuring high engineering standards.</li><li>Identify system bottlenecks and drive performance and scalability improvements.</li><li>Troubleshoot complex production issues in distributed systems.</li><li>Contribute to technical discussions and guide best practices within the team.</li></ul><p><strong>What we need:</strong></p><ul><li>5+ years of backend engineering experience with strong Python expertise.</li><li>Proven experience building and scaling microservices architectures.</li><li>Strong knowledge of FastAPI or Django.</li><li>Experience working with AWS (including services such as Lambda).</li><li>Strong experience with Docker and containerization.</li><li>Experience with CI/CD pipelines (GitLab preferred).</li><li>Strong understanding of distributed systems and high-load environments.</li><li>Experience designing and optimizing systems for performance and scalability.</li><li>Solid experience integrating third-party APIs.</li><li>Strong problem-solving and analytical skills.</li><li>Excellent communication skills and ability to work in a remote-first environment.</li><li>Experience in fintech, payments, or financial platforms.</li>",
+   "socialSharingDescription": "The role is about:We are expanding our engineering capabilities and looking for a Senior Backend Engineer to join our growing team.In this role, you will play a key part in designing and building scalable, high-performance backend systems, contributing...",
+   "employmentType": "Full-time",
+   "benefitsSection": "",
+   "requirementsSection": "",
+   "url": "https://jobs.workable.com/view/3TBBgqTUFAy7o5RLxfkSXg/remote-senior-backend-python-developer---relocation-to-cyprus-in-netherlands-at-payabl.",
+   "language": "en",
+   "locations": [
+    "TELECOMMUTE",
+    "Netherlands"
+   ],
+   "location": {
+    "city": "",
+    "subregion": null,
+    "countryName": "Netherlands"
+   },
+   "created": "2026-06-23T14:58:09.132Z",
+   "updated": "2026-06-23T14:58:09.132Z",
+   "company": {
+    "id": "da0005c5-0da3-4fac-94cf-90f2aa0c4760",
+    "title": "payabl.",
+    "website": "http://payabl.com",
+    "image": "https://workablehr.s3.amazonaws.com/uploads/account/logo/641826/logo",
+    "description": "<p>We're powering the growth of merchants by helping them take payments easily, securely and globally.</p>",
+    "url": "https://jobs.workable.com/company/sVkt9hjnPaomoq9k7Rs6ZA/jobs-at-payabl.",
+    "socialSharingImage": "https://workablehr.s3.amazonaws.com/uploads/account/open_graph_logo/641826/social",
+    "socialSharingDescription": "We&#39;re powering the growth of merchants by helping them take payments easily, securely and globally."
+   },
+   "isFeatured": false,
+   "workplace": "remote"
+  },
+  {
+   "department": "IT & Digital",
+   "id": "29c7992e-a2ca-429c-8f4d-302955159ede",
+   "title": "Backend Developer",
+   "state": "published",
+   "description": "<p><strong>ABOUT ORGANOX:</strong></p><p>OrganOx is a commercial stage organ technology company dedicated to developing technologies to improve outcomes for patients with acute or chronic organ failure. The company was established as a spin out of the University of Oxford in 2008 and is now part of the Terumo Group. OrganOx is a pioneer in normothermic machine perfusion (NMP).\u00a0 It's flagship platform, the metra\u00ae, is available for use in the U.S., Europe, Canada, and Australia. It has been utilized in over 7,000 liver transplants to date to keep donor livers in a metabolically active state outside the body enabling longer preservation times and functional assessment of the organ prior to transplant, leading to an increased number of organs available for transplant. Founded in 1921, Terumo Corporation (TSE:4543) strives to fulfil its mission of \u201cContributing to Society through Healthcare\u201d by providing a comprehensive range of solutions in the fields of therapeutic procedures, hospital operations, and life sciences in more than 160 countries and regions.</p><p></p><p><strong>Position Summary </strong></p><p>The Backend Developer is a hands-on software engineering role within the Digital team, contributing to the delivery of secure, maintainable cloud services and APIs across OrganOx digital platforms. Aligned with Terumo values of integrity, collaboration, respect, and contribution to society through healthcare, the role supports regulated medical device and data solutions developed within OrganOx quality and software lifecycle processes.</p><p>Working closely with internal stakeholders and external development partners, the Backend Developer designs, develops, tests, documents, and maintains server-side applications, APIs, databases, and cloud-based services that underpin OrganOx digital products and have a direct impact on clinical outcomes.</p><p>This is an on site position in Oxford with flexibility.</p><p>Listed below are the major responsibilities of the role and a brief description of some of the key tasks to be performed. This list is not totally exhaustive.</p><p></p><p><strong>Major Responsibilities </strong></p><ul><li>Design, develop, and maintain scalable back-end services, APIs, integration platforms, databases, and Microsoft Azure cloud-native solutions to deliver defined requirements across regulated and non-regulated digital projects.</li>",
+   "socialSharingDescription": "ABOUT ORGANOX:OrganOx is a commercial stage organ technology company dedicated to developing technologies to improve outcomes for patients with acute or chronic organ failure. The company was established as a spin out of the University of Oxford in 200...",
+   "employmentType": "Full-time",
+   "benefitsSection": "<p>At OrganOx, we value innovation, evidence, integrity, teamwork, respect, and passion. We offer competitive compensation and comprehensive benefits, including healthcare and retirement plans. We support work-life balance and provide opportunities for ongoing professional development. </p><p><em>We are an equal opportunity employer, and all qualified applicants will receive consideration for employment without regard to age, disability, gender reassignment, marriage and civil partnership, pregnancy and maternity, race, religion or belief, sex, sexual orientation race, or any other characteristics protected by law.</em></p>",
+   "requirementsSection": "<p><strong>Skills &amp; Experience</strong></p><ul><li>Professional experience as a software engineer within a commercial delivery team, with current and relevant back-end development skills.</li><li>Strong back-end development experience centred on Microsoft technologies and platforms, including C#, .NET, SQL Server, and Azure.</li><li>Experience designing and developing RESTful APIs, microservices, and distributed systems.</li><li>Strong knowledge of database design, optimisation, performance tuning, and data modelling.</li><li>Solid understanding of cloud technologies, secure API design, application security, networking concepts, authentication, authorisation, and API-based architectures.</li><li>Experience with DevOps practices including source control, configuration management, build pipelines, continuous integration, and continuous deployment.</li><li>Strong understanding of software engineering best practices including Clean Code, SOLID principles, automated testing, and continuous integration.</li><li>Excellent problem-solving skills and the ability to learn new technologies and develop robust solutions.</li><li>Strong communication and team-working skills.</li><li>High attention to detail and concern for quality of work.</li><li>Experience working with containerisation technologies such as Docker and orchestration platforms such as Kubernetes (desirable)</li><li>Comfortable working within Agile development approaches and controlled software lifecycle processes, ideally in regulated medical device or healthcare environments (desirable)</li><li>Experience developing software within a regulated environment, including awareness of quality system requirements, software lifecycle controls, traceability, verification, validation, and software risk management (desirable)</li><li>Experience with event-driven architectures, messaging technologies, IoT platforms, telemetry, or scientific systems (desirable)</li><li> Additional experience with Linux, time-series data, data quality, data analytics, or business intelligence (desirable)</li></ul><p></p><p><strong>Qualifications </strong></p><ul><li>Bachelor\u2019s degree or higher in Computer Science or another STEM related subject, or equivalent experience</li></ul>",
+   "url": "https://jobs.workable.com/view/6aejMyuEJiiWmu8yQUHza9/backend-developer-in-oxford-at-organox",
+   "language": "en",
+   "locations": [
+    "Oxford, England, United Kingdom"
+   ],
+   "location": {
+    "city": "Oxford",
+    "subregion": "England",
+    "countryName": "United Kingdom"
+   },
+   "created": "2026-10-07T12:41:02.870Z",
+   "updated": "2026-10-07T12:41:02.870Z",
+   "company": {
+    "id": "676fd3bc-a1cd-4458-b085-c26dc2b15e96",
+    "title": "OrganOx",
+    "website": "https://www.organox.com/",
+    "image": "https://workablehr.s3.amazonaws.com/uploads/account/logo/665040/logo",
+    "description": "<p>OrganOx is an innovative, fast-paced, global medical device company with a mission to save lives by making every donated organ count. We are a commercial stage organ technology company, spun out of the University of Oxford in 2008, committed to improving transplantation outcomes throughout the world. The company\u2019s first product, the OrganOx metra\u00ae normothermic machine perfusion (NMP) system for liver transplantation, has been used to support more than 4,000 liver transplant operations globally. </p>",
+    "url": "https://jobs.workable.com/company/dLPLtisv87FxkKJZJYvXfE/jobs-at-organox",
+    "socialSharingImage": "https://workablehr.s3.amazonaws.com/uploads/account/open_graph_logo/665040/social",
+    "socialSharingDescription": "OrganOx is an innovative, fast-paced, global medical device company with a mission to save lives by making every donated organ count. "
+   },
+   "isFeatured": false,
+   "workplace": "on_site"
+  },
+  {
+   "department": "Project Services (PS)",
+   "id": "68fcfc98-e678-4fae-a8a4-0a0fc86ecc96",
+   "title": "Senior Full Stack Engineer",
+   "state": "published",
+   "description": "<p><strong>Becoming Informed\u00a0</strong></p><p>At Informed, we develop award-winning digital business change methods and platforms that help organisations deliver smarter, safer, greener and healthier digital services.\u202f\u00a0</p><p>We combine innovative thinking, deep expertise and cutting-edge technology to solve complex challenges and bring our clients' ambitions to life. Our success is built on strong relationships, collaboration and a belief that great people deliver great outcomes.\u202f\u00a0</p><p>Established in 1992, Informed Solutions is a certified and we're proud of the supportive and inclusive environment we've created. We invest in our people, encourage continuous learning and provide opportunities to take ownership, grow your skills and build a rewarding career.\u202f\u00a0</p><p>Join us and make a difference on some of the UK's most important #tech4good programmes, helping to create digital services that have a positive impact on society and the communities they serve.\u202f\u00a0 </p><p></p><p><strong>The Opportunity\u00a0</strong></p><p>As a Senior Full Stack Software Engineer at Informed Solutions, you\u2019ll take a leading role in designing, building, and delivering complex digital solutions that tackle real-world challenges in the public sector. Your work will make a tangible difference, helping to create a healthier, safer, and more sustainable UK.</p><p>You\u2019ll be part of a collaborative, high-performing team, taking ownership of end-to-end delivery on greenfield projects while guiding and supporting colleagues to develop their skills and contribute effectively. </p><p>Our consultancy is proudly technology agnostic, empowering you to architect the best solutions using the most effective tools for each challenge. With technologies ranging from .NET, Java, Python, Node.js, AWS and Azure, you\u2019ll have opportunities to deepen your expertise, explore new areas, and grow your career.</p>",
+   "socialSharingDescription": "Becoming Informed&amp;nbsp;At Informed, we develop award-winning digital business change methods and platforms that help organisations deliver smarter, safer, greener and healthier digital services.\u202f&amp;nbsp;We combine innovative thinking, deep expert...",
+   "employmentType": "Full-time",
+   "benefitsSection": "<p><strong>Why Informed?\u202f\u00a0</strong></p><p>At Informed, you'll work on meaningful projects that make a real difference, alongside talented people who are passionate about solving complex challenges.\u202f\u00a0</p><p>We're committed to helping our people thrive through structured career development, professional certifications, mentoring and continuous learning opportunities. Alongside this, we offer a competitive and flexible benefits package designed to support your wellbeing, development and work-life balance.\u202f\u00a0</p><p>Our values of Innovation, Excellence and Integrity underpin everything we do, helping us create an environment where people can do their best work and build rewarding careers.\u202f\u00a0</p><p>You\u2019ll have opportunities to develop your skills through InformedACADEMY\u2122, alongside support from experienced colleagues and access to professional learning.\u00a0</p><p>Our benefits support your wellbeing, career development and participation in the success of the business.\u202f\u00a0</p><ul><li>Industry leading health and wellbeing plan \u2013 We partner with several wellbeing support functions to cater to each individuals need, including 24/7 GP services, mental health support and physical health support.\u202f\u00a0</li></ul><ul><li>Hybrid working arrangements and an annual profit-sharing scheme.\u202f\u00a0</li></ul><ul><li>Private medical cover, life assurance and gym membership, subject to qualifying periods.\u202f\u00a0</li></ul><ul><li>25 days of annual holiday in addition to bank holidays, plus a sabbatical scheme; qualifying periods apply.\u202f\u00a0</li></ul><ul><li>Enhanced maternity and paternity provisions, subject to qualifying periods.\u202f\u00a0</li></ul><ul><li>Employer pension contributions and support for professional subscription costs.\u202f\u00a0</li></ul><ul><li>Employee referral rewards, regular office lunches and onsite wellbeing sessions.\u202f\u00a0</li></ul>",
+   "requirementsSection": "<p><strong>What you\u2019ll do\u00a0</strong></p><p></p><ul><li><strong>Own delivery of services</strong>: Take responsibility for the engineering and delivery of small-to-medium services (or major components of larger services) across the full lifecycle, from design and build through to deployment, operation and continual improvement.</li><li><strong>Lead on architecture and design</strong>: Take ownership of the end-to-end design of components or services, producing and maintaining high-quality documentation. </li><li><strong>Support delivery planning:</strong> Partner with Delivery Managers to plan and structure technical activities, provide accurate and commercially sound estimates, and proactively identify and mitigate technical risks, issues and dependencies.</li><li><strong>Build stakeholder trust</strong>: Act as a trusted technical advisor to client counterparts, partner organisations and third parties, ensuring alignment between business needs and technical delivery.</li></ul><p></p><p><strong>What you\u2019ll bring</strong></p><p></p><ul><li> <strong>5+ years</strong>\u2019 proven experience in a Full Stack Engineering role, with advanced skills in .NET, Java or Python, plus modern JavaScript libraries.</li><li>Experience taking <strong>ownership </strong>of delivery for services or significant components across the full lifecycle from design to operation.</li><li>Strong understanding of architectural and design patterns, including serverless and microservices, with the ability to lead and assure their application.</li><li>Experience working in <strong>Agile </strong>environments, using Scrum, Kanban and test-driven development (TDD), and contributing to delivery planning and estimation.</li><li>Experience mentoring and supporting less experienced engineers, providing guidance and enabling high quality, efficient delivery.</li></ul><p></p><p><strong>It would be great if you also have\u00a0</strong></p><ul><li>Experience working in a consultancy environment, engaging with external stakeholders and clients.</li><li>Exposure to public sector projects and delivering solutions in complex organisational landscapes.</li></ul><p></p><p><strong>How you\u2019ll work\u00a0</strong></p><p>Our work is varied, fast-moving and often complex. You\u2019ll need to be comfortable with uncertainty, adapt as priorities change and bring sound judgement to difficult problems.\u00a0</p><p></p><p></p>",
+   "url": "https://jobs.workable.com/view/dXWdSuXtsEorA3dibY2RDG/hybrid-senior-full-stack-engineer-in-leeds-at-informed-solutions",
+   "language": "en",
+   "locations": [
+    "Leeds, England, United Kingdom"
+   ],
+   "location": {
+    "city": "Leeds",
+    "subregion": "England",
+    "countryName": "United Kingdom"
+   },
+   "created": "2026-10-12T09:20:18.725Z",
+   "updated": "2026-10-12T09:20:18.725Z",
+   "company": {
+    "id": "591e0c6a-0233-4129-9f1a-cd0dad53b68b",
+    "title": "Informed Solutions",
+    "website": "https://www.informed.com/",
+    "image": "https://workablehr.s3.amazonaws.com/uploads/account/logo/631547/logo",
+    "description": "",
+    "url": "https://jobs.workable.com/company/c1gsgNnGmCe3er2tbBrsfx/jobs-at-informed-solutions",
+    "socialSharingDescription": ""
+   },
+   "isFeatured": false,
+   "workplace": "hybrid"
+  }
+ ],
+ "nextPageToken": "tok2"
+}

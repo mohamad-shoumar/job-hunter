@@ -24,6 +24,7 @@ from . import (
     smartrecruiters,
     teamtailor,
     weworkremotely,
+    workable,
 )
 from .base import Source, SourceResult
 
@@ -45,6 +46,7 @@ BUILDERS = {
     "smartrecruiters_boards": smartrecruiters.from_config,
     "pinpoint_boards": pinpoint.from_config,
     "arbeitnow": arbeitnow.from_config,
+    "workable": workable.from_config,
 }
 
 # Sections that configure something other than one source (boards.py reads "watch_boards").

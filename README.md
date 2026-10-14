@@ -406,7 +406,9 @@ Checked on 2026-09-25, SerpApi on 2026-09-27, the investor and Gulf boards on 20
 | LinkedIn, Wellfound, Work at a Startup | not built | bot walls, login, or terms forbid scraping (LinkedIn's guest search works, but you chose not to risk it, 2026-10-10) |
 | Bayt, GulfTalent, NaukriGulf | not built | block scripts or forbid them in robots.txt, and mostly recruiters |
 | Arbeitnow | public API | jobs in Germany, the Netherlands and the UK, for the visa list. Its visa flag is per company (flagged postings say "we do not provide visa sponsorship" too), so it only trims the NL and UK feeds; the posting's words decide. Only titles with one of `queries` are kept |
-| Relocate.me, visasponsor.jobs, Welcome to the Jungle/Otta, DevITjobs, Landing.jobs, Duunitori | not built | checked 2026-10-13 for the visa list: too few jobs, no visa field, or terms forbid scripts (`docs/research/2026-10-13-eu-visa-sponsorship.md`) |
+| Workable | public job search API | every company on Workable, searched by country and `day_range`, for the visa list. Full text |
+| Investor job boards (Getro), European funds | public search API | Index Ventures, Atomico, Creandum, Seedcamp, Speedinvest, and Accel/General Catalyst/Point Nine's jobs in the UK, Netherlands and Ireland, for the visa list. No posting text, so only the countries with a sponsor register |
+| Relocate.me, visasponsor.jobs, Welcome to the Jungle/Otta, DevITjobs, Landing.jobs, Duunitori, EURES, Bundesagentur für Arbeit, Consider (Balderton) | not built | checked 2026-10-13 for the visa list: too few jobs, no visa field, or terms forbid scripts (`docs/research/2026-10-13-eu-visa-sponsorship.md`) |
 
 **Agencies.** Staffing agencies and talent marketplaces (Jobs for Humanity, Toptal,
 Proxify, micro1, ...) are rejected with what matched: a name, a word in the company

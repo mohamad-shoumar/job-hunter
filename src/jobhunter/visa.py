@@ -247,6 +247,15 @@ def language_needed(job: Job, languages: list[str]) -> str | None:
     return None
 
 
+_RELOCATE_TO = re.compile(r"\b(?i:relocat\w*\s+to\s+(?:the\s+)?)([A-Z][\w-]+(?:\s+[A-Z][\w-]+)?)")
+
+
+def _moves_elsewhere(text: str, country: Country) -> bool:
+    """'Relocation to Cyprus' for a job filed under the Netherlands."""
+    m = _RELOCATE_TO.search(text or "")
+    return bool(m) and not any(f" {p} " in f" {normalize_words(m.group(1))} " for p in country.places)
+
+
 def assess_visa(job: Job, place: str, country: Country, rules: VisaRules) -> Assessment:
     if job.remote_status == REMOTE:
         where = f'Remote, for people living in "{place}"'
@@ -280,13 +289,19 @@ def assess_visa(job: Job, place: str, country: Country, rules: VisaRules) -> Ass
     if posting.permits:
         return Assessment(NOT_ELIGIBLE, [f'Wants a right to work you would need a visa for: '
                                          f'"{_short(posting.permits[0])}"'], "no_sponsor")
+    # "Senior Backend Engineer - Relocation to Cyprus", listed under the Netherlands: a move elsewhere.
+    posting.relocation = [s for s in posting.relocation if not _moves_elsewhere(s, country)]
+    if posting.relocation and _moves_elsewhere(job.title, country):
+        posting.relocation = []
     if posting.relocation:
         reasons = [f'{where}, {country.name}; the posting offers help moving, not a visa by name (ask): '
                    f'"{_short(posting.relocation[0])}"']
         return Assessment(VISA_SPONSOR, reasons + ([on_list] if on_list else []), "relocation_offered")
     if listed:
         return Assessment(VISA_SPONSOR, [f'{where}, {country.name}; the company is on {LISTS[country.code]}: '
-                                         f'"{listed.quote()}". The posting does not mention visas: ask'],
+                                         f'"{listed.quote()}". '
+                                         + ("The posting does not mention visas: ask" if job.description
+                                            else "This source gives no posting text: read it and ask")],
                           "visa_register")
     if job.remote_status == REMOTE:
         missing = "and a remote role for people living there rarely comes with one"

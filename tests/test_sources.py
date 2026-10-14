@@ -442,3 +442,27 @@ def test_arbeitnow_keeps_wanted_titles_and_stops_at_the_look_back():
     assert [p["page"] for p in pages] == [1, 2] and pages[0]["visa_sponsorship"] == "true"
     titles = {j.title for j in result.jobs}
     assert "Recruiter" not in titles and "Senior Backend Engineer - MarTech" in titles
+
+
+def test_workable_searches_each_country_and_reads_the_three_text_parts():
+    from jobhunter.sources import workable
+
+    calls = []
+
+    def respond(params):
+        calls.append(dict(params))
+        data = fixture_json("workable_search.json")
+        if "pageToken" in params:
+            data = dict(data, jobs=[], nextPageToken=None)
+        return data
+
+    source = workable.WorkableSource(["python"], ["Netherlands", "United Kingdom"], day_range=3, max_pages=2)
+    result = source.fetch(FakeHttp({workable.API: respond}))
+    assert [(c["location"], c.get("pageToken")) for c in calls] == [
+        ("Netherlands", None), ("Netherlands", "tok2"), ("United Kingdom", None), ("United Kingdom", "tok2")]
+    assert calls[0]["day_range"] == 3
+    jobs = {j.company: j for j in result.jobs}
+    assert jobs["payabl."].remote_status == REMOTE and jobs["payabl."].allowed_locations == ["Netherlands"]
+    assert jobs["OrganOx"].location_raw.startswith("Oxford") and jobs["OrganOx"].remote_status == "onsite"
+    assert jobs["Informed Solutions"].remote_status == HYBRID
+    assert "<p>" not in jobs["OrganOx"].description and jobs["OrganOx"].posted_at is not None

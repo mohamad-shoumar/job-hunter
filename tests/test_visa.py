@@ -284,3 +284,16 @@ def test_the_visa_list_has_its_own_report_section(tmp_path, filters):
     assert "Wheely" in section and '- **Visa:** visa_sponsor — On-site in "London", the UK;' in section
     assert "Wheely" not in text.split("## Visa list")[0]
     assert store.unreported() == []
+
+
+def test_relocation_to_another_country_does_not_count(filters):
+    text = "Python.\nLocation: Cyprus — Onsite (employment contract with relocation support)"
+    result = _classify(filters, title="Senior Backend Python Engineer - Relocation to Cyprus",
+                       allowed_locations=["Netherlands"], description=text)
+    assert result.reject_code == "no_visa_evidence"
+
+
+def test_a_source_without_posting_text_says_so(listed):
+    result = _classify(listed, source="getro", company="Monzo", allowed_locations=["London, UK"], description="")
+    assert result.status == VISA_LIST
+    assert result.eligibility.reasons[0].endswith("This source gives no posting text: read it and ask")

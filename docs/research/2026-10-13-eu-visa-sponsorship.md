@@ -49,6 +49,11 @@ title. Not built: too many dead boards for what it finds. The watched boards
 | --- | --- | --- |
 | Arbeitnow API | **built** (`sources/arbeitnow.py`) | `GET <site>/api/job-board-api?page=N[&visa_sponsorship=true]`, no key, full HTML descriptions, `created_at`. Sites: arbeitnow.com (Germany, and mixes in 50 jobs each from .co.uk, .nl, .fr, .ch per 300), arbeitnow.co.uk, arbeitnow.nl (100 a page). No country field: the job URL's domain says it. UK/NL descriptions are sometimes HTML-escaped twice. The visa flag is per company: of 123 companies, 77 had every job flagged and 43 none; only 120 of 300 flagged jobs mention a visa at all, and some say "We do not provide visa sponsorship" (Terraquantum, Socure, Kraken, Docker). Terms: free, "please do not abuse", link back. 36 hours of NL+UK (flagged) and DE (all) = 11 requests, 281 jobs with a target word in the title |
 | Hacker News (already a source) | **rule** | Posts put visa status in the header ("VISA", "NO VISA (EU work authorisation required)", "Visa sponsorship"). 14 posts in the DB mention it; 4 yes posts were in target countries (Attendi, Stream, Flow Traders, Planlab.ai) and were rejected as not remote |
+| Workable job search | **built** (`sources/workable.py`) | `GET https://jobs.workable.com/api/v1/jobs?query=&location=<country>&day_range=N`, no key, 20 a page (`nextPageToken`), sorted by relevance, not date (so `day_range`). Full text in `description` + `requirementsSection` + `benefitsSection`; `locations` like `["TELECOMMUTE", "Netherlands"]`; `workplace` remote/hybrid/on_site. Python jobs: UK 691, DE 134, ES 133, NL 71, IT 37, IE 28, FI 12. Of 805 target roles fetched, 57 reached the visa list (38 register, 16 relocation, 3 visa offers): few postings name a visa. The first live run: 119 listings, 8 on the list |
+| Getro, European funds | **built** (config: `getro` boards) | Same API as the remote boards. Collection ids: Index Ventures 1629, Atomico 36986, Creandum 53552, Seedcamp 4186, Speedinvest 947, Earlybird 617, HV Capital 234, Cherry Ventures 44081 (plus Accel 8672, General Catalyst 222, Point Nine 1680). `searchable_locations` takes several countries at once. No posting text, so only the UK, NL and IE (the sponsor-register countries) are fetched: a job there reaches the list through the register, and its company's own board is then watched. Target titles found per fund (first pages, UK): Index 83, Accel 87, General Catalyst 68, Seedcamp 45, Creandum 31, Atomico 27. The first live run: 37 on the list (Anthropic, Wise, Stripe, Neo4j, Spotify, Vinted, Google, ...) |
+| Consider boards (Balderton, Notion Capital) | not built | a different API; Balderton listed 80 target roles in the UK and 41 in Germany. A new adapter for later |
+| Bundesagentur für Arbeit (Jobsuche API) | not built | `rest.arbeitsagentur.de/jobboerse/jobsuche-service`, header `X-API-Key: jobboerse-jobsuche`; 2,281 Python jobs in Germany, but 2 of 45 sampled descriptions were in English, and none mentioned a visa |
+| EURES (EU job mobility portal) | not built | `POST https://europa.eu/eures/api/jv-searchengine/public/jv-search/search`, no key, descriptions included (NL Python 969, DE English Python 393). Public employment services' jobs: not checked for visa wording before the agent stopped |
 | Relocate.me | not built | Every job lists its package ("Visa services"), robots allow it, but only 23 jobs, 3 with our titles; no API or RSS |
 | visasponsor.jobs | not built | IT jobs: UK 207, DE 150, IE 22, NL 20, re-listed from LinkedIn/Careerjet; terms forbid "automated uses"; its visa labels look assigned by country |
 | DevITjobs (.de/.uk/.nl) | not built | `/api/jobsLight` has `hasVisaSponsorship`, but "Yes" on 14 of 7,432 jobs and no Python job |
@@ -92,6 +97,18 @@ a sponsor list, 62 say nothing, 2 refuse, 31 need a language; 64 jobs end on
 the visa list. On the stored DB, the rules move 5
 jobs to the visa list (Wintermute, TradingHub, Aurora Energy Research,
 Planlab.ai, Ripple) and change no shortlisted or needs-review job.
+
+## Matching trap seen in the first runs
+
+A one-word name with a London office can still be someone else: "Cinder" (a
+software company) matched "Cinder Restaurants Limited T/A Cinder, London". The
+reason always quotes the register row, so check the name.
+
+## Storage
+
+Arbeitnow adds about 300 new stored rows a run (most rejected for their title);
+the first Getro EU run stored 891 (596 of them too old, which Getro lists for
+months), later runs only new ones. Watch `data/jobs.sqlite` size if it grows fast.
 
 ## Network note
 
