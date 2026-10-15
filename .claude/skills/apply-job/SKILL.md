@@ -152,8 +152,21 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
     (Levels.fyi, Glassdoor, the posting's own range). Ask for a bit below the usual figure, but
     never below the "Salary floor" line in the profile. Use the form's currency and period (monthly
     or yearly). If nothing turns up, use the floor plus about 10%.
-  - **Code sample / project you're proud of / portfolio link:** https://github.com/mohamad-shoumar/job-hunter
-    If the form also asks why (or "tell us about it"), use this, as the user wrote it:
+  - **Something you're proud of building / a project you're proud of:** use this, as the user
+    wrote it (if the box has a length limit, drop the "I built it in TypeScript ..." sentence
+    first, never the last one):
+    "I built Vibe Taxi, a booking system for my dad's one-driver taxi business in Lebanon, so he
+    no longer has to answer every booking message by hand while driving. It's a WhatsApp bot that
+    chats naturally with customers, plus a booking website with a map and live prices, and a phone
+    dashboard he uses to accept rides and take over chats. I built it in TypeScript (Node, Hono,
+    SQLite, deployed on Fly.io). The AI is never trusted with money: it can only call tools I
+    wrote, so every price and booking comes from my own code, and the bot switches to a simple
+    button flow if OpenAI goes down. It taught me how to use AI safely in a real product, and it
+    solves a real problem for someone I care about."
+    Vibe Taxi has no public link: if the question requires a link or repo, use the job-hunter one
+    below and note it in the report.
+  - **Code sample / repo / portfolio link:** https://github.com/mohamad-shoumar/job-hunter
+    If the form also asks about that code (or "tell us about it"), use this, as the user wrote it:
     "A job-search tool I built that uses Claude to tailor my CV. The rule is that the model may
     reword my experience, but code decides what's true. check_bullet compares each AI rewrite to
     the original bullet and rejects any new number, technology, seniority word or name, with a
