@@ -73,9 +73,10 @@ def _print_report_counts(store: JobStore, report_paths: list[Path]) -> None:
 def cmd_run(args) -> int:
     paths, sources_config, filters = _load(args)
     only = {s.strip() for s in args.sources.split(",")} if args.sources else None
+    skip = {s.strip() for s in args.skip.split(",")} if args.skip else None
     date_range = _date_range(args)
     summary, report_paths = pipeline.run(
-        paths, sources_config, filters, only=only, report=not args.no_report, date_range=date_range, ai=not args.no_ai,
+        paths, sources_config, filters, only=only, skip=skip, report=not args.no_report, date_range=date_range, ai=not args.no_ai,
         outreach=not args.no_outreach,
     )
     for name, stats in sorted(summary.sources.items()):
@@ -538,6 +539,7 @@ def main(argv: list[str] | None = None) -> int:
         "for the day it was posted (one file per day).",
     )
     p.add_argument("--sources", help="comma-separated source names, e.g. himalayas,lever")
+    p.add_argument("--skip", help="comma-separated source names to leave out, e.g. serpapi")
     p.add_argument("--from", dest="from_date", type=_date, metavar="YYYY-MM-DD", help="first day of a date range")
     p.add_argument("--to", dest="to_date", type=_date, metavar="YYYY-MM-DD", help="last day of the range (default: today)")
     p.add_argument("--days", type=int, metavar="N", help="the last N days, today included (--days 7 = this week)")

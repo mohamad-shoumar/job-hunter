@@ -340,3 +340,16 @@ def test_a_blocked_company_is_rejected_with_its_reason(filters):
     linked = make_job(company="Acme https://acme.example", allowed_locations=["Worldwide"])  # Hacker News style
     assert classify(linked, filters, NOW).reject_code == "blocked_company"
     assert classify(make_job(company="Acme Labs", allowed_locations=["Worldwide"]), filters, NOW).status == SHORTLISTED
+
+
+def test_skip_leaves_a_source_out_of_the_run(tmp_path, filters):
+    (tmp_path / "config").mkdir()
+    config = {
+        "greenhouse_boards": [{"company": "GitLab", "board_token": "gitlab"}],
+        "himalayas": {"queries": ["backend"], "limit": 20},
+    }
+    http = FakeHttp({greenhouse.API.format(token="gitlab"): fixture_json("greenhouse_gitlab.json")})
+    summary, _ = pipeline.run(Paths(tmp_path), config, filters, skip={"himalayas", "serpapi"}, http=http, now=NOW,
+                              ai=False, outreach=False)
+    assert set(summary.sources) == {"greenhouse"} and summary.new == 2
+    assert "--skip: no enabled source named serpapi" in summary.config_notes

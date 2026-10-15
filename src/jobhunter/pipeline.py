@@ -204,12 +204,13 @@ def refresh_sponsors(root_paths, filters: Filters, http: Http, now: datetime, su
 
 
 def run(root_paths, sources_config: dict, filters: Filters, only: set[str] | None = None,
-        report: bool = True, http: Http | None = None, now: datetime | None = None,
+        skip: set[str] | None = None, report: bool = True, http: Http | None = None, now: datetime | None = None,
         date_range: tuple[date, date] | None = None, ai: bool = True,
         ai_checker: AiChecker | None = None, outreach: bool = True) -> tuple[RunSummary, list[Path]]:
     """ai=False skips every Claude call. ai_checker overrides the one built from config/ai_check.json.
 
-    outreach=False skips contacts, drafts and the inbox check (outreach.py).
+    outreach=False skips contacts, drafts and the inbox check (outreach.py). `skip` leaves those sources out
+    (the evening run skips serpapi, whose credits last only for one run a day).
     """
     now = now or utcnow()
     sources, config_notes = build_sources(sources_config)
@@ -230,6 +231,12 @@ def run(root_paths, sources_config: dict, filters: Filters, only: set[str] | Non
             if unknown:
                 raise SystemExit(f"unknown or disabled source(s): {', '.join(sorted(unknown))}")
             sources = [s for s in sources if s.name in only]
+        if skip:
+            # A note, not an error: the scheduled evening run must not fail when serpapi is turned off.
+            unknown = skip - {s.name for s in sources}
+            if unknown:
+                config_notes.append(f"--skip: no enabled source named {', '.join(sorted(unknown))}")
+            sources = [s for s in sources if s.name not in skip]
         if date_range:
             since = datetime.combine(date_range[0], time.min).astimezone()  # local midnight
             for source in sources:
