@@ -2,8 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
   Second daily run at 21:00 local time, for the jobs posted since the 09:00 run (most
-  are posted 14:00-17:00 Lebanon time, the US morning). It skips serpapi: its credits
-  last for one run a day. If the Mac is asleep then, launchd runs it on wake.
+  are posted 14:00-17:00 Lebanon time, the US morning). This is the run that fetches
+  serpapi (the morning run skips it). If the Mac is asleep then, launchd runs it on wake.
   Install (from the project folder; it fills in your paths):
              sed "s|__PROJECT__|$PWD|; s|__HOME__|$HOME|" scripts/local.jobhunter.evening.plist \
                > ~/Library/LaunchAgents/local.jobhunter.evening.plist
@@ -21,8 +21,6 @@
     <array>
         <string>/bin/sh</string>
         <string>__PROJECT__/scripts/run_daily.sh</string>
-        <string>--skip</string>
-        <string>serpapi</string>
     </array>
     <key>StartCalendarInterval</key>
     <dict>

@@ -503,10 +503,11 @@ is skipped. Output goes to `data/run.log`; launchd's own errors go to
 `~/Library/Logs/jobhunter.log`.
 
 A second one (`scripts/local.jobhunter.evening.plist`, installed the same way)
-runs at 21:00 with `--skip serpapi`. Most jobs are posted 14:00-17:00 Lebanon
-time (the US morning), so with the 09:00 run alone they wait until the next
-morning; the evening run puts them in the same day's report. SerpApi stays in
-the morning run only, so its credits still last the month.
+runs at 21:00. Most jobs are posted 14:00-17:00 Lebanon time (the US morning),
+so with the 09:00 run alone they wait until the next morning; the evening run
+puts them in the same day's report. SerpApi runs only in the evening run (the
+morning one has `--skip serpapi`), so its credits still last the month and it
+sees the day's US postings.
 
 ```sh
 launchctl kickstart gui/$(id -u)/local.jobhunter.daily    # run now

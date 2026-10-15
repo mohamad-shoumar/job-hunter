@@ -210,7 +210,7 @@ def run(root_paths, sources_config: dict, filters: Filters, only: set[str] | Non
     """ai=False skips every Claude call. ai_checker overrides the one built from config/ai_check.json.
 
     outreach=False skips contacts, drafts and the inbox check (outreach.py). `skip` leaves those sources out
-    (the evening run skips serpapi, whose credits last only for one run a day).
+    (the morning run skips serpapi, whose credits last only for one run a day).
     """
     now = now or utcnow()
     sources, config_notes = build_sources(sources_config)
@@ -232,7 +232,7 @@ def run(root_paths, sources_config: dict, filters: Filters, only: set[str] | Non
                 raise SystemExit(f"unknown or disabled source(s): {', '.join(sorted(unknown))}")
             sources = [s for s in sources if s.name in only]
         if skip:
-            # A note, not an error: the scheduled evening run must not fail when serpapi is turned off.
+            # A note, not an error: the scheduled morning run must not fail when serpapi is turned off.
             unknown = skip - {s.name for s in sources}
             if unknown:
                 config_notes.append(f"--skip: no enabled source named {', '.join(sorted(unknown))}")
