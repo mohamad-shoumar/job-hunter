@@ -38,8 +38,8 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
 1. Make sure the app is running: `curl -s http://127.0.0.1:8765/api/status`. If it isn't, start
    `cd ~/job-hunter && .venv/bin/jobhunter serve` in the background and wait for it.
 2. Open http://127.0.0.1:8765/#pipeline in a new tab. The **To apply** column lists shortlisted
-   jobs the user hasn't applied to yet. Do them one at a time, top to bottom (or only the job the
-   user named).
+   jobs, and visa-list jobs (the **visa** chip), that the user hasn't applied to yet. Do them one at
+   a time, top to bottom (or only the job the user named).
 
 ## For each job
 
@@ -132,14 +132,22 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
   - **Authorized to work?** Yes, in Lebanon (lives in Beirut). If the question is about the US, EU
     or another specific country, answer truthfully from the profile (contractor / EOR, no visa
     needed for remote work). Sponsorship needed? No, when the role is remote.
+  - **Jobs the user would move for** (on-site/hybrid in the UAE or Qatar, and visa-list jobs in the
+    Netherlands, Germany, Finland, the UK, Ireland, Spain or Italy): authorized to work there? No.
+    Needs visa sponsorship? Yes. Willing to relocate / work on-site there? Yes (for the EU and UK only
+    with sponsorship, as the user said on 2026-10-13). Current location: Beirut, Lebanon. In the UAE
+    or Qatar the pay floor is the profile's relocation line (5000 usd/month), not the remote floor.
+    A visa-list job whose posting or form says it can't sponsor (needs an existing right to work):
+    Skip it with that reason.
   - **Location / time zone / notice:** from the profile's "Work authorization and logistics" section.
     If the form's notice options don't include 2 weeks / 14 days, pick the next shorter one
     (10 days, not 20).
   - **Disability, medical needs, accommodations or adjustments:** No / none needed.
   - **Gender, race, veteran and other voluntary questions:** "Prefer not to say" / "Decline to
     self-identify" when that option exists.
-  - **How did you hear about us:** the site the job came from (the job's source in the app), or
-    "Job board".
+  - **How did you hear about us:** pick **Other** ("Other (please specify)" or the like) and write
+    "An AI job hunter tool I built in-house" in its text box. A free-text question gets the same
+    words. If the list has no Other option, pick the closest choice ("Job board") and note it.
   - **Expected salary:** do a quick web search for what this company pays for this role and level
     (Levels.fyi, Glassdoor, the posting's own range). Ask for a bit below the usual figure, but
     never below the "Salary floor" line in the profile. Use the form's currency and period (monthly

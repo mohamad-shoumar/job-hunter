@@ -140,7 +140,9 @@ def test_the_visa_list_is_its_own_view(client, home, filters):
     store.close()
     visa = client.get("/api/jobs?view=visa_list").json()["jobs"]
     assert [j["company"] for j in visa] == ["Wheely"] and visa[0]["status"] == "visa_list"
-    # Not in the shortlist, so not in "To apply" either.
+    # Stage "new" puts it in the pipeline's To apply column, which adds the visa list to the shortlist.
+    assert visa[0]["stage"] == "new"
+    # Still not in the shortlist view (the daily CV, letter and contact steps take shortlisted jobs only).
     assert "Wheely" not in {j["company"] for j in client.get("/api/jobs?view=shortlisted").json()["jobs"]}
     today = client.get("/api/today").json()
     assert [j["company"] for j in today["new_visa_jobs"]] == ["Wheely"]
