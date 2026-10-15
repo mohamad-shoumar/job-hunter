@@ -670,8 +670,8 @@ async function renderToday() {
 
 // --- pipeline ----------------------------------------------------------------------
 
-// Board columns. "To apply" is shortlisted and visa-list jobs you haven't acted on (stage new); rejected
-// gets its own column, and Closed holds the other reasons (ghosted, skipped).
+// Board columns. "To apply" is shortlisted jobs you haven't acted on (stage new), plus visa-list jobs posted
+// today or yesterday; rejected gets its own column, and Closed holds the other reasons (ghosted, skipped).
 const BOARD = [
   { key: "to_apply", label: "To apply", stage: "new" },
   ...["saved", "reached_out", "replied", "interviewing", "offer"].map((s) => ({ key: s, stage: s })),
@@ -686,7 +686,7 @@ function boardKey(j) {
 
 async function renderPipeline() {
   const [open, visa, tracked, closed] = await Promise.all([
-    api("/api/jobs?view=shortlisted"), api("/api/jobs?view=visa_list"), api("/api/jobs?view=tracked"), api("/api/jobs?view=closed"),
+    api("/api/jobs?view=shortlisted"), api("/api/jobs?view=visa_list&days=2"), api("/api/jobs?view=tracked"), api("/api/jobs?view=closed"),
   ]);
   const toApply = [...open.jobs, ...visa.jobs].filter((j) => !j.stage || j.stage === "new");
   const jobs = [...toApply, ...tracked.jobs, ...closed.jobs];

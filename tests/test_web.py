@@ -131,21 +131,29 @@ def test_today_stats_and_status(client):
 
 
 def test_the_visa_list_is_its_own_view(client, home, filters):
+    from datetime import timedelta
+
     from jobhunter.models import ONSITE
+
+    from .conftest import NOW
 
     store = JobStore(home / "data" / "jobs.sqlite")
     store_job(store, filters, source_job_id="3", company="Wheely", remote_status=ONSITE, allowed_locations=["London"],
               description="Python.\nUK visa sponsorship is available.")
+    store_job(store, filters, source_job_id="4", company="Oldvisa", remote_status=ONSITE, allowed_locations=["London"],
+              description="Python.\nUK visa sponsorship is available.", posted_at=NOW - timedelta(days=6))
     store.commit()
     store.close()
-    visa = client.get("/api/jobs?view=visa_list").json()["jobs"]
-    assert [j["company"] for j in visa] == ["Wheely"] and visa[0]["status"] == "visa_list"
-    # Stage "new" puts it in the pipeline's To apply column, which adds the visa list to the shortlist.
-    assert visa[0]["stage"] == "new"
+    visa = {j["company"]: j for j in client.get("/api/jobs?view=visa_list").json()["jobs"]}
+    assert set(visa) == {"Wheely", "Oldvisa"} and visa["Wheely"]["status"] == "visa_list"
+    # The pipeline's To apply column adds the ones posted today or yesterday (stage new) to the shortlist.
+    fresh = client.get("/api/jobs?view=visa_list&days=2").json()["jobs"]
+    assert [j["company"] for j in fresh] == ["Wheely"] and fresh[0]["stage"] == "new"
     # Still not in the shortlist view (the daily CV, letter and contact steps take shortlisted jobs only).
     assert "Wheely" not in {j["company"] for j in client.get("/api/jobs?view=shortlisted").json()["jobs"]}
     today = client.get("/api/today").json()
-    assert [j["company"] for j in today["new_visa_jobs"]] == ["Wheely"]
+    # The Today card is what was found this week, however old the posting.
+    assert {j["company"] for j in today["new_visa_jobs"]} == {"Wheely", "Oldvisa"}
     assert "Wheely" not in {j["company"] for j in today["new_jobs"]}
 
 

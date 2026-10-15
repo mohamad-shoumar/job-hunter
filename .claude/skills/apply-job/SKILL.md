@@ -38,8 +38,8 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
 1. Make sure the app is running: `curl -s http://127.0.0.1:8765/api/status`. If it isn't, start
    `cd ~/job-hunter && .venv/bin/jobhunter serve` in the background and wait for it.
 2. Open http://127.0.0.1:8765/#pipeline in a new tab. The **To apply** column lists shortlisted
-   jobs, and visa-list jobs (the **visa** chip), that the user hasn't applied to yet. Do them one at
-   a time, top to bottom (or only the job the user named).
+   jobs the user hasn't applied to yet, plus visa-list jobs (the **visa** chip) posted today or
+   yesterday. Do them one at a time, top to bottom (or only the job the user named).
 
 ## For each job
 
