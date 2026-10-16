@@ -167,6 +167,29 @@ def test_date_range_brings_back_jobs_rejected_only_for_age(filters):
     assert store.get(1)["status"] == SHORTLISTED and store.get(1)["report_date"] == day.isoformat()
 
 
+def test_a_lower_age_limit_reaches_daily_jobs_but_not_date_range_ones(filters):
+    from jobhunter.classify import classify, recheck_age
+    from jobhunter.store import row_to_job
+
+    store = JobStore(":memory:")
+    posted = NOW - timedelta(days=45)
+    filters.max_posting_age_days = 90
+    jobs = [make_job(source_job_id=name, company=name, posted_at=posted, allowed_locations=["Worldwide"])
+            for name in ("Daily", "Range")]
+    summary, _ = daily(store, filters, SourceResult("test", jobs[:1]))
+    summary = ingest(store, filters, SourceResult("test", jobs[1:]))
+    day = pipeline.local_day(posted)
+    pipeline.assign_range(store, summary, filters, NOW, day, day)
+    assert [r["status"] for r in store.all_jobs()] == [SHORTLISTED, SHORTLISTED]
+
+    filters.max_posting_age_days = 30
+    for row in store.all_jobs():
+        store.update_classification(row["id"], classify(row_to_job(row), filters, NOW, check_age=recheck_age(row)))
+    daily_job, range_job = store.all_jobs()
+    assert daily_job["reject_code"] == "too_old"  # found by the daily run: judged again
+    assert range_job["status"] == SHORTLISTED  # asked for by the date range, however old
+
+
 def test_date_range_skips_jobs_not_listed_anymore(filters):
     store = JobStore(":memory:")
     ingest(store, filters, SourceResult("test", [make_job(source_job_id="closed", company="Gone", allowed_locations=["Worldwide"])]))

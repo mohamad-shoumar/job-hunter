@@ -32,6 +32,20 @@ from .models import (
     Job,
 )
 from .relevance import assess_relevance
+from .text import parse_datetime
+
+def recheck_age(row) -> bool:
+    """Whether re-running the rules on a stored job judges its age again.
+
+    A date-range run files each job under its posting day, because those postings were
+    asked for however old: their age is not re-judged. Every other job is, so a change
+    to the age limit reaches the jobs the daily run found (age is still measured at discovery).
+    """
+    if not row["report_date"] or row["reject_code"] == "too_old":
+        return True
+    posted = parse_datetime(row["posted_at"])
+    return not posted or posted.astimezone().date().isoformat() != row["report_date"]
+
 
 def apply_ai_check(rule: Assessment, check: AiCheck) -> Assessment:
     """Combine an `unclear` rule verdict with the AI check. The rule's reasons stay listed."""

@@ -38,7 +38,7 @@ from dataclasses import dataclass, field, fields, replace
 from datetime import datetime
 from pathlib import Path
 
-from .classify import classify
+from .classify import classify, recheck_age
 from .config import Filters
 from .eligibility import assess_eligibility
 from .llm import CLAUDE_CODE, JsonModel, Usage, error_line, find_quote, forced_tool_choice, json_model, pages_read, plain
@@ -484,9 +484,8 @@ def check_jobs(store: JobStore, checker: AiChecker, rows, filters: Filters, now:
                         other.cancel()
                 continue
             store.save_ai_check(row["id"], check)
-            # Same rule as `reclassify`: age is not re-judged once a job sits in a report.
-            check_age = not row["report_date"] or row["reject_code"] == "too_old"
-            cls: Classification = classify(row_to_job(store.get(row["id"])), filters, now, check_age=check_age)
+            stored = store.get(row["id"])
+            cls: Classification = classify(row_to_job(stored), filters, now, check_age=recheck_age(stored))
             store.update_classification(row["id"], cls)
             store.commit()
             run.checked += 1

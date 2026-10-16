@@ -13,7 +13,7 @@ from pathlib import Path
 
 from . import pipeline
 from .ai_check import build_checker, check_jobs
-from .classify import classify
+from .classify import classify, recheck_age
 from .config import Filters, Paths, load_dotenv, load_json, resolve_root
 from .extract import enrich
 from .report import write_report
@@ -263,11 +263,7 @@ def cmd_reclassify(args) -> int:
             job.required_yoe = None  # no source sets it: it is always read from the text
             job = enrich(job)  # re-extract too, so extraction changes apply
             store.update_extracted(row["id"], job)
-            # Age only decides whether a job is taken at all. Once it sits in a
-            # report (fresh when found, or asked for by a date range) it is not
-            # re-judged on age - unless age is what rejected it.
-            check_age = not row["report_date"] or row["reject_code"] == "too_old"
-            cls = classify(job, filters, now, check_age=check_age)
+            cls = classify(job, filters, now, check_age=recheck_age(row))
             if cls.status != row["status"] or cls.eligibility.verdict != row["eligibility"]:
                 changes[f"{row['status']} -> {cls.status}"] += 1
                 if row["report_date"]:
