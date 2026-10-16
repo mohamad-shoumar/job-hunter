@@ -120,8 +120,6 @@ class Filters:
     blocked_companies: dict[str, tuple[str, str]] = field(default_factory=dict)
     # Staffing agencies and talent marketplaces (agency.py): rejected with what matched.
     agencies: AgencyRules = field(default_factory=AgencyRules)
-    # A company's own careers page keeps a job listed while it is open, often for months.
-    max_posting_age_days_company_boards: int | None = None
     # Countries you would move to (relocation.py): jobs there may be on-site. None: remote only.
     relocation: Relocation | None = None
     # Countries you would move to on a work visa (visa.py): their jobs go to the separate visa list.
@@ -147,7 +145,6 @@ class Filters:
             agencies=AgencyRules.from_dict(data.get("agencies")),
             relocation=Relocation.from_dict(data.get("relocation")),
             visa=VisaRules.from_dict(data.get("visa_list")),
-            max_posting_age_days_company_boards=data.get("max_posting_age_days_company_boards"),
         )
 
     @classmethod

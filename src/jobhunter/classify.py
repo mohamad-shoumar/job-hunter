@@ -33,12 +33,6 @@ from .models import (
 )
 from .relevance import assess_relevance
 
-# Sources that read a company's own careers page (watched boards included): a job
-# listed there is open, so it gets max_posting_age_days_company_boards.
-COMPANY_BOARD_SOURCES = {"greenhouse", "lever", "ashby", "custom_page", "teamtailor", "bamboohr",
-                         "smartrecruiters", "pinpoint"}
-
-
 def apply_ai_check(rule: Assessment, check: AiCheck) -> Assessment:
     """Combine an `unclear` rule verdict with the AI check. The rule's reasons stay listed."""
     evidence = f'"{check.quote}" ({check.source_url})'
@@ -78,8 +72,6 @@ def classify(job: Job, filters: Filters, now: datetime, check_age: bool = True) 
     # reject jobs that were fresh when they were found.
     found = job.first_seen or now
     limit = filters.max_posting_age_days
-    if job.source in COMPANY_BOARD_SOURCES and filters.max_posting_age_days_company_boards is not None:
-        limit = filters.max_posting_age_days_company_boards
     if check_age and job.posted_at and limit is not None:
         age = (found - job.posted_at).days
         if age > limit:
