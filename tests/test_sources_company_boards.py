@@ -97,7 +97,7 @@ def test_the_company_board_sections_are_built():
 
 
 def test_a_company_board_gets_the_same_age_limit_as_a_job_site(filters):
-    # Watched boards read whole careers pages, which keep 2-month-old postings up.
+    # Watched boards read whole careers pages, which keep months-old postings up.
     from jobhunter.classify import classify
 
     from .conftest import NOW, make_job
@@ -106,8 +106,8 @@ def test_a_company_board_gets_the_same_age_limit_as_a_job_site(filters):
         job = make_job(source=source, allowed_locations=["Worldwide"], posted_at=NOW - timedelta(days=days))
         return classify(job, filters, NOW)
 
-    assert status("greenhouse", 20).status == "shortlisted"
-    old = status("greenhouse", 57)
-    assert old.reject_code == "too_old" and old.reject_reason == "Posted 57 days before it was found (limit 30)"
-    assert status("teamtailor", 60).reject_code == "too_old"
-    assert status("himalayas", 60).reject_code == "too_old"
+    assert status("greenhouse", 10).status == "shortlisted"
+    old = status("greenhouse", 20)
+    assert old.reject_code == "too_old" and old.reject_reason == "Posted 20 days before it was found (limit 14)"
+    assert status("teamtailor", 20).reject_code == "too_old"
+    assert status("himalayas", 20).reject_code == "too_old"
