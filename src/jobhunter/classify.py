@@ -35,10 +35,11 @@ from .models import (
 from .relevance import assess_relevance
 from .text import parse_datetime
 
-# A 401(k) is a US-only retirement plan: a posting that offers one hires in the US, whatever its
-# location says. Rejected on sight (the user's call, 2026-10-19), even with "Worldwide" or a can-hire
-# AI check; Metabase's "Global Remote" posts, which offer one to US staff, are lost too. Not "$401k"
-# or "401K-500K" (pay).
+# A 401(k) is a US-only retirement plan: a remote job that offers one is remote within the US,
+# whatever its location says. Rejected on sight (the user's call, 2026-10-19), even with "Worldwide"
+# or a can-hire AI check; Metabase's "Global Remote" posts, which offer one to US staff, are lost
+# too. A visa-list job is kept: it sponsors the move, and big companies list every country's
+# benefits ("retirement options (401(k)/pension)", Roku Cambridge). Not "$401k" or "401K-500K" (pay).
 _US_BENEFITS = re.compile(r"(?<![\w$€£.,])401\s?\(?\s?k\s?\)?(?![\w\-–])", re.I)
 
 
@@ -113,7 +114,7 @@ def classify(job: Job, filters: Filters, now: datetime, check_age: bool = True) 
 
     if relevance.verdict == IRRELEVANT:
         return Classification(REJECTED, eligibility, relevance, score, relevance.reasons[0], relevance.code)
-    benefits = us_benefits(job.description)
+    benefits = us_benefits(job.description) if eligibility.verdict != VISA_SPONSOR else None
     if benefits:
         reason = f'Offers a 401(k), a US-only retirement plan, so it hires in the US: "{benefits}"'
         return Classification(REJECTED, eligibility, relevance, score, reason, "us_benefits")

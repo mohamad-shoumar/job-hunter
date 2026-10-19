@@ -43,6 +43,16 @@ def test_a_visa_offer_puts_the_job_on_the_visa_list(filters):
         '"- Competitive relocation packages and visa sponsorship where necessary for expats."')
 
 
+def test_a_401k_does_not_drop_a_job_that_sponsors_the_move(filters):
+    """Roku Cambridge lists every country's benefits; a remote job with a 401(k) is still rejected."""
+    text = ("We build APIs with Python.\n- Visa sponsorship available.\n"
+            "- Medical, dental, and retirement options (401(k)/pension).")
+    result = _classify(filters, allowed_locations=["London, United Kingdom"], description=text)
+    assert result.status == VISA_LIST
+    remote = _classify(filters, remote_status=REMOTE, allowed_locations=["Worldwide"], description=text)
+    assert remote.status == REJECTED and remote.reject_code == "us_benefits"
+
+
 @pytest.mark.parametrize("sentence", [
     "We sponsor visas for the right candidate.",
     "Surfly can provide or transfer Dutch visa sponsorship.",
