@@ -173,11 +173,11 @@ def find_required_yoe(text: str) -> tuple[int, str] | None:
             counts = [c for c in counts if not c[1]]
         for years, _, start, end in counts:
             if best is None or years > best[0]:
-                best = (years, _quote_around(segment, start, end))
+                best = (years, quote_around(segment, start, end))
     return best
 
 
-def _quote_around(segment: str, start: int, end: int, width: int = 160) -> str:
+def quote_around(segment: str, start: int, end: int, width: int = 160) -> str:
     text = " ".join(segment.split())
     if len(text) <= width:
         return text

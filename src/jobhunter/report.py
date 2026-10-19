@@ -35,6 +35,8 @@ _REJECT_GROUPS = [
     ("local_only", "Only for nationals or people already there",
      "A country you would move to, but the posting wants nationals or a visa you already hold. Quoted."),
     ("below_relocation_pay", "Pays under your floor for moving", "`RELOCATION_MIN_MONTHLY_USD` in `.env`."),
+    ("us_benefits", "Offers a 401(k), so it hires in the US",
+     "A 401(k) is a US-only retirement plan; rejected whatever the location says. Quoted."),
     ("location_restricted", "Location does not include Lebanon", "The places the posting allows."),
     ("residency_required", "Description requires living elsewhere", "Quoted from the description."),
     ("timezone_restricted", "Time zones exclude Lebanon", "Lebanon is UTC+2 / UTC+3."),

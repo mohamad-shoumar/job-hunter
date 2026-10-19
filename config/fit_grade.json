@@ -13,6 +13,6 @@
   "max_skipped_examples": 30,
   "description_chars": 3500,
   "_preferences": "What you want, in your words. The model weighs it after your Applied and skipped jobs. No contact details or pay figures here: this file is in git.",
-  "preferences": "I have about 3 years of experience. I want jobs relevant to my experience and the things I'm good at. Most listings ask for 5+ years of experience and very few match 3+, which is what I'm looking for: rank jobs that ask for 5 or more years lower.",
+  "preferences": "I have about 3 years of experience. I want jobs relevant to my experience and the things I'm good at. Most listings ask for 5+ years of experience and very few match 3+, which is what I'm looking for: rank jobs that ask for 5 or more years lower. My AI experience is junior level: AI roles that are very specialised and clearly want more than that should rank lower.",
   "workers": 4
 }

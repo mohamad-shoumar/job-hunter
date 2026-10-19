@@ -11,6 +11,7 @@ from datetime import datetime
 
 from .config import Filters
 from .eligibility import assess_eligibility
+from .extract import quote_around
 from .identity import company_key
 from .models import (
     CAN_HIRE,
@@ -33,6 +34,24 @@ from .models import (
 )
 from .relevance import assess_relevance
 from .text import parse_datetime
+
+# A 401(k) is a US-only retirement plan: a posting that offers one hires in the US, whatever its
+# location says. Rejected on sight (the user's call, 2026-10-19), even with "Worldwide" or a can-hire
+# AI check; Metabase's "Global Remote" posts, which offer one to US staff, are lost too. Not "$401k"
+# or "401K-500K" (pay).
+_US_BENEFITS = re.compile(r"(?<![\w$€£.,])401\s?\(?\s?k\s?\)?(?![\w\-–])", re.I)
+
+
+def us_benefits(description: str) -> str | None:
+    """The line that offers a 401(k), quoted around the match, or None."""
+    text = description or ""
+    m = _US_BENEFITS.search(text)
+    if not m:
+        return None
+    start = text.rfind("\n", 0, m.start()) + 1
+    end = text.find("\n", m.end())
+    line = text[start:end if end != -1 else len(text)]
+    return quote_around(line, m.start() - start, m.end() - start)
 
 def recheck_age(row) -> bool:
     """Whether re-running the rules on a stored job judges its age again.
@@ -94,6 +113,10 @@ def classify(job: Job, filters: Filters, now: datetime, check_age: bool = True) 
 
     if relevance.verdict == IRRELEVANT:
         return Classification(REJECTED, eligibility, relevance, score, relevance.reasons[0], relevance.code)
+    benefits = us_benefits(job.description)
+    if benefits:
+        reason = f'Offers a 401(k), a US-only retirement plan, so it hires in the US: "{benefits}"'
+        return Classification(REJECTED, eligibility, relevance, score, reason, "us_benefits")
     if eligibility.verdict == NOT_ELIGIBLE:
         return Classification(REJECTED, eligibility, relevance, score, eligibility.reasons[0], eligibility.code)
     if eligibility.verdict == VISA_SPONSOR:

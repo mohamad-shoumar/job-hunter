@@ -365,6 +365,21 @@ def test_a_blocked_company_is_rejected_with_its_reason(filters):
     assert classify(make_job(company="Acme Labs", allowed_locations=["Worldwide"]), filters, NOW).status == SHORTLISTED
 
 
+def test_a_401k_means_a_us_hire_whatever_the_location_says(filters):
+    """Alloy, 2026-10-19: "Anywhere in the World" on the board, a 401(k) in the benefits."""
+    from jobhunter.classify import classify
+
+    text = "We build APIs with Python.\nBenefits:\n- 401k with 100% match up to 4% of annual employee compensation"
+    result = classify(make_job(description=text, allowed_locations=["Anywhere in the World"]), filters, NOW)
+    assert result.status == REJECTED and result.reject_code == "us_benefits"
+    assert result.reject_reason == ('Offers a 401(k), a US-only retirement plan, so it hires in the US: '
+                                    '"- 401k with 100% match up to 4% of annual employee compensation"')
+    # A title that is not a target keeps its own reason; pay that reads "401K" is not a plan.
+    assert classify(make_job(title="Account Executive", description=text), filters, NOW).reject_code == "title_not_target"
+    pay = make_job(description="Python APIs. Salary 401K–500K a year.", allowed_locations=["Worldwide"])
+    assert classify(pay, filters, NOW).status == SHORTLISTED
+
+
 def test_skip_leaves_a_source_out_of_the_run(tmp_path, filters):
     (tmp_path / "config").mkdir()
     config = {
