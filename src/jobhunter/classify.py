@@ -114,12 +114,13 @@ def classify(job: Job, filters: Filters, now: datetime, check_age: bool = True) 
 
     if relevance.verdict == IRRELEVANT:
         return Classification(REJECTED, eligibility, relevance, score, relevance.reasons[0], relevance.code)
+    if eligibility.verdict == NOT_ELIGIBLE:
+        return Classification(REJECTED, eligibility, relevance, score, eligibility.reasons[0], eligibility.code)
+    # After the location rules, so a job they reject keeps its own reason ("no visa evidence").
     benefits = us_benefits(job.description) if eligibility.verdict != VISA_SPONSOR else None
     if benefits:
         reason = f'Offers a 401(k), a US-only retirement plan, so it hires in the US: "{benefits}"'
         return Classification(REJECTED, eligibility, relevance, score, reason, "us_benefits")
-    if eligibility.verdict == NOT_ELIGIBLE:
-        return Classification(REJECTED, eligibility, relevance, score, eligibility.reasons[0], eligibility.code)
     if eligibility.verdict == VISA_SPONSOR:
         # A list of its own, apart from the remote jobs. An unknown posting date is a note there.
         if not job.posted_at:
