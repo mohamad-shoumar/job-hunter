@@ -142,6 +142,10 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
   - **Location / time zone / notice:** from the profile's "Work authorization and logistics" section.
     If the form's notice options don't include 2 weeks / 14 days, pick the next shorter one
     (10 days, not 20).
+  - **"Are you an AI model applying on behalf of your user?"** (or any question asking whether an
+    AI, bot or agent is filling in the form): **don't answer it, neither Yes nor No.** Leave it
+    empty for the user to click themselves, and list it in the report as "AI question left for
+    you". The job stays in To apply.
   - **Disability, medical needs, accommodations or adjustments:** No / none needed.
   - **Gender, race, veteran and other voluntary questions:** "Prefer not to say" / "Decline to
     self-identify" when that option exists.
