@@ -183,9 +183,9 @@ def company_site(domain: str, company: str, http, guessed: bool = False) -> list
     return pages
 
 
-def research(store: JobStore, job, config: OutreachConfig, http, now: datetime) -> Research:
-    """The company's own pages: from its known domain, the links in the job, else <name>.com."""
-    row = job_company(store, job, now)
+def research(row, job, config: OutreachConfig, http) -> Research:
+    """The company's own pages (row: its `companies` row): from its known domain, the links in the job, else
+    <name>.com. Call it with no write lock held: pages take a while."""
     name = row["name"]
     if row["is_job_board"] or skip_list_match(name, config):
         return Research([], f"{name} is a job board or agency, so paragraph 1 is from the posting only")
@@ -635,10 +635,12 @@ def cover_for_job(store: JobStore, job_id: int, writer: CoverWriter, profile_pat
     facts = load_letter_facts(profile_path, tags)
     if not facts.facts or not facts.name:
         raise CoverError("profile/master_profile.md has no name or no facts to write from")
-    found = research(store, job, config, writer.http, now)
+    company_row = job_company(store, job, now)
     app = tracking.ensure_application(store, job_id, now)
     old = cover_of(app)
     store.commit()  # no write lock held while pages load and the model writes
+
+    found = research(company_row, job, config, writer.http)
 
     second = " ".join(config.cover_paragraph.split())
     opening, usage, attempts = writer.write(job, company, facts, found.pages, second)

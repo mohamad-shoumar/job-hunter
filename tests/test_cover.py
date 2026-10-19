@@ -87,19 +87,24 @@ def test_a_guessed_domain_counts_only_when_it_names_the_company():
 
 def test_research_uses_the_known_domain_and_skips_job_boards(filters):
     store = JobStore(":memory:")
-    job = store.get(store_job(store, filters, description=POSTING))
-    key = job_company(store, job, NOW)["key"]
-    store.conn.execute("UPDATE companies SET domain = 'acme.io' WHERE key = ?", (key,))
-    found = research(store, job, OutreachConfig(), FakeHttp({"https://acme.io": HOME}), NOW)
+
+    def company(**overrides):
+        job = store.get(store_job(store, filters, description=POSTING, **overrides))
+        return job_company(store, job, NOW), job
+
+    row, job = company()
+    store.conn.execute("UPDATE companies SET domain = 'acme.io' WHERE key = ?", (row["key"],))
+    row, _ = company(source_job_id="9")
+    found = research(row, job, OutreachConfig(), FakeHttp({"https://acme.io": HOME}))
     assert [url for url, _ in found.pages] == ["https://acme.io"] and found.note == ""
-    guessed = research(store, store.get(store_job(store, filters, source_job_id="2", company="Globex")),
-                       OutreachConfig(), FakeHttp({}), NOW)
+    guessed = research(*company(source_job_id="2", company="Globex"), OutreachConfig(), FakeHttp({}))
     assert guessed.pages == [] and "Could not read Globex's website (globex.com)" in guessed.note
-    valsoft = store.get(store_job(store, filters, source_job_id="3", company="Valsoft Corporation"))
-    found = research(store, valsoft, OutreachConfig(), FakeHttp({"https://valsoft.com": "<p>Valsoft buys software</p>"}), NOW)
-    assert [url for url, _ in found.pages] == ["https://valsoft.com"]
-    set_job_board(store, key, True)
-    assert "job board or agency" in research(store, job, OutreachConfig(), FakeHttp({}), NOW).note
+    valsoft = research(*company(source_job_id="3", company="Valsoft Corporation"), OutreachConfig(),
+                       FakeHttp({"https://valsoft.com": "<p>Valsoft buys software</p>"}))
+    assert [url for url, _ in valsoft.pages] == ["https://valsoft.com"]
+    set_job_board(store, row["key"], True)
+    row, _ = company(source_job_id="10")
+    assert "job board or agency" in research(row, job, OutreachConfig(), FakeHttp({})).note
 
 
 # --- the sentence check ------------------------------------------------------------------------
