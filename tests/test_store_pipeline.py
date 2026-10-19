@@ -325,6 +325,42 @@ def test_reclassify_leaves_tracking_alone(tmp_path, filters):
     assert (row["stage"], row["notes"]) == (tracking.SAVED, "keep me")
 
 
+def test_reclassify_lets_the_web_app_save_while_it_runs(tmp_path, filters, monkeypatch):
+    # It used to hold the write lock for the whole run (minutes), so Skip in
+    # the web app failed with "database is locked".
+    import shutil
+    import sqlite3
+
+    from jobhunter import cli, tracking
+
+    from .conftest import ROOT, store_job
+
+    shutil.copytree(ROOT / "config", tmp_path / "config")
+    db = tmp_path / "data" / "jobs.sqlite"
+    store = JobStore(db)
+    ids = [store_job(store, filters, source_job_id=str(n), title=f"Backend Engineer {n}") for n in range(150)]
+    store.commit()
+    store.close()
+    saved = []
+
+    def classify_then_skip(job, *args, **kwargs):
+        if len(saved) < 2 and job.source_job_id in ("5", "120"):  # in the first batch, and after one was saved
+            web = JobStore(db, migrate=False)
+            web.conn.execute("PRAGMA busy_timeout = 0")  # no waiting: fails at once if a write is open
+            tracking.set_stage(web, ids[int(job.source_job_id)], tracking.CLOSED, NOW, reason="skipped")
+            web.close()
+            saved.append(job.source_job_id)
+        return classify(job, *args, **kwargs)
+
+    from jobhunter.classify import classify
+    monkeypatch.setattr(cli, "classify", classify_then_skip)
+    assert cli.main(["--home", str(tmp_path), "reclassify"]) == 0
+    assert saved == ["5", "120"]
+    store = JobStore(db)
+    assert tracking.get_application(store, ids[120])["closed_reason"] == "skipped"
+    assert store.conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0] == 150
+
+
 def test_a_failing_outreach_step_still_writes_the_reports(tmp_path, filters, monkeypatch):
     def broken(*args, **kwargs):
         raise ValueError("bad config/outreach.json")

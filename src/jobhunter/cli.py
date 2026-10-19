@@ -295,19 +295,31 @@ def cmd_reclassify(args) -> int:
     changes: Counter = Counter()
     changed_days: set[str] = set()
     now = utcnow()
+    pending: list = []
+
+    def save() -> None:
+        # A run takes minutes: the jobs are judged with no write lock held and
+        # saved 100 at a time, so the web app's saves never wait long.
+        for job_id, job, cls in pending:
+            store.update_extracted(job_id, job)
+            store.update_classification(job_id, cls)
+        store.commit()
+        pending.clear()
+
     try:
         for row in store.all_jobs():
             job = row_to_job(row)
             job.required_yoe = None  # no source sets it: it is always read from the text
             job = enrich(job)  # re-extract too, so extraction changes apply
-            store.update_extracted(row["id"], job)
             cls = classify(job, filters, now, check_age=recheck_age(row))
             if cls.status != row["status"] or cls.eligibility.verdict != row["eligibility"]:
                 changes[f"{row['status']} -> {cls.status}"] += 1
                 if row["report_date"]:
                     changed_days.add(row["report_date"])
-            store.update_classification(row["id"], cls)
-        store.commit()
+            pending.append((row["id"], job, cls))
+            if len(pending) == 100:
+                save()
+        save()
         summary = store.last_run_stats()
         rebuilt = [write_report(store, paths.reports_dir, day, summary, now, filters.max_posting_age_days)
                    for day in sorted(changed_days)]
