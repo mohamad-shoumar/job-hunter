@@ -78,15 +78,26 @@ function skipPicker(id) {
   const reasons = Object.entries(state.status?.skip_reasons || {});
   return `<div class="skip-picker" data-skip-job="${id}">
     <div class="small muted">Why skip it? The fit grade learns from this.</div>
-    <input class="skip-note" placeholder="In your own words (optional), then pick a reason">
+    <input class="skip-note" placeholder="In your own words (optional), then pick a reason or press Enter">
     <div class="row">${reasons.map(([key, label]) => `<button class="btn small" data-skip-reason="${key}">${esc(label)}</button>`).join("")}</div>
   </div>`;
 }
+// Skip pressed again (or Enter) with a note typed skips it as "Other"; with no note it closes the picker.
 function toggleSkipPicker(anchor, id) {
   const open = anchor.parentElement.querySelector(`.skip-picker[data-skip-job="${id}"]`);
-  if (open) return open.remove();
+  if (open) return open.querySelector(".skip-note")?.value.trim() ? submitSkip(open, "other", anchor) : open.remove();
   anchor.insertAdjacentHTML("afterend", skipPicker(id));
   anchor.parentElement.querySelector(".skip-note")?.focus();
+}
+async function submitSkip(picker, reason, button) {
+  const id = Number(picker.dataset.skipJob);
+  const detail = await busy(button, "…", () => api(`/api/jobs/${id}/stage`, {
+    method: "POST", body: { stage: "closed", reason: "skipped", skip_reason: reason, skip_note: picker.querySelector(".skip-note")?.value || "" },
+  }));
+  const message = `Skipped: ${(state.status?.skip_reasons || {})[reason] || reason}`;
+  if (state.jobId === id && $("#drawer").contains(picker)) return setDetail(detail, message);
+  toast(message);
+  return render();
 }
 const EMAIL_BADGE = {
   verified: ["good", "verified"], manual: ["good", "added by you"], found: ["info", "found (not verified)"],
@@ -776,20 +787,11 @@ document.addEventListener("click", async (e) => {
     const skipReason = e.target.closest("[data-skip-reason]");
     if (skipReason) {
       e.stopPropagation();
-      const picker = skipReason.closest("[data-skip-job]");
-      const id = Number(picker.dataset.skipJob);
-      const detail = await busy(skipReason, "…", () => api(`/api/jobs/${id}/stage`, {
-        method: "POST", body: { stage: "closed", reason: "skipped", skip_reason: skipReason.dataset.skipReason,
-                                skip_note: picker.querySelector(".skip-note")?.value || "" },
-      }));
-      const message = `Skipped: ${skipReason.textContent}`;
-      if (state.jobId === id && $("#drawer").contains(picker)) return setDetail(detail, message);
-      toast(message);
-      return render();
+      return await submitSkip(skipReason.closest("[data-skip-job]"), skipReason.dataset.skipReason, skipReason);
     }
     if (quick && quick.dataset.quick === "skipped") {
       e.stopPropagation();
-      return toggleSkipPicker(quick.closest(".row") || quick, quick.dataset.id);
+      return await toggleSkipPicker(quick.closest(".row") || quick, quick.dataset.id);
     }
     if (quick) {
       e.stopPropagation();
@@ -878,6 +880,10 @@ document.addEventListener("submit", async (e) => {
 });
 
 document.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && e.target.matches(".skip-note") && e.target.value.trim()) {
+    e.preventDefault();
+    return submitSkip(e.target.closest("[data-skip-job]"), "other").catch(() => {});
+  }
   if (e.key === "Escape" && state.jobId) closeDrawer();
 });
 $("#scrim").addEventListener("click", () => closeDrawer());
