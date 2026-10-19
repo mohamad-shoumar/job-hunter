@@ -51,6 +51,7 @@ from jobhunter.text import fix_mojibake, html_to_text, normalize_words, parse_da
         ("Strong experience (7+ years) building full stack web applications", 7),
         ("A staffing firm servicing clients in America for the past 12+ years.", None),
         ("Paid sabbatical after 5+ years with us.", None),
+        ("We're a small senior team: the team skews toward 7+ years.", None),
         ("Founded 10+ years ago in Berlin.", None),
         ("A team with 30+ years combined experience", None),
         ("0–4 years of experience (recent grads welcome)", None),

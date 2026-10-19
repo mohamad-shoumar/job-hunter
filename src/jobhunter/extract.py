@@ -121,9 +121,12 @@ _OPTIONAL_CONTEXT = re.compile(r"\b(?:preferred|nice to have|nice-to-have|bonus|
 _BRAG_CONTEXT = re.compile(
     r"(?:\b(?:we have|our|company has|with over|for over)|(?:^|[.!?:]\s+)(?:with|for)\s+more\s+than)\s*$", re.I
 )
-# Benefits and company history, not requirements: "sabbatical after 5+ years",
-# "vesting within 4 years", "serving clients for the past 12+ years".
-_NOT_REQUIRED_BEFORE = re.compile(r"\b(?:after|every|within|(?:for|over|in)\s+the\s+(?:next|last|past))\s*$", re.I)
+# Benefits, company history and the team, not requirements: "sabbatical after 5+ years",
+# "vesting within 4 years", "serving clients for the past 12+ years", "the team skews toward 7+ years".
+_NOT_REQUIRED_BEFORE = re.compile(
+    r"\b(?:after|every|within|(?:for|over|in)\s+the\s+(?:next|last|past)|(?:skews?|averages?)(?:\s+(?:toward|towards|around|about))?)\s*$",
+    re.I,
+)
 # Sentences and bullets. Many sources send a whole posting as one line, so
 # "Kafka is a plus" must only hide the years in its own sentence.
 _SEGMENTS = re.compile(r"\n|(?<=[.!?;])\s+|\s*[•·▪●◦]\s*|\s+[-–]\s+(?=[A-Z])")
