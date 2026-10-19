@@ -5,7 +5,7 @@
   2. an email draft for each of them that has a contact;
   3. a tailored CV for each of them, best fit first (cv.py), which becomes the
      email attachment and what you upload when applying through the posting;
-  4. a cover letter for each of them (cover.py), next to the CV;
+  4. a cover letter for each of them (cover.py), next to the CV, only with auto_cover (off: you ask per job);
   5. the inbox check (replies, bounces) and ghosting.
 
 Steps 3 and 4 also catch up on shortlisted jobs from the last catch_up_days

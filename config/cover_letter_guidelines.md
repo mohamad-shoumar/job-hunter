@@ -1,153 +1,79 @@
 # Cover letter guidelines
 
-How the letters should read: length, shape, voice, and the words that make a
-letter sound machine-written. Built from research in October 2026 (sources at
-the end).
+How paragraph 1 of a cover letter reads: why the engineer wants to join this
+company. Paragraph 2 is the engineer's own text (`cover_paragraph` in
+config/outreach.json), printed word for word, so nothing here applies to it.
 
 How this file is used:
 
 - The part between `writer:start` and `writer:end` is written to the model
-  that drafts the letter. `cover.py` loads it as the writer's instructions
-  (`cover_guidelines` in config/outreach.json), so you can change how letters
-  read by editing this file, not the code.
-- The facts rules do not live here. They stay in code (`check_sentence`,
-  `valid_gap`) and in CLAUDE.md: a letter may only say what
-  `profile/master_profile.md` says. This file only decides how those facts are
-  told.
-- The lists in section 10 are one item per line so code can read them and
-  check every letter, the same way it checks numbers today.
+  (`cover_model`, DeepSeek) after the rules in `cover.py`'s `SYSTEM`. Change
+  how the paragraph reads by editing this file, not the code.
+- The facts rules do not live here. They stay in code (`check_sentence`): about
+  the company, every name and number must be in the posting or the pages code
+  fetched from its website; about the engineer, only what
+  `profile/master_profile.md` says.
+- Code reads the two lists in section 4 and checks every sentence against them.
 
 <!-- writer:start -->
 
-## 1. What the letter is for
+## 1. The task
 
-You write the middle of a short cover letter for a software engineer applying
-to one job. Code adds the header, the date, the greeting and the sign-off, and
-checks every sentence you write against the engineer's numbered facts.
+Write the first paragraph of my cover letter: why I want to join this
+company. Act as a pragmatic software engineer applying to a company, not a
+professional cover letter writer.
 
-The reader is an engineer or a hiring manager. They have the CV open and will
-give the letter under a minute. It should read like a short, plain email from
-one engineer to another: who I am, the one or two things I've done that matter
-for this job, and that's it. No pitch, no build-up, no big finish.
+Use the job description and the company's own pages that code fetched (home
+page, about page, blog), which you get in the prompt. That is all your
+research. Find ONE specific reason a developer with my background would
+genuinely want to work there.
 
-A letter reads as machine-written when it is too neat: a clever first line
-about the company's problem, every sentence tied back to the job, a CV bullet
-broken into short dramatic sentences, and a last line that wraps it all up.
-Write the opposite: plain, a little loose, and with less in it.
+What to look for, in this order:
 
-This file has no sample sentences on purpose. Write every sentence from the
-facts and the posting in front of you.
+1. What interesting technical or business problem is the company solving?
+2. What makes that problem challenging or interesting from an engineering
+   perspective?
+3. How does it connect to my experience in backend engineering, startups,
+   financial technology, AI-native development, or automation? Only what my
+   listed facts say.
 
-## 2. Length
+## 2. Writing rules
 
-- 90 to 170 words for everything you write. Never more than 220.
-- Shorter is fine. If there is one good point, make one good point.
-- Never add a sentence to reach a length or to round a paragraph off.
+- Write 2 or 3 sentences, at most 65 words.
+- Sound like a real developer explaining their interest to another developer.
+- Be conversational, direct, confident, and slightly informal.
+- Focus on ONE specific reason, not a list of reasons.
+- Prefer interesting engineering problems, product challenges, or ways of
+  working over generic company values.
+- Mention a concrete detail from the posting or the pages, but only if it
+  fits naturally.
+- Connect that detail to my professional interests or experience by naming
+  one thing I built, in my facts' own words. Never say I've already done the
+  company's kind of work ("a problem I've been working on", "the kind of work
+  I already do", "maps directly to") unless a fact says exactly that.
+- Don't pretend I've used their product, followed them for years, or admired
+  them. There is no evidence of that.
+- Don't invent emotional attachment or enthusiasm.
+- Avoid corporate language: "passionate about", "deeply resonates",
+  "innovative solutions", "cutting-edge", "industry-leading",
+  "revolutionizing", "I am thrilled to apply".
+- Don't summarize their website or repeat their mission statement.
+- Avoid exaggerated praise and technical name-dropping.
+- Don't force a personal connection if none exists. A specific, intellectually
+  honest interest in their work is enough.
+- No em dash (—), no exclamation marks, no questions.
+- The second paragraph (in the prompt) follows yours: don't repeat what it
+  says.
 
-## 3. Shape
+## 3. Human authenticity test
 
-- An opening of 1 or 2 sentences, one body paragraph, and a closing of 0 or 1
-  sentence. Write a second body paragraph only when it makes a different
-  point that the posting clearly asks for.
-- One main story and at most one supporting point. Pick the main story from
-  the fact that best matches the main work in the posting. Add a supporting
-  point only when the posting asks for it directly. A point may draw on two
-  facts only when they are about the same piece of work. Skills named in
-  passing do not count. The CV covers the rest.
-- Leave out the parts of a fact the posting gives no reason to care about.
-  A frontend job does not need the failure handling of a job queue.
-- No tours: do not string facts together with "I also", "Before that",
-  "Earlier" or "Outside work".
+Before you answer, ask: "Would a pragmatic developer actually say this in a
+casual conversation with the hiring manager?" If it sounds polished, generic,
+flattering, or AI-generated, rewrite it more naturally.
 
-## 4. Opening
+## 4. Words that read as AI
 
-- Start with the engineer and the work that matters for this job, in a plain
-  sentence: their current title and company from the facts, and what they
-  built. Starting with "I" is normal.
-- Do not open with a sentence about the company, the job or its problem. No
-  general truth or thesis ("X comes down to Y", "X is only safe when Y", "the
-  hard part of X is Y"), and no sentence whose subject is an "-ing" phrase
-  ("Turning X into Y is...", "Keeping X safe means...").
-- Never announce the application ("I'm applying for", "I am writing to").
-  The header names the job. Code removes it.
-- Never tell the company what their business needs, depends on or is really
-  about. You do not know, and they do.
-
-## 5. The main story
-
-- Tell the main fact the way you would explain it to a colleague: what the
-  thing is, what the engineer did, and the one detail that matters for this
-  job. Two to four normal sentences.
-- Do not split a CV bullet into a run of short sentences, one per clause.
-  Join related parts with "and", "but", "so" or "which", the way people
-  write email.
-- At most one number, inside a sentence, exactly as the fact gives it.
-- Plain verbs: built, wrote, set up, moved, led, fixed, run. Not architected,
-  spearheaded or established, even when the fact uses them.
-- Say each thing once. Do not restate it for weight ("I built it and I own
-  it", "nothing ships unchecked").
-
-Never add, even when it sounds natural:
-
-- Feelings, motives, opinions or habits no fact states ("the work I'm proudest
-  of", "I've always", "the call I make every time").
-- What other people think or do ("the team relies on it").
-- A domain, a setting, an order of events ("then", "after that") or a time
-  span that no fact gives.
-
-## 6. Connecting to the job
-
-- Let the reader make the connection. The facts were picked for this job, so
-  you do not need to explain why each one fits.
-- At most one short, plain clause in the whole letter may connect the
-  engineer's work to the job, and it names one thing from the posting by its
-  own name (a product, a part of the stack). Keep it modest: "close to", not
-  "the same as". Never call the engineer's work "the same problem", "the same
-  question" or "the same call" as the company's, and never build an analogy
-  between the two.
-- If the prompt has a line that starts "In the engineer's words", that is
-  the only reason for wanting this job the letter may give. Code places it;
-  do not repeat or reword it. Without it, give no reason and write no "why
-  this company" sentence.
-
-## 7. Gaps
-
-Code writes the gap sentence, not you. You only choose which gap, if any.
-
-- Default: no gap. Never more than one.
-- Name one only when the posting requires it and it is central (in the title,
-  or asked for more than once), and the facts have nothing close to it.
-- Never mention a gap in your own sentences, and never apologize for one.
-
-## 8. Closing
-
-- Optional: 0 or 1 short sentence. An empty closing is fine, because the
-  sign-off follows.
-- If you write one, make it a plain offer to talk or to go into more detail on
-  the main story. Nothing after it: no "since...", no tie-back to their
-  problem, no summary, no restated interest.
-- No logistics: time zone, location, notice, start date or availability. Code
-  removes them.
-
-## 9. Voice
-
-- Plain, direct and a little casual, like a short email. Contractions are
-  normal (I'm, I've, it's).
-- Normal sentences, mostly 10 to 25 words. At most one sentence under 6 words
-  in the whole letter, and never one written for effect.
-- No colon or dash set-up for a reveal ("X comes down to one rule: Y").
-- No metaphors, no analogies, no clever reframes of what the engineer did.
-- No selling adjectives. Let the fact do the work, and understate.
-- Plain "is" and "has". Not "serves as", "stands as", "boasts".
-- No buzzwords, no exclamation marks, no questions, no bold or bullet points.
-- Never use the em dash (—) or a spaced en dash ( – ) as punctuation. Use a
-  comma, a full stop or brackets.
-
-## 10. Words and patterns that read as AI
-
-Code checks every letter against these lists. Matching ignores case. A word
-or phrase that appears in the fact a sentence cites is allowed in that
-sentence.
+Code checks every sentence against these lists. Matching ignores case.
 
 ### Never use
 
@@ -217,8 +143,6 @@ sentence.
 - truly
 - genuinely
 - comes down to
-- the hard part
-- the hardest part
 - the same problem
 - the same question
 - the same call
@@ -239,8 +163,34 @@ sentence.
 - I built it and I own it
 - keep it honest
 - on trust
+- passionate about
+- resonates
+- innovative solutions
+- industry-leading
+- revolutionizing
+- revolutionize
+- I am thrilled to apply
+- I've used
+- I have used
+- I've been following
+- I have been following
+- long-time user
+- big fan
+- I've admired
+- I have admired
+- I've always
+- dream company
+- natural extension
+- fits naturally
+- ties directly
+- ties into
+- connects directly
+- maps directly
+- the kind of work I already do
+- I'd love to
+- I would love to
 
-### Use at most one of these in a whole letter
+### Use at most one of these in the paragraph
 
 - delve
 - tapestry
@@ -275,104 +225,30 @@ sentence.
 - earlier
 - outside work
 
-### Patterns to avoid
-
-- An opening about the company or its problem instead of the engineer: a
-  general truth, a thesis, or an "-ing" phrase as the subject.
-- Telling the company what its business needs or depends on.
-- A bridge from the engineer's work to the company's: "the same problem as",
-  "since that's the part your X can't get wrong", "that's the shape your Y
-  would take".
-- A CV bullet split into a run of short sentences, one per clause.
-- Short sentences written for effect, and more than one sentence under 6
-  words in a letter.
-- A tour of facts joined by "I also", "Before that", "Earlier".
-- Restating a point for weight: "I built it and I own it".
-- A closing that ties back, sums up, or gives a reason after the offer.
-- An opening that announces the application.
-- Logistics anywhere in the opening or closing.
-- A paragraph that opens by restating the posting: "The role calls for",
-  "You need", "<Company> values".
-- Lists of three adjectives or three abstract nouns.
-- A sentence that ends in a ", -ing" add-on: ", ensuring...", ", enabling...".
-- "Not X, but Y" and "It's not X, it's Y" contrasts.
-- A last sentence in a paragraph that states the paragraph's moral.
-
-## 11. Format
-
-Code handles all of this; it is here so you know what surrounds your text.
-
-- Header: name, contact line, location, date. Then "<Company> Hiring Team",
-  the job title, and "Dear <Company> Hiring Team,".
-- Sign-off: "Best regards," and the name.
-- Plain text: it is pasted into form boxes as often as it is uploaded. No
-  markdown, no bullet points, no bold.
-
-## 12. Notes to the engineer
-
-Write 1 to 3 short lines for the engineer, who edits the letter before
-sending:
-
-- Which fact you led with, and why it fits this posting.
-- Anything central in the posting that the facts do not cover and the letter
-  does not mention (a kind of experience, not only a tool), so the engineer
-  can decide whether to address it in their own words.
-- When there was no "In the engineer's words" line: the letter gives no
-  reason for wanting the job, and one line from them would help most.
-
-## 13. Check before you answer
-
-- [ ] 90 to 170 words, never over 220.
-- [ ] The opening is about the engineer and their work, not about the
-      company or a general truth.
-- [ ] One main story, at most one supporting point, no "I also" tour.
-- [ ] Normal sentences joined with "and", "but", "so"; at most one under 6
-      words.
-- [ ] No bridge or analogy to the company's work; at most one modest clause.
-- [ ] Every fact about the engineer is in the numbered facts; no feelings,
-      motives, opinions, order of events or results added.
-- [ ] No word or phrase from "Never use", at most one from "Use at most one".
-- [ ] No em dash.
-- [ ] At most one gap chosen, and only a central, required one.
-- [ ] The closing is empty or one plain sentence with nothing after the offer.
-
 <!-- writer:end -->
 
-## What code does with this file, and what is still open
+## What code does with this file
 
-Done (`src/jobhunter/cover.py`):
+`src/jobhunter/cover.py`:
 
-- The `writer:start`/`writer:end` part is the writer's prompt, after the fact
-  rules and the JSON contract, which stay in code.
-- `check_style` reads the two lists in section 10. A "Never use" phrase is
-  treated like a fact problem: sent back once, then the sentence is left out.
-  Dashes, ", -ing" add-ons, questions, two "Use at most one" words, more
-  than one sentence under 6 words, and a letter over 220 words are sent back
-  once, then only noted; a dash that is left becomes a comma. The closing may
-  be empty (no stock "Thanks for reading."). In a body paragraph, a sentence that opens by
-  restating the posting ("The role calls for...") is a problem. So is a
-  sentence that announces the application ("I'm applying for...") and, in
-  the opening or closing, logistics (time zone, notice, location). When the
-  whole opening is removed, the first body paragraph opens the letter; no
-  stock line is added.
-- The letter's facts no longer include the profile's logistics lines (where
-  you live, time zone, notice period). The header still shows your location.
-- Gaps: at most 1, and only when the posting names it in the title or twice
-  and the facts have nothing close to it (`gap_matters`; the CI/CD case).
-- Writer model: `cover_model` is `claude-code` (`claude -p`, your Claude
-  login, no tools, none of your Claude settings).
+- The writer part above is the model's prompt, after the rules and the JSON
+  contract in `SYSTEM`.
+- A "Never use" phrase, an "I'm applying for" sentence, or logistics (time
+  zone, notice, location) is a problem: sent back once, then the sentence is
+  left out. So is a name or number that is in neither the posting, the
+  company's pages nor the profile.
+- More than 65 words, fewer than 2 or more than 3 sentences, two "Use at most
+  one" words, a dash, a ", -ing" add-on, or a quote that code cannot find in
+  the posting or pages: sent back once, then only noted. A dash that is left
+  becomes a comma.
+- Claims in plain words ("they ship weekly") pass when they name nothing and
+  have no number. Read the paragraph before sending.
 
-Still open:
+## Background research
 
-- Greeting: when the `contacts` table has the hiring manager's name,
-  "Dear <First name>," reads better than "Dear <Company> Hiring Team,".
-  `render_letter` always writes the second today.
-- Claims written in plain words ("a high-trust, compliance-conscious domain",
-  "the chart shows every trade") pass every check, because the checks look
-  for numbers, tools, titles, names and the phrase lists. Read each letter
-  before sending.
-
-## Evidence
+The research below was done in October 2026 for an earlier, longer letter (an
+opening, a body paragraph citing profile facts, a closing). The word lists
+came from it.
 
 Strength: **[strong]** field data, an experiment or a peer-reviewed or working
 paper; **[survey]** a survey that states its method (answers are self-reported);

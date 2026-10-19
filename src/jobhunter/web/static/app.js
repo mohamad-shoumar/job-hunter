@@ -413,19 +413,19 @@ function coverSection(d) {
   const note = s.cover_note;
   const info = c ? `
       <div class="small muted" style="margin-top:6px">Written ${esc(ago(c.written_at))} by ${esc(c.model)}${c.cost_usd ? `, $${c.cost_usd.toFixed(3)}` : ""}
-        · ${c.words} words · <span class="mono">${esc(c.file)}</span></div>
+        · paragraph 1: ${c.words} words · <span class="mono">${esc(c.file)}</span></div>
       ${c.notes.length ? `<ul class="small">${c.notes.map((n) => `<li>${esc(n)}</li>`).join("")}</ul>` : ""}
       ${c.removed.length ? `<div class="warnings">Left out by the checks:<ul>${c.removed.map((r) => `<li>${esc(r)}</li>`).join("")}</ul></div>` : ""}
       ${c.warnings.length ? `<div class="warnings">Check these by eye:<ul>${c.warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></div>` : ""}
-      ${c.gaps_named.length ? `<div class="small" style="margin-top:6px">It says you have not worked with <b>${esc(c.gaps_named.join(", "))}</b>.</div>` : ""}
+      <div class="small muted" style="margin-top:6px">Read: ${c.pages?.length ? c.pages.map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(u.replace(/^https:\/\//, ""))}</a>`).join(", ") : "the posting only"}</div>
       <textarea id="cover-text" rows="14" readonly style="margin-top:8px">${esc(c.text || "")}</textarea>` : "";
   return `
     <div class="section">
       <h3>Cover letter</h3>
-      ${c ? "" : `<div class="muted">None yet. It uses only the facts your CV prints for this job.</div>`}
+      ${c ? "" : `<div class="muted">None yet. Paragraph 1 is why this company (from the posting and its website); paragraph 2 is your own text.</div>`}
       ${info}
       <div class="row small" style="margin-top:8px">
-        <button class="btn" data-action="cover" ${note ? `disabled title="${esc(note)}"` : `title="${esc(s.cover_model || "")} writes it from your profile facts; code checks every sentence"`}>${c ? "Write again" : "Write cover letter"}</button>
+        <button class="btn" data-action="cover" ${note ? `disabled title="${esc(note)}"` : `title="${esc(s.cover_model || "")} writes paragraph 1 from the posting and the company's site; code checks every sentence"`}>${c ? "Write again" : "Write cover letter"}</button>
         ${c ? `<button class="btn" data-action="copy-cover">Copy</button>` : ""}
       </div>
       ${note ? `<div class="small muted" style="margin-top:6px">${esc(note)}</div>` : ""}
@@ -612,7 +612,7 @@ async function drawerAction(action, el) {
   }
   if (action === "cover") {
     if (d.cover && !confirm("Write a new cover letter? It replaces this one, including edits you made to the file.")) return;
-    const detail = await busy(el, "Writing… (up to a minute)", () => api(`/api/jobs/${id}/cover`, { method: "POST" }));
+    const detail = await busy(el, "Reading the company's site and writing… (up to a minute)", () => api(`/api/jobs/${id}/cover`, { method: "POST" }));
     return setDetail(detail, `Cover letter ready: ${detail.cover?.file}${detail.cover?.removed.length ? " (the check left some sentences out)" : ""}`);
   }
   if (action === "edit-cv") {
