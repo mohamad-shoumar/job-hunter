@@ -137,3 +137,18 @@ def test_stats_count_replies_by_role(store, filters):
     assert data["by_role"] == {"ceo": {"emailed": 1, "replied": 1}}
     assert data["by_size"] == {"≤50": {"emailed": 1, "replied": 1}}
     assert data["stages"][tracking.REPLIED] == 1
+
+
+def test_a_skip_keeps_its_reason_and_note_until_you_unskip(store, filters):
+    job_id = store_job(store, filters)
+    with pytest.raises(tracking.TrackingError):
+        tracking.set_stage(store, job_id, tracking.CLOSED, NOW, reason="skipped", skip_reason="bored")
+    row = tracking.set_stage(store, job_id, tracking.CLOSED, NOW, reason="skipped", skip_reason="too_senior",
+                             skip_note="  wants   8 years ")
+    assert (row["skip_reason"], row["skip_note"]) == ("too_senior", "wants 8 years")
+    assert tracking.events_for(store, job_id)[-1]["detail"] == "New → Closed (skipped): Too senior, wants 8 years"
+    # Picking another reason for the same skip is a change too.
+    row = tracking.set_stage(store, job_id, tracking.CLOSED, NOW, reason="skipped", skip_reason="wrong_stack")
+    assert (row["skip_reason"], row["skip_note"]) == ("wrong_stack", None)
+    row = tracking.set_stage(store, job_id, tracking.SAVED, NOW)
+    assert (row["skip_reason"], row["skip_note"]) == (None, None)

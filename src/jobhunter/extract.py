@@ -91,6 +91,29 @@ _YOE = re.compile(
     rf"|(?:in|as|of)\s+(?:an?\s+|the\s+)?(?:[\w/+#.-]+\s+){{0,2}}?{_FIELD}\b)",
     re.I,
 )
+# Postings rarely say "experience" after a "+" or a minimum: "5+ years building
+# production backend systems", "(typically 8+ years)", "Minimum 5 years of
+# development", "Proficiency (5+ yrs) in Python".
+_YEARS = r"(?:years?|yrs?)\b"
+_YOE_PLUS = re.compile(
+    rf"(?<![\d.$€£\w]){_COUNT}\s*(?:\+|plus)\s*{_YEARS}"
+    r"(?!\s+(?:ago|old|in\s+business|of\s+(?:history|heritage|innovation|growth|operations?|research|combined|collective))\b)"
+    r"(?!\s+(?:combined|collective|cumulative)\b)",
+    re.I,
+)
+_YOE_MIN = re.compile(rf"\b(?:minimum|min\.?|at\s+least)\s*(?:of\s+)?:?\s*{_COUNT}\s*\+?\s*{_YEARS}", re.I)
+# A range is a requirement when what follows is the work ("4-7 years in back-end API development").
+_YOE_RANGE = re.compile(
+    rf"(?<![\d.$€£\w]){_COUNT}\s*(?:-|–|—|to)\s*{_COUNT}\s*\+?\s*{_YEARS}"
+    r"(?=\s+(?:of|in|as|building|working|shipping|developing|designing|writing|leading|with|hands-on|professional|"
+    r"relevant|industry|commercial|experience|exp)\b)",
+    re.I,
+)
+# "Experience level: 2–5 years", "Experience: 8 years required".
+_YOE_LABEL = re.compile(
+    rf"\bexperience(?:\s+level)?\s*[:\-–—]\s*{_COUNT}\s*\+?\s*(?:(?:-|–|—|to)\s*{_COUNT}\s*\+?\s*)?{_YEARS}", re.I
+)
+_YOE_PATTERNS = (_YOE, _YOE_RANGE, _YOE_LABEL, _YOE_MIN, _YOE_PLUS)
 _OPTIONAL_CONTEXT = re.compile(r"\b(?:preferred|nice to have|nice-to-have|bonus|ideally|a plus|is a plus)\b", re.I)
 # "With more than 10 years of experience in this field and 40 employees": a
 # sentence that opens this way is about the company; "Candidates with more
@@ -98,28 +121,72 @@ _OPTIONAL_CONTEXT = re.compile(r"\b(?:preferred|nice to have|nice-to-have|bonus|
 _BRAG_CONTEXT = re.compile(
     r"(?:\b(?:we have|our|company has|with over|for over)|(?:^|[.!?:]\s+)(?:with|for)\s+more\s+than)\s*$", re.I
 )
+# Benefits and company history, not requirements: "sabbatical after 5+ years",
+# "vesting within 4 years", "serving clients for the past 12+ years".
+_NOT_REQUIRED_BEFORE = re.compile(r"\b(?:after|every|within|(?:for|over|in)\s+the\s+(?:next|last|past))\s*$", re.I)
+# Sentences and bullets. Many sources send a whole posting as one line, so
+# "Kafka is a plus" must only hide the years in its own sentence.
+_SEGMENTS = re.compile(r"\n|(?<=[.!?;])\s+|\s*[•·▪●◦]\s*|\s+[-–]\s+(?=[A-Z])")
 
 
-def extract_required_yoe(text: str) -> int | None:
-    """The strictest 'N+ years of experience' stated as a requirement.
+def _optional(segment: str, start: int, end: int) -> bool:
+    """'Nice to have: 8+ years' or '2+ years of Rust preferred', close to the years. A comma ends
+    the clause ('5+ years in Python, ideally in startups'), and an aside in brackets is about
+    something else ('5+ yrs in Python (large codebases a plus)'): the years are still required."""
+    after = re.sub(r"\([^)]*\)?", " ", segment[end:end + 120].split(",", 1)[0])
+    return bool(_OPTIONAL_CONTEXT.search(segment[max(0, start - 60):start]) or _OPTIONAL_CONTEXT.search(after))
+
+
+def find_required_yoe(text: str) -> tuple[int, str] | None:
+    """The strictest 'N+ years' stated as a requirement, and the sentence that says it.
 
     Counts may be words ('seven years of experience') and the field may stand
-    in for 'experience' ('6+ years in software engineering'). Lines marked
+    in for 'experience' ('6+ years in software engineering'). Sentences marked
     preferred/nice-to-have are ignored, as are company boasts ('our 15 years
-    of experience').
+    of experience') and benefits ('after 5+ years'). A range counts its low end.
     """
-    best = None
-    for line in (text or "").split("\n"):
-        if _OPTIONAL_CONTEXT.search(line):
+    best: tuple[int, str] | None = None
+    for segment in _SEGMENTS.split(text or ""):
+        if not segment or not re.search(r"\d|year", segment, re.I):
             continue
-        for m in _YOE.finditer(line):
-            if _BRAG_CONTEXT.search(line[max(0, m.start() - 22):m.start()]):
+        found = sorted(((m.start(), -m.end(), m) for pattern in _YOE_PATTERNS for m in pattern.finditer(segment)),
+                       key=lambda item: item[:2])
+        counts: list[tuple[int, bool, int, int]] = []
+        last_end = -1
+        for start, _, m in found:
+            if start < last_end:  # "3-8+ years": the range's "8+" is not a second count
+                continue
+            last_end = m.end()
+            before = segment[max(0, start - 22):start]
+            if _BRAG_CONTEXT.search(before) or _NOT_REQUIRED_BEFORE.search(before) or _optional(segment, start, m.end()):
                 continue
             count = m.group(1).lower()
             years = int(count) if count.isdigit() else _NUMBER_WORDS[count]
             if 1 <= years <= 15:
-                best = years if best is None else max(best, years)
+                aside = segment[:start].count("(") > segment[:start].count(")")
+                counts.append((years, aside, start, m.end()))
+        # "3+ years of experience (5+ years for seniors)": an aside counts only when it is the sentence's only count.
+        if any(not aside for _, aside, _, _ in counts):
+            counts = [c for c in counts if not c[1]]
+        for years, _, start, end in counts:
+            if best is None or years > best[0]:
+                best = (years, _quote_around(segment, start, end))
     return best
+
+
+def _quote_around(segment: str, start: int, end: int, width: int = 160) -> str:
+    text = " ".join(segment.split())
+    if len(text) <= width:
+        return text
+    matched = " ".join(segment[start:end].split())
+    at = max(0, text.find(matched) - width // 3)
+    window = text[at:at + width].strip()
+    return ("…" if at else "") + window + ("…" if at + width < len(text) else "")
+
+
+def extract_required_yoe(text: str) -> int | None:
+    found = find_required_yoe(text)
+    return found[0] if found else None
 
 
 # --- skills -----------------------------------------------------------------

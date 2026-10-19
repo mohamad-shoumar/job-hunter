@@ -98,8 +98,9 @@
     }
   },
 
-  "_title_include": "A title must contain at least one of these.",
+  "_title_include": "A title must contain at least one of these, or be an AI engineering role: 'AI', 'LLM', 'GenAI' or 'Agentic' followed within three words by engineer/developer ('AI Harness Engineer'; relevance.py). Lead titles (Technical Lead, Engineering Lead) are left out on purpose: when they state years, most ask for 5+ (checked 2026-10-19).",
   "title_include": [
+    "platform engineer", "web engineer", "automation developer", "distributed systems engineer", "microservices engineer",
     "backend", "software engineer", "software engineering", "software developer", "software development engineer", "web developer",
     "python", "fastapi", "django", "flask",
     "ai engineer", "applied ai", "ai ml engineer", "llm engineer", "genai engineer", "generative ai engineer",

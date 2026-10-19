@@ -41,6 +41,7 @@ open reports/$(date +%F).md
 | `jobhunter cover <id>` | a cover letter for that job, next to its CV (the daily run does these too) |
 | `jobhunter inbox` | check Gmail for replies and bounces (the daily run does this too) |
 | `jobhunter check` | AI-check waiting "needs review" jobs, newest first (`--limit N`, `--recheck`, or job ids) |
+| `jobhunter grade` | AI fit grade 1-5 for open shown jobs, learned from your Applied and skipped jobs (`--regrade`, `--days N`, `--limit N`, or job ids) |
 | `jobhunter show <id>` | everything stored about one job and why it got its status (`-d` adds the description) |
 | `jobhunter reclassify` | re-apply the rules to every stored job after you edit `config/filters.json`, and rebuild the day files that changed |
 | `jobhunter report --date 2026-09-25` | rebuild one day's file from the database |
@@ -95,13 +96,18 @@ restriction (it usually means EU residency), but "European time zones" does not.
 Preferences ("US preferred") are ignored rather than treated as rules.
 
 **2. Is it a role worth applying to?** (`src/jobhunter/relevance.py`,
-`config/filters.json`) Title keywords to include and exclude, a cap on years of
-experience, and a fit score from the skills in the posting (used only for
-sorting). A posting that mentions Python is a `match`; without Python it is a
-`maybe`.
+`config/filters.json`) Title keywords to include and exclude (plus any "AI …
+engineer/developer" title, like "AI Harness Engineer"), a cap on years of
+experience, and a fit score from the skills in the posting. A posting that
+mentions Python is a `match`; without Python it is a `maybe`. Years are read
+from the posting's own sentence, which the reason quotes (`Asks for 5+ years
+(a stretch): "5+ years building production backend systems"`): "5+ years
+building …", "Minimum 5 years", "(typically 8+ years)", "4-7 years in …"; a
+"nice to have" only cancels the years in its own sentence. 6+ is rejected, 5
+is a "stretch" note that the fit grade (5, below) ranks down.
 
-**3. Is it new?** Jobs posted more than 30 days before they were found are
-rejected, so the first run is not flooded with months-old listings.
+**3. Is it new?** Jobs posted more than `max_posting_age_days` (14) before they
+were found are rejected, so the first run is not flooded with old listings.
 
 The result is one status: **shortlisted** (eligible or likely), **needs review**
 (unclear), **visa list** (a job abroad that sponsors a visa, below), or **rejected**.
@@ -134,11 +140,31 @@ $0.10–0.30 a job). Only a found quote counts:
 | can hire | yes | shortlisted as `likely` |
 | anything else | | stays in "needs review", with what the AI found attached |
 
-It runs at the end of `jobhunter run` for that day's new "needs review" jobs
-(at most `max_jobs_per_run`), and never on a job the rules already decided. Each
-job is checked once; results are stored, so `reclassify` keeps them. Waiting
-jobs from earlier days: `jobhunter check --limit 250`. A found quote proves the
+It runs at the end of `jobhunter run` for unchecked "needs review" jobs from
+the last `lookback_days` (7), newest first, at most `max_jobs_per_run`, and never
+on a job the rules already decided. Each job is checked once; results are
+stored, so `reclassify` keeps them. Older waiting jobs: `jobhunter check --limit 250`. A found quote proves the
 text exists, not that the AI read it right, so the link is always shown.
+
+**5. Fit grade, for sorting only.** (`src/jobhunter/fitgrade.py`,
+`config/fit_grade.json`) Steps 1-4 decide a job's status; this never changes
+it, never hides a job and never rejects one. It decides the order: the report,
+the To apply column and which jobs get a CV first show the best grade first.
+DeepSeek (`deepseek-v4-flash`, about $0.0015 a job) grades each shown job 1-5
+with one sentence why, after reading:
+
+- your profile's facts (no contact details),
+- `preferences` in `config/fit_grade.json`, in your words,
+- your latest choices: jobs you marked **Applied**, and jobs you **skipped**,
+  with the reason you picked (Too senior, Wrong stack, Not open to me, Agency,
+  repost or gig, Not my kind of role, Pay too low, Other) and your note.
+
+There are no preference rules to maintain: each Applied or Skip changes the
+examples the next grades read, so the grades follow what you actually do.
+Stages you set by hand (Reached out, Interviewing) are not used. A job keeps its
+grade; `jobhunter grade --regrade` grades the open ones again with today's
+examples. The daily run grades open jobs from the last `lookback_days` (7), up
+to `max_jobs_per_run`.
 
 ## Outreach and tracking
 
@@ -481,6 +507,7 @@ per run. The list lives in the database (`watched_boards`), not in
 - `config/sources.json` — boards and feeds. Any entry can take `"enabled": false`.
 - `config/filters.json` — title keywords, experience cap, posting age, fit weights.
   Run `jobhunter reclassify` after changing it.
+- `config/ai_check.json` / `config/fit_grade.json` — the AI check (step 4) and the fit grade (step 5).
 - `config/outreach.json` — who to target by size, the job-board skip list,
   lookup and send limits, follow-up days, the models, the resume folder, and the
   CV and cover letter settings.

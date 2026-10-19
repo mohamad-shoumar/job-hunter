@@ -40,6 +40,7 @@ from ..contacts import (
     ROLE_LABELS, ContactFinder, chosen_contact, clean_company_name, company_contacts, domain_from_links, job_company,
     rank_contacts, save_manual_contact, set_domain, set_job_board, skip_list_match, targets_for, verify_email,
 )
+from ..fitgrade import grade_of
 from ..hunter import Hunter, HunterError
 from ..llm import CLAUDE_CODE, anthropic_client, error_line, key_note
 from ..mailer import GmailInbox, MailAccount, SendError, SmtpSender, check_inbox, mail_account, outgoing, send_for_job
@@ -203,7 +204,8 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
             "cover_model": cover_model(config), "cover_note": key_note(cover_model(config), "Cover letters"),
             "sends_today": tracking.sends_today(store, now()),
             "stages": tracking.STAGES, "stage_labels": tracking.STAGE_LABELS,
-            "closed_reasons": tracking.CLOSED_REASONS, "role_labels": ROLE_LABELS,
+            "closed_reasons": tracking.CLOSED_REASONS, "skip_reasons": tracking.SKIP_REASONS,
+            "role_labels": ROLE_LABELS,
         }
 
     @app.get("/api/jobs")
@@ -240,13 +242,14 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
             params.append(iso(datetime.combine(local_day(now()) - timedelta(days=days - 1), time.min).astimezone()))
         rows = store.conn.execute(
             f"""
-            SELECT j.*, a.stage, a.closed_reason, a.body IS NOT NULL AS has_draft, a.draft_blocked,
+            SELECT j.*, a.stage, a.closed_reason, a.skip_reason, a.body IS NOT NULL AS has_draft, a.draft_blocked,
                    a.next_follow_up_at, a.emailed_at, a.applied_at, a.replied_at,
                    a.cv_tailored_json IS NOT NULL AS has_cv, a.cover_letter_json IS NOT NULL AS has_cover
             FROM jobs j LEFT JOIN applications a ON a.job_id = j.id
             WHERE {where}
             ORDER BY COALESCE(j.report_date, substr(j.first_seen, 1, 10)) DESC,
-                     CASE j.status WHEN 'shortlisted' THEN 0 ELSE 1 END, j.fit_score DESC, j.id DESC
+                     CASE j.status WHEN 'shortlisted' THEN 0 ELSE 1 END,
+                     COALESCE(json_extract(j.fit_grade_json, '$.grade'), 0) DESC, j.fit_score DESC, j.id DESC
             LIMIT 500
             """,
             params,
@@ -274,7 +277,8 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
     def stage(job_id: int, body: dict | None = Body(default=None), store: JobStore = Depends(db)):
         body = body or {}
         job_or_404(store, job_id)
-        tracking.set_stage(store, job_id, body.get("stage"), now(), reason=body.get("reason"))
+        tracking.set_stage(store, job_id, body.get("stage"), now(), reason=body.get("reason"),
+                           skip_reason=body.get("skip_reason") or None, skip_note=str(body.get("skip_note") or ""))
         store.commit()
         return _job_detail(store, store.get(job_id), config, services, profile(), now())
 
@@ -506,7 +510,8 @@ def _job_summary(store: JobStore, row: sqlite3.Row, config: OutreachConfig) -> d
         "required_yoe": row["required_yoe"], "salary": _salary(row), "posted_at": row["posted_at"], "first_seen": row["first_seen"],
         "report_date": row["report_date"], "source": row["source"],
         "apply_url": row["application_url"] or row["source_url"],
-        "stage": row["stage"] or "new", "closed_reason": row["closed_reason"], "has_draft": bool(row["has_draft"]),
+        "stage": row["stage"] or "new", "closed_reason": row["closed_reason"], "skip_reason": row["skip_reason"],
+        "fit_grade": grade_of(row), "has_draft": bool(row["has_draft"]),
         "draft_blocked": bool(row["draft_blocked"]), "emailed_at": row["emailed_at"], "applied_at": row["applied_at"],
         "has_cv": bool(row["has_cv"]), "has_cover": bool(row["has_cover"]),
         "replied_at": row["replied_at"], "next_follow_up_at": row["next_follow_up_at"],
@@ -555,6 +560,7 @@ def _job_detail(store: JobStore, row: sqlite3.Row, config: OutreachConfig, servi
             "apply_url": row["application_url"] or row["source_url"], "description": row["description"],
             "reject_reason": row["reject_reason"],
             "ai_check": json.loads(row["ai_check_json"]) if row["ai_check_json"] else None,
+            "fit_grade": grade_of(row),
             "seen_on": [{"source": s["source"], "url": s["source_url"]} for s in sightings],
         },
         "company": {**dict(company), "targets": [ROLE_LABELS[t] for t in targets], "why": why,

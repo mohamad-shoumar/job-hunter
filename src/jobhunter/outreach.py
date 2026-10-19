@@ -28,6 +28,7 @@ from .config import OutreachConfig, Paths
 from .contacts import build_finder, clean_company_name, find_contacts, run_budget
 from .cover import build_cover_writer, cover_for_job, cover_of
 from .cv import build_cv_writer, tailor_for_job, tailored_of
+from .fitgrade import sort_grade
 from .llm import error_line
 from .mailer import check_inbox, mail_account
 from .models import SHORTLISTED
@@ -121,14 +122,16 @@ def run_outreach(store: JobStore, paths: Paths, new_ids: list[int], now: datetim
 
 
 def to_prepare(store: JobStore, new_shortlisted: list, config: OutreachConfig, now: datetime) -> list:
-    """This run's new shortlisted jobs, best fit first, then older ones from the last catch_up_days.
+    """This run's new shortlisted jobs, best first, then older ones from the last catch_up_days.
 
-    Older jobs only while they are New or Saved: one you reached out about, or closed, is left alone.
+    Best first: the AI fit grade (fitgrade.py), then the skills fit score. Older jobs only while
+    they are New or Saved: one you reached out about, or closed, is left alone.
     """
     def best_first(rows):
-        return sorted(rows, key=lambda row: -(row["fit_score"] or 0))
+        return sorted(rows, key=lambda row: (-sort_grade(row), -(row["fit_score"] or 0)))
 
-    rows = best_first(new_shortlisted)
+    # Re-read: the fit grade step ran after these rows were loaded.
+    rows = best_first(store.get(row["id"]) for row in new_shortlisted)
     if config.catch_up_days > 0:
         since = (now.astimezone().date() - timedelta(days=config.catch_up_days)).isoformat()
         seen = {row["id"] for row in rows}

@@ -124,19 +124,24 @@
     "countries": ["United Kingdom", "Netherlands", "Ireland", "Germany", "Spain", "Italy", "Finland"]
   },
   "serpapi": {
-    "_note": "Google Jobs (includes LinkedIn postings). Needs SERPAPI_API_KEY in .env; skipped without it. One credit per query page per run. 7 daily queries + 1 Gulf city a day (Dubai, Abu Dhabi, Doha in turn: every_days 3, day 0/1/2) = 8 credits/day, ~240/month (the Free plan has 250). 2026-10-09: dropped two word-order duplicates of 'python backend engineer', added mid/junior-friendly searches. 2026-10-10: 'junior python developer remote' replaced by the city searches (location names from serpapi.com/locations.json).",
+    "_note": "Google Jobs (includes LinkedIn postings). Needs SERPAPI_API_KEY in .env; skipped without it. One credit per query page per run (the 21:00 run only). A query with no location searches the US market. 2026-10-19, from the stored results: the Gulf city search gave 15 of the 18 shortlisted and 5 of the 6 applied-to jobs; the six US 'remote' searches gave ~245 results, 4 shortlisted, 1 applied; the trading ones none. Now: each Gulf city every day (search words in turn), Beirut twice a day (a test found 10 jobs no other source had, 3 shortlisted), two remote searches. 7 credits/day, ~217/month (the Free plan has 250).",
     "engine": "google_jobs",
     "queries": [
-      "python backend engineer remote",
-      "software engineer python remote",
-      "fastapi engineer remote",
-      "python developer remote",
       "mid level backend engineer remote",
-      "trading systems engineer python",
-      "algorithmic trading engineer python",
+      "backend developer python remote",
       { "q": "software engineer python", "location": "Dubai,Dubai,United Arab Emirates", "every_days": 3, "day": 0 },
+      { "q": "backend engineer", "location": "Dubai,Dubai,United Arab Emirates", "every_days": 3, "day": 1 },
+      { "q": "ai engineer", "location": "Dubai,Dubai,United Arab Emirates", "every_days": 3, "day": 2 },
       { "q": "software engineer python", "location": "Abu Dhabi,Abu Dhabi,United Arab Emirates", "every_days": 3, "day": 1 },
-      { "q": "software engineer python", "location": "Doha,Doha Municipality,Qatar", "every_days": 3, "day": 2 }
+      { "q": "backend engineer", "location": "Abu Dhabi,Abu Dhabi,United Arab Emirates", "every_days": 3, "day": 2 },
+      { "q": "ai engineer", "location": "Abu Dhabi,Abu Dhabi,United Arab Emirates", "every_days": 3, "day": 0 },
+      { "q": "software engineer python", "location": "Doha,Doha Municipality,Qatar", "every_days": 3, "day": 2 },
+      { "q": "backend engineer", "location": "Doha,Doha Municipality,Qatar", "every_days": 3, "day": 0 },
+      { "q": "ai engineer", "location": "Doha,Doha Municipality,Qatar", "every_days": 3, "day": 1 },
+      { "q": "software engineer", "location": "Beirut,Beirut Governorate,Lebanon", "every_days": 2, "day": 0 },
+      { "q": "backend developer", "location": "Beirut,Beirut Governorate,Lebanon", "every_days": 2, "day": 1 },
+      { "q": "ai engineer", "location": "Beirut,Beirut Governorate,Lebanon", "every_days": 2, "day": 0 },
+      { "q": "full stack developer", "location": "Beirut,Beirut Governorate,Lebanon", "every_days": 2, "day": 1 }
     ],
     "pages_per_query": 1
   },
@@ -146,11 +151,12 @@
     "limit": 100
   },
   "himalayas": {
-    "_note": "country=LB makes Himalayas return jobs that list Lebanon or list no countries. No countries is treated as unknown, not worldwide.",
+    "_note": "country=LB makes Himalayas return jobs that list Lebanon or list no countries. No countries is treated as unknown, not worldwide. 2026-10-19: the best source (most applied-to jobs) searched only Python/backend words; added the profile's other target roles.",
     "enabled": true,
     "limit": 100,
     "country": "LB",
-    "queries": ["python backend", "python engineer", "backend engineer", "fastapi", "django", "trading systems"]
+    "queries": ["python backend", "python engineer", "backend engineer", "fastapi", "django", "trading systems",
+                "software engineer", "full stack", "ai engineer", "forward deployed", "solutions engineer", "automation engineer"]
   },
   "remoteok": {
     "_note": "The API returns its latest ~100 jobs only. 'queries' is a local filter on title + tags.",

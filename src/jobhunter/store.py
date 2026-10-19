@@ -17,6 +17,8 @@ report can always be rebuilt and two runs on one day share one file.
 
 jobs.ai_check_json is the AI web check's finding (ai_check.py). It is kept
 apart from the rule verdict so `reclassify` can combine the two again.
+jobs.fit_grade_json is the AI fit grade (fitgrade.py): only for sorting, never
+part of the status, so `reclassify` leaves it alone.
 """
 
 from __future__ import annotations
@@ -216,7 +218,8 @@ CREATE TABLE IF NOT EXISTS kv (
 """
 
 # Columns added after the first release, for databases created before them.
-_ADDED_COLUMNS = {"report_date": "TEXT", "ai_check_json": "TEXT"}
+_ADDED_COLUMNS = {"report_date": "TEXT", "ai_check_json": "TEXT", "fit_grade_json": "TEXT"}
+_ADDED_APPLICATION_COLUMNS = ("cv_file", "cv_tailored_json", "cover_letter_json", "skip_reason", "skip_note")
 
 # Filled from a later sighting only when the stored value is empty.
 _FILL_IF_EMPTY = (
@@ -324,7 +327,7 @@ class JobStore:
             if column not in existing:
                 self.conn.execute(f"ALTER TABLE jobs ADD COLUMN {column} {kind}")
         app_columns = {row["name"] for row in self.conn.execute("PRAGMA table_info(applications)")}
-        for column in ("cv_file", "cv_tailored_json", "cover_letter_json"):
+        for column in _ADDED_APPLICATION_COLUMNS:
             if column not in app_columns:
                 self.conn.execute(f"ALTER TABLE applications ADD COLUMN {column} TEXT")
         self.conn.execute("CREATE INDEX IF NOT EXISTS jobs_report_date ON jobs (report_date)")
@@ -439,6 +442,9 @@ class JobStore:
 
     def save_ai_check(self, job_id: int, check: AiCheck) -> None:
         self.conn.execute("UPDATE jobs SET ai_check_json = ? WHERE id = ?", (json.dumps(asdict(check)), job_id))
+
+    def save_fit_grade(self, job_id: int, grade: dict) -> None:
+        self.conn.execute("UPDATE jobs SET fit_grade_json = ? WHERE id = ?", (json.dumps(grade), job_id))
 
     def update_classification(self, job_id: int, cls: Classification) -> None:
         values = _classification_values(cls)

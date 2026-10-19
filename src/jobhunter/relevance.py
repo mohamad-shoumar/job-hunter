@@ -19,10 +19,14 @@ from __future__ import annotations
 import re
 
 from .config import Filters
+from .extract import find_required_yoe
 from .models import IRRELEVANT, MATCH, MAYBE, Assessment, Job
 from .text import has_phrase, normalize_words
 
 _PYTHON_FAMILY = {"python", "fastapi", "django", "flask"}
+# "AI Harness Engineer", "AI-Native Engineer", "LLM Platform Developer": AI-building roles named
+# too many ways to list. Checked after the exclusions, so "AI Sales Engineer" stays out.
+_AI_ROLE = re.compile(r"\b(?:ai|llm|genai|agentic)\b(?:\s+[a-z0-9+#]+){0,3}?\s+(?:engineer|developer)\b")
 _GENDER_MARKER = re.compile(r"\(\s*(?:[mfwdxh]\s*/\s*){1,3}[mfwdxh]\s*\)|\(\s*all genders\s*\)", re.I)
 # Separators that join two ROLES ("Frontend / Backend Engineer"). Commas are
 # left alone: "Software Engineer, Frontend" is one role and its team.
@@ -73,9 +77,12 @@ def check_title(raw_title: str, filters: Filters) -> tuple[bool, str, str]:
             blocked = blocked or specialty
             continue
         keyword = _first(candidate, filters.title_include)
+        suffix = " (one of several roles in the title)" if i else ""
         if keyword:
-            suffix = " (one of several roles in the title)" if i else ""
             return True, f'Title matches "{keyword}"{suffix}', ""
+        ai_role = _AI_ROLE.search(candidate)
+        if ai_role:
+            return True, f'Title is an AI engineering role ("{ai_role.group(0)}"){suffix}', ""
     if blocked:
         return False, f'Title contains "{blocked}"', "title_excluded"
     return False, "Title is not a target role", "title_not_target"
@@ -93,10 +100,12 @@ def assess_relevance(job: Job, filters: Filters) -> tuple[Assessment, int]:
 
     reasons = [reason]
     yoe = job.required_yoe
+    found = find_required_yoe(job.description) if yoe is not None else None
+    said = f': "{found[1]}"' if found and found[0] == yoe else ""
     if yoe is not None and filters.reject_if_required_yoe_at_least and yoe >= filters.reject_if_required_yoe_at_least:
-        return Assessment(IRRELEVANT, [f"Asks for {yoe}+ years of experience"], "too_senior"), score
+        return Assessment(IRRELEVANT, [f"Asks for {yoe}+ years of experience{said}"], "too_senior"), score
     if yoe is not None and filters.stretch_yoe_at_least and yoe >= filters.stretch_yoe_at_least:
-        reasons.append(f"Asks for {yoe}+ years (a stretch)")
+        reasons.append(f"Asks for {yoe}+ years (a stretch){said}")
 
     if has_phrase(normalize_words(job.title), "python") or _PYTHON_FAMILY & set(job.skills):
         reasons.append("Python stack")

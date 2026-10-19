@@ -191,3 +191,8 @@ form.inline { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 6px; 
   .kv { grid-template-columns: 1fr; }
   .board { grid-template-columns: repeat(8, 78vw); }
 }
+
+/* skip reasons */
+.skip-picker { margin-top: 6px; padding: 8px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel-2); }
+.skip-picker .row { flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.skip-picker .skip-note { margin-top: 6px; width: 100%; }

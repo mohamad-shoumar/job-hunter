@@ -191,3 +191,23 @@ def test_filter_by_years_asked_and_date_posted(client, home, filters):
     assert rows["Twoyears"]["required_yoe"] == 2 and rows["Acme"]["required_yoe"] is None
     assert client.get("/api/jobs?yoe=3").status_code == 400
     assert client.get("/api/jobs?days=-1").status_code == 400
+
+
+def test_skip_with_a_reason_for_the_fit_grade(client):
+    assert client.get("/api/status").json()["skip_reasons"]["too_senior"] == "Too senior"
+    body = {"stage": "closed", "reason": "skipped", "skip_reason": "wrong_stack", "skip_note": "mostly Go"}
+    detail = client.post("/api/jobs/1/stage", json=body, headers=AUTH).json()
+    assert (detail["application"]["skip_reason"], detail["application"]["skip_note"]) == ("wrong_stack", "mostly Go")
+    assert client.post("/api/jobs/1/stage", json={**body, "skip_reason": "nope"}, headers=AUTH).status_code == 400
+    closed = client.get("/api/jobs?view=closed").json()["jobs"]
+    assert [(j["id"], j["skip_reason"]) for j in closed] == [(1, "wrong_stack")]
+
+
+def test_lists_carry_the_fit_grade_and_put_the_best_first(client, home):
+    store = JobStore(home / "data" / "jobs.sqlite")
+    store.save_fit_grade(2, {"grade": 5, "reason": "Python backend, 3+ years.", "model": "m", "at": "x"})
+    store.save_fit_grade(1, {"grade": 2, "reason": "Asks for 7+ years.", "model": "m", "at": "x"})
+    store.close()
+    jobs = client.get("/api/jobs?view=shortlisted").json()["jobs"]
+    assert [(j["id"], j["fit_grade"]["grade"]) for j in jobs] == [(2, 5), (1, 2)]
+    assert client.get("/api/jobs/2").json()["job"]["fit_grade"]["reason"] == "Python backend, 3+ years."

@@ -23,6 +23,14 @@ from .conftest import make_job
         "Algorithmic Trading Engineer",
         "AI agent engineer",
         "Senior Full-Stack Developer - Marketplace Web & Mobile Platform",
+        # Missed before 2026-10-19: postings open to Lebanon that died on the title.
+        "AI Harness Engineer (100% Remote, Worldwide)",
+        "AI-Native Engineers & Operators",
+        "AI Experience Engineer (Conversational AI)",
+        "Cloud Platform Engineer",
+        "Senior Web Engineer",
+        "Low-code / No-code Automation Developer",
+        "Microservices Engineer",
     ],
 )
 def test_target_titles_pass(title, filters):
@@ -44,6 +52,13 @@ def test_target_titles_pass(title, filters):
         ("Software Engineer (m/f/d) – Go / Cloud-Native IMS", "other_stack"),
         ("Account Executive", "title_not_target"),
         ("Data Analyst", "title_not_target"),
+        # The AI-role rule comes after the exclusions, and needs a role noun.
+        ("AI Sales Engineer, (EMEA)", "title_excluded"),
+        ("AI Security Engineer", "title_excluded"),
+        ("Backend Engineering Specialist - AI Trainer", "title_excluded"),
+        ("AI Growth Ops", "title_not_target"),
+        ("Machine Learning Engineer", "title_not_target"),
+        ("Technical Lead", "title_not_target"),
     ],
 )
 def test_other_titles_are_rejected(title, code, filters):
@@ -68,6 +83,12 @@ def test_years_of_experience(filters):
     assert assess_relevance(too_many, filters)[0].code == "too_senior"
     assessment, _ = assess_relevance(stretch, filters)
     assert assessment.verdict == MATCH and any("stretch" in r for r in assessment.reasons)
+
+
+def test_years_reason_quotes_the_posting(filters):
+    job = enrich(make_job(description="We ship fast. 7+ years building production backend systems. Remote."))
+    assessment, _ = assess_relevance(job, filters)
+    assert assessment.reasons == ['Asks for 7+ years of experience: "7+ years building production backend systems."']
 
 
 def test_fit_score_counts_profile_skills(filters):

@@ -36,6 +36,10 @@ class Paths:
         return self.root / "config" / "outreach.json"
 
     @property
+    def fit_grade_file(self) -> Path:
+        return self.root / "config" / "fit_grade.json"
+
+    @property
     def profile_file(self) -> Path:
         return self.root / "profile" / "master_profile.md"
 

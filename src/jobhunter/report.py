@@ -13,6 +13,7 @@ import sqlite3
 from datetime import date, datetime
 from pathlib import Path
 
+from .fitgrade import grade_of, sort_grade
 from .models import ELIGIBLE, LIKELY, NEEDS_REVIEW, REJECTED, SHORTLISTED, VISA_LIST
 from .store import JobStore
 
@@ -99,6 +100,9 @@ def _job_block(n: int, row: sqlite3.Row, sightings: list[sqlite3.Row], prepared:
         f"- **{label}:** {row['eligibility']} — {reasons[0] if reasons else ''}",
     ]
     lines += [f"  - {r}" for r in reasons[1:]]
+    grade = grade_of(row)
+    if grade:
+        lines.append(f"- **Fit grade:** {grade['grade']}/5 — {grade['reason']}")
     lines.append(f"- **Fit:** {row['fit_score']} · {'; '.join(relevance)}" + (f" · {', '.join(skills[:10])}" if skills else ""))
     lines.append(f"- **Details:** {' · '.join(details)}")
     if row["location_raw"]:
@@ -113,7 +117,8 @@ def _job_block(n: int, row: sqlite3.Row, sightings: list[sqlite3.Row], prepared:
 
 
 def _sort_key(row: sqlite3.Row):
-    return (_ELIGIBILITY_ORDER.get(row["eligibility"], 2), -row["fit_score"], row["posted_at"] or "")
+    """Best AI fit grade first (fitgrade.py; none counts as 0), then how sure the Lebanon verdict is."""
+    return (-sort_grade(row), _ELIGIBILITY_ORDER.get(row["eligibility"], 2), -row["fit_score"], row["posted_at"] or "")
 
 
 def _rejected_section(rows: list[sqlite3.Row], max_age: int | None) -> list[str]:
@@ -204,6 +209,14 @@ def render(day: str, rows: list[sqlite3.Row], sightings: dict[int, list[sqlite3.
             out += [f"**AI check** ({ai['model']}): {ai['checked']} checked ({verdicts}), about ${ai['cost_usd']:.2f}", ""]
             out += [f"- {_cell(line)}" for line in ai["notes"] + ai["errors"]]
             out += [""] if ai["notes"] or ai["errors"] else []
+        fit = summary.get("fit_grade")
+        if fit:
+            grades = ", ".join(f"{n}× {g}/5" for g, n in sorted(fit["grades"].items(), reverse=True)) or "none"
+            learned = f", learning from {fit['examples']}" if fit.get("examples") else ""
+            out += [f"**Fit grades** ({fit['model']}{learned}): {fit['graded']} graded ({grades}), "
+                    f"about ${fit['cost_usd']:.2f}", ""]
+            out += [f"- {_cell(line)}" for line in fit["notes"] + fit["errors"]]
+            out += [""] if fit["notes"] or fit["errors"] else []
         outreach = summary.get("outreach")
         if outreach:
             parts = []

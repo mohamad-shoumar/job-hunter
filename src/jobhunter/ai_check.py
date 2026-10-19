@@ -121,6 +121,8 @@ class AiCheckConfig:
     web_model: str = ""
     web_timeout: int = 420
     max_jobs_per_run: int = 25
+    # The daily run also checks unchecked jobs from this many days back, so a busy day's leftovers are not stuck.
+    lookback_days: int = 7
     max_searches_per_job: int = 4
     max_fetches_per_job: int = 3
     max_page_tokens: int = 12000

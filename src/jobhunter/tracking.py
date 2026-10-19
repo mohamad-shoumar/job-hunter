@@ -40,6 +40,17 @@ STAGE_LABELS = {
     INTERVIEWING: "Interviewing", OFFER: "Offer", CLOSED: "Closed",
 }
 CLOSED_REASONS = ("rejected", "ghosted", "skipped")
+# Why you skipped a job: one tap, plus an optional note in your own words. The fit grade
+# (fitgrade.py) shows these to the model with the job, so later grades follow them.
+SKIP_REASONS = {
+    "too_senior": "Too senior",
+    "wrong_stack": "Wrong stack",
+    "not_open": "Not open to me",
+    "junk": "Agency, repost or gig",
+    "not_my_role": "Not my kind of role",
+    "low_pay": "Pay too low",
+    "other": "Other",
+}
 
 # Stages a reply can move a job out of. Interviewing/offer are ahead of a reply already.
 _BEFORE_REPLY = {NEW, SAVED, REACHED_OUT, CLOSED}
@@ -115,20 +126,28 @@ def _stage_label(stage: str, reason: str | None) -> str:
 
 
 def set_stage(store: JobStore, job_id: int, stage: str, now: datetime, reason: str | None = None,
-              detail: str = "") -> sqlite3.Row:
+              detail: str = "", skip_reason: str | None = None, skip_note: str = "") -> sqlite3.Row:
+    """`skip_reason` (a SKIP_REASONS key) and `skip_note` only when closing as skipped; both optional."""
     if stage not in STAGES:
         raise TrackingError(f"unknown stage {stage!r}")
     if stage == CLOSED and reason not in CLOSED_REASONS:
         raise TrackingError(f"closing needs a reason: {', '.join(CLOSED_REASONS)}")
+    if skip_reason and skip_reason not in SKIP_REASONS:
+        raise TrackingError(f"unknown skip reason {skip_reason!r}: {', '.join(SKIP_REASONS)}")
     row = ensure_application(store, job_id, now)
     reason = reason if stage == CLOSED else None
-    if row["stage"] == stage and row["closed_reason"] == reason:
+    skipped = reason == "skipped"
+    why = (skip_reason or None) if skipped else None
+    note = " ".join((skip_note or "").split())[:300] if skipped else ""
+    if row["stage"] == stage and row["closed_reason"] == reason and (
+            not skipped or (row["skip_reason"], row["skip_note"] or "") == (why, note)):
         return row
     # next_follow_up_at is kept: follow-ups are only shown for jobs in "reached
     # out", so moving a job away and back restores its schedule.
-    _update(store, job_id, {"stage": stage, "closed_reason": reason}, now)
+    _update(store, job_id, {"stage": stage, "closed_reason": reason, "skip_reason": why, "skip_note": note or None}, now)
     text = f"{_stage_label(row['stage'], row['closed_reason'])} → {_stage_label(stage, reason)}"
-    add_event(store, job_id, "stage", text + (f": {detail}" if detail else ""), now)
+    said = ", ".join(x for x in (SKIP_REASONS.get(why or ""), note) if x)
+    add_event(store, job_id, "stage", text + (f": {said}" if said else "") + (f": {detail}" if detail else ""), now)
     return get_application(store, job_id)
 
 
@@ -270,19 +289,21 @@ def today(store: JobStore, now: datetime, config: OutreachConfig) -> dict:
     week_ago = iso(now - timedelta(days=7))
     new_jobs = store.conn.execute(
         """
-        SELECT j.id, j.title, j.company, j.status, j.fit_score, j.report_date FROM jobs j
+        SELECT j.id, j.title, j.company, j.status, j.fit_score, j.report_date,
+               json_extract(j.fit_grade_json, '$.grade') AS fit_grade FROM jobs j
         LEFT JOIN applications a ON a.job_id = j.id
         WHERE (a.job_id IS NULL OR a.stage = 'new') AND j.status = 'shortlisted' AND j.first_seen >= ?
-        ORDER BY j.fit_score DESC, j.id DESC
+        ORDER BY COALESCE(json_extract(j.fit_grade_json, '$.grade'), 0) DESC, j.fit_score DESC, j.id DESC
         """,
         (week_ago,),
     ).fetchall()
     new_visa = store.conn.execute(
         """
-        SELECT j.id, j.title, j.company, j.status, j.fit_score, j.report_date FROM jobs j
+        SELECT j.id, j.title, j.company, j.status, j.fit_score, j.report_date,
+               json_extract(j.fit_grade_json, '$.grade') AS fit_grade FROM jobs j
         LEFT JOIN applications a ON a.job_id = j.id
         WHERE (a.job_id IS NULL OR a.stage = 'new') AND j.status = 'visa_list' AND j.first_seen >= ?
-        ORDER BY j.fit_score DESC, j.id DESC
+        ORDER BY COALESCE(json_extract(j.fit_grade_json, '$.grade'), 0) DESC, j.fit_score DESC, j.id DESC
         """,
         (week_ago,),
     ).fetchall()

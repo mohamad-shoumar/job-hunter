@@ -25,6 +25,7 @@ from .ai_check import AiChecker, build_checker, check_jobs
 from .classify import classify
 from .config import Filters, OutreachConfig
 from .extract import enrich
+from .fitgrade import FitGrader, build_grader, grade_jobs, to_grade
 from .http import Http
 from .models import NEEDS_REVIEW, UNCLEAR, Job
 from .outreach import run_outreach
@@ -54,6 +55,7 @@ class RunSummary:
     reject_codes: Counter = field(default_factory=Counter)
     config_notes: list[str] = field(default_factory=list)
     ai_check: dict | None = None
+    fit_grade: dict | None = None
     outreach: dict | None = None
     boards: dict | None = None
     # Job ids this run touched (new or seen again), and the new ones. Not saved.
@@ -77,6 +79,7 @@ class RunSummary:
             "reject_codes": dict(self.reject_codes),
             "config_notes": self.config_notes,
             "ai_check": self.ai_check,
+            "fit_grade": self.fit_grade,
             "outreach": self.outreach,
             "boards": self.boards,
         }
@@ -140,6 +143,12 @@ def local_day(dt: datetime) -> date:
 
 def days_between(start: date, end: date) -> list[str]:
     return [(start + timedelta(days=i)).isoformat() for i in range((end - start).days + 1)]
+
+
+def recent_days(now: datetime, count: int) -> list[str]:
+    """Today and the `count - 1` days before it (at least today)."""
+    today = local_day(now)
+    return days_between(today - timedelta(days=max(1, count) - 1), today)
 
 
 def assign_daily(store: JobStore, summary: RunSummary, now: datetime) -> list[str]:
@@ -206,8 +215,10 @@ def refresh_sponsors(root_paths, filters: Filters, http: Http, now: datetime, su
 def run(root_paths, sources_config: dict, filters: Filters, only: set[str] | None = None,
         skip: set[str] | None = None, report: bool = True, http: Http | None = None, now: datetime | None = None,
         date_range: tuple[date, date] | None = None, ai: bool = True,
-        ai_checker: AiChecker | None = None, outreach: bool = True) -> tuple[RunSummary, list[Path]]:
-    """ai=False skips every Claude call. ai_checker overrides the one built from config/ai_check.json.
+        ai_checker: AiChecker | None = None, outreach: bool = True,
+        fit_grader: FitGrader | None = None) -> tuple[RunSummary, list[Path]]:
+    """ai=False skips every model call. ai_checker and fit_grader override the ones built from
+    config/ai_check.json and config/fit_grade.json.
 
     outreach=False skips contacts, drafts and the inbox check (outreach.py). `skip` leaves those sources out
     (the morning run skips serpapi, whose credits last only for one run a day).
@@ -216,6 +227,10 @@ def run(root_paths, sources_config: dict, filters: Filters, only: set[str] | Non
     sources, config_notes = build_sources(sources_config)
     if ai and ai_checker is None:
         ai_checker, note = build_checker(root_paths.ai_check_file)
+        if note:
+            config_notes.append(note)
+    if ai and fit_grader is None:
+        fit_grader, note = build_grader(root_paths.fit_grade_file)
         if note:
             config_notes.append(note)
     watch = boards.WatchConfig.from_sources(sources_config)
@@ -253,7 +268,23 @@ def run(root_paths, sources_config: dict, filters: Filters, only: set[str] | Non
         else:
             days = assign_daily(store, summary, now)
         if ai and ai_checker:
-            ai_check_days(store, ai_checker, days, filters, now, summary)
+            # A daily run also looks back, so jobs over one day's cap are checked on the next days.
+            check_days = days if date_range else recent_days(now, ai_checker.config.lookback_days)
+            ai_check_days(store, ai_checker, check_days, filters, now, summary)
+        if ai and fit_grader and not date_range:
+            # After the AI check (it can move a job to the shortlist), before the CVs (made best grade first).
+            try:
+                rows = to_grade(store, now, fit_grader.config.lookback_days)
+                result = grade_jobs(store, fit_grader, rows[:fit_grader.config.max_jobs_per_run],
+                                    root_paths.profile_file, now)
+                if len(rows) > fit_grader.config.max_jobs_per_run:
+                    result.notes.append(f"{len(rows) - fit_grader.config.max_jobs_per_run} more left for the next "
+                                        "run or `jobhunter grade`")
+                summary.fit_grade = result.to_dict()
+            except Exception as exc:  # grades only sort: the run goes on without them
+                log.exception("fit grade step failed")
+                summary.fit_grade = {"graded": 0, "grades": {}, "errors": [f"fit grade: {describe_error(exc)}"],
+                                     "notes": [], "cost_usd": 0, "model": fit_grader.label, "examples": ""}
         if watch.enabled:
             # After the AI check, so a job it shortlisted counts too. New boards are fetched from the next run.
             try:

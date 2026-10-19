@@ -16,6 +16,7 @@ from .ai_check import build_checker, check_jobs
 from .classify import classify, recheck_age
 from .config import Filters, Paths, load_dotenv, load_json, resolve_root
 from .extract import enrich
+from .fitgrade import build_grader, grade_jobs, to_grade
 from .report import write_report
 from .sources import build_sources
 from .models import NEEDS_REVIEW
@@ -196,6 +197,43 @@ def cmd_report(args) -> int:
     finally:
         store.close()
     return 0
+
+
+def cmd_grade(args) -> int:
+    """AI fit grade for shown jobs: given ids, or the open (New or Saved) ungraded ones from the last days."""
+    paths, _, filters = _load(args)
+    grader, note = build_grader(paths.fit_grade_file, require_enabled=False)
+    if grader is None:
+        raise SystemExit(note or "fit grades are off")
+    now = utcnow()
+    store = JobStore(paths.db_file)
+    try:
+        if args.job_ids:
+            rows = [row for row in (store.get(i) for i in args.job_ids) if row]
+        else:
+            rows = to_grade(store, now, args.days or grader.config.lookback_days, regrade=args.regrade)
+        waiting = len(rows)
+        rows = rows[: args.limit or None] if not args.job_ids else rows
+        if not rows:
+            print("nothing to grade")
+            return 0
+        print(f"grading {len(rows)} of {waiting} jobs with {grader.label}\n")
+
+        def show(row, grade):
+            print(f"#{row['id']:<5} {grade['grade']}/5  {row['company']} — {row['title']}")
+            print(f"       {grade['reason']}")
+
+        result = grade_jobs(store, grader, rows, paths.profile_file, now, on_result=show)
+        rebuilt = [write_report(store, paths.reports_dir, day, store.last_run_stats(), now, filters.max_posting_age_days)
+                   for day in sorted(result.changed_days)]
+    finally:
+        store.close()
+    print(f"\n{result.graded} graded (learning from {result.examples or 'no examples'}), about ${result.cost_usd:.3f}")
+    for line in result.notes + result.errors:
+        print(f"  {line}")
+    for path in rebuilt:
+        print(f"rebuilt {path}")
+    return 1 if result.errors and not result.graded else 0
 
 
 def cmd_check(args) -> int:
@@ -595,8 +633,9 @@ def main(argv: list[str] | None = None) -> int:
 
     p = sub.add_parser(
         "check",
-        help="AI web check: can the company hire from Lebanon? (needs_review jobs, needs ANTHROPIC_API_KEY)",
-        description="Claude searches the web for each job and returns a verdict with a quote. The quote must be "
+        help="AI web check: can the company hire from Lebanon? (needs_review jobs; models in config/ai_check.json)",
+        description="The model in config/ai_check.json reads the job's pages (DeepSeek), then searches the web for "
+        "the ones it could not settle (web_model, e.g. Claude Code), and returns a verdict with a quote. The quote must be "
         "found word for word on the page before it changes a job's status. Without ids: the unchecked "
         "needs_review jobs, newest first, up to max_jobs_per_run from config/ai_check.json.",
     )
@@ -604,6 +643,20 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--limit", type=int, metavar="N", help="check at most N jobs (default: max_jobs_per_run)")
     p.add_argument("--recheck", action="store_true", help="include jobs already checked (unknown or unverified)")
     p.set_defaults(func=cmd_check)
+
+    p = sub.add_parser(
+        "grade",
+        help="AI fit grade 1-5 for shown jobs, learned from your Applied and skipped jobs (sorting only)",
+        description="Each grade is one model call that reads your profile's facts, `preferences` in "
+        "config/fit_grade.json, and your latest Applied and skipped jobs (with your skip reasons). It only "
+        "sorts: it never changes a job's status. Without ids: the open (New or Saved) shortlisted, needs-review "
+        "and visa-list jobs from the last lookback_days that have no grade yet.",
+    )
+    p.add_argument("job_ids", type=int, nargs="*", help="grade these jobs (again, if already graded)")
+    p.add_argument("--regrade", action="store_true", help="grade open jobs again with today's examples")
+    p.add_argument("--days", type=int, metavar="N", help="look back N report days (default: lookback_days)")
+    p.add_argument("--limit", type=int, metavar="N", help="grade at most N jobs")
+    p.set_defaults(func=cmd_grade)
 
     p = sub.add_parser("report", help="rebuild reports/<date>.md from the database")
     p.add_argument("--date", type=_date, metavar="YYYY-MM-DD",

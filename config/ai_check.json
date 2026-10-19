@@ -9,6 +9,8 @@
   "web_timeout": 420,
   "_max_jobs_per_run": "A cap per daily run. The rest wait for the next run or `jobhunter check`.",
   "max_jobs_per_run": 25,
+  "_lookback_days": "The daily run checks unchecked jobs from today and the days before, newest first, up to max_jobs_per_run. Before 2026-10-19 it checked only today's, so a busy day's leftovers waited forever.",
+  "lookback_days": 7,
   "max_searches_per_job": 4,
   "_max_fetches_per_job": "Pages code fetches for DeepSeek (and the Claude API may open).",
   "max_fetches_per_job": 3,

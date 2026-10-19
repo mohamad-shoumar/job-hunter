@@ -58,9 +58,34 @@ function stageLabel(stage, reason) {
   const labels = state.status?.stage_labels || {};
   return (labels[stage] || stage) + (stage === "closed" && reason ? ` (${reason})` : "");
 }
-function stageChip(stage, reason) {
+function stageChip(stage, reason, skipReason) {
   if (!stage || stage === "new") return "";
-  return `<span class="chip ${STAGE_CHIP[stage] || ""}">${esc(stageLabel(stage, reason))}</span>`;
+  const why = reason === "skipped" && skipReason ? `: ${(state.status?.skip_reasons || {})[skipReason] || skipReason}` : "";
+  return `<span class="chip ${STAGE_CHIP[stage] || ""}">${esc(stageLabel(stage, reason))}${esc(why)}</span>`;
+}
+// The AI fit grade (sorting only): 1-5, its one-sentence reason on hover.
+function gradeChip(g) {
+  if (!g) return "";
+  const tone = g.grade >= 4 ? "good" : g.grade <= 2 ? "warn" : "";
+  return `<span class="chip ${tone}" title="${esc(g.reason)}">grade ${g.grade}/5</span>`;
+}
+function byGrade(a, b) {
+  return (b.fit_grade?.grade || 0) - (a.fit_grade?.grade || 0);
+}
+// Why you skip a job: one tap, plus an optional note. The fit grade learns from these.
+function skipPicker(id) {
+  const reasons = Object.entries(state.status?.skip_reasons || {});
+  return `<div class="skip-picker" data-skip-job="${id}">
+    <div class="small muted">Why skip it? The fit grade learns from this.</div>
+    <input class="skip-note" placeholder="In your own words (optional), then pick a reason">
+    <div class="row">${reasons.map(([key, label]) => `<button class="btn small" data-skip-reason="${key}">${esc(label)}</button>`).join("")}</div>
+  </div>`;
+}
+function toggleSkipPicker(anchor, id) {
+  const open = anchor.parentElement.querySelector(`.skip-picker[data-skip-job="${id}"]`);
+  if (open) return open.remove();
+  anchor.insertAdjacentHTML("afterend", skipPicker(id));
+  anchor.parentElement.querySelector(".skip-note")?.focus();
 }
 const EMAIL_BADGE = {
   verified: ["good", "verified"], manual: ["good", "added by you"], found: ["info", "found (not verified)"],
@@ -197,11 +222,12 @@ function jobRow(j) {
       <div>
         <div class="job-title">${esc(j.title)}</div>
         <div class="muted">${esc(j.company)} · <span class="small">${esc(j.reason)}</span></div>
-        <div class="job-meta" style="margin-top:4px">${statusChip(j.status, j.eligibility)} ${stageChip(j.stage, j.closed_reason)} ${contactChip(j)}
+        <div class="job-meta" style="margin-top:4px">${statusChip(j.status, j.eligibility)} ${stageChip(j.stage, j.closed_reason, j.skip_reason)} ${contactChip(j)}
           ${j.has_draft ? `<span class="chip ${j.draft_blocked ? "bad" : ""}">${j.draft_blocked ? "draft needs edit" : "draft ready"}</span>` : ""}
           ${j.has_cv ? `<span class="chip">CV tailored</span>` : ""}${j.has_cover ? ` <span class="chip">cover letter</span>` : ""}</div>
       </div>
       <div class="job-side">
+        ${gradeChip(j.fit_grade)}
         <span class="chip" title="Fit score from your skills">fit ${j.fit}</span>
         ${j.required_yoe ? `<span class="small" title="Years of experience the posting asks for">${j.required_yoe}+ yrs</span>` : ""}
         ${j.salary ? `<span class="small">${esc(j.salary)}</span>` : ""}
@@ -260,8 +286,8 @@ function renderDrawer() {
       <div class="grow">
         <h2>${esc(j.title)}</h2>
         <div class="muted">${esc(co.name)} · job #${j.id}</div>
-        <div class="job-meta" style="margin-top:6px">${statusChip(j.status, j.eligibility)} ${stageChip(stage, app.closed_reason)}
-          <span class="chip">fit ${j.fit}</span></div>
+        <div class="job-meta" style="margin-top:6px">${statusChip(j.status, j.eligibility)} ${stageChip(stage, app.closed_reason, app.skip_reason)}
+          ${gradeChip(j.fit_grade)} <span class="chip">fit ${j.fit}</span></div>
       </div>
       <button class="btn" data-action="close" title="Close (Esc)">✕</button>
     </div>
@@ -296,6 +322,7 @@ function whySection(d) {
       <ul class="small">${j.eligibility_reasons.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>
       ${ai ? `<div class="small"><b>AI check:</b> ${esc(ai.verdict)}${ai.verified ? "" : " (quote not verified)"} · ${esc(ai.reason)}
         ${ai.quote ? `<div class="quote">“${esc(ai.quote)}” ${ai.source_url ? `<a href="${esc(ai.source_url)}" target="_blank" rel="noopener">source</a>` : ""}</div>` : ""}</div>` : ""}
+      ${j.fit_grade ? `<div style="margin-top:6px"><b>Fit grade ${j.fit_grade.grade}/5</b> <span class="small muted">${esc(j.fit_grade.reason)} (${esc(j.fit_grade.model)}, from your Applied and skipped jobs)</span></div>` : ""}
       <div style="margin-top:6px"><b>Fit ${j.fit}</b> <span class="small muted">${esc(j.relevance_reasons.join("; "))}</span></div>
       <div class="small muted">${esc(j.skills.join(", "))}</div>
       <div class="kv small" style="margin-top:8px">${details.map(([k, v]) => `<div>${esc(k)}</div><div>${esc(v)}</div>`).join("")}</div>
@@ -521,6 +548,7 @@ async function drawerAction(action, el) {
   const id = state.jobId;
   const d = state.detail;
   if (action === "close") return closeDrawer();
+  if (action === "stage" && el.dataset.reason === "skipped") return toggleSkipPicker(el.parentElement, id);
   if (action === "stage") {
     const detail = await busy(el, "…", () => api(`/api/jobs/${id}/stage`, { method: "POST", body: { stage: el.dataset.stage, reason: el.dataset.reason } }));
     return setDetail(detail, `Moved to ${stageLabel(el.dataset.stage, el.dataset.reason)}`);
@@ -657,9 +685,9 @@ async function renderToday() {
     <div class="cards">
       ${card("Replies to answer", t.replies.map((r) => item(r, `<div class="quote">${esc(r.reply_from || "")}: ${esc(r.reply_snippet || "")}</div>`)), "No new replies. Click Check inbox to look.")}
       ${card("Follow-ups due", t.follow_ups_due.map((r) => item(r, `<div class="small muted">to ${esc(r.email || "?")} · follow-up ${r.follow_ups + 1} · due ${esc(day(r.next_follow_up_at))}</div>`)), "Nothing due.")}
-      ${card("New shortlisted to triage", t.new_jobs.map((r) => item(r, ` <span class="chip">fit ${r.fit_score}</span>
+      ${card("New shortlisted to triage", t.new_jobs.map((r) => item(r, ` ${r.fit_grade ? `<span class="chip">grade ${r.fit_grade}/5</span>` : ""} <span class="chip">fit ${r.fit_score}</span>
         <span class="row" style="margin-top:4px"><button class="btn small" data-quick="saved" data-id="${r.id}">Save</button><button class="btn small danger" data-quick="skipped" data-id="${r.id}">Skip</button></span>`)), "All caught up.")}
-      ${card("New on the visa list (EU/UK)", (t.new_visa_jobs || []).map((r) => item(r, ` <span class="chip">fit ${r.fit_score}</span>
+      ${card("New on the visa list (EU/UK)", (t.new_visa_jobs || []).map((r) => item(r, ` ${r.fit_grade ? `<span class="chip">grade ${r.fit_grade}/5</span>` : ""} <span class="chip">fit ${r.fit_score}</span>
         <span class="row" style="margin-top:4px"><button class="btn small" data-quick="saved" data-id="${r.id}">Save</button><button class="btn small danger" data-quick="skipped" data-id="${r.id}">Skip</button></span>`)), "None this week.")}
       ${t.unsure_sends.length ? card("Sends to double-check", t.unsure_sends.map((r) => item(r, `<div class="small muted">Gmail didn't confirm ${esc(r.subject)}: Check inbox resolves it.</div>`)), "") : ""}
       ${card("Ghosted this week", t.ghosted.map((r) => item(r, `<div class="small muted">closed ${esc(day(r.at))}</div>`)), "None.")}
@@ -688,7 +716,7 @@ async function renderPipeline() {
   const [open, visa, tracked, closed] = await Promise.all([
     api("/api/jobs?view=shortlisted"), api("/api/jobs?view=visa_list&days=2"), api("/api/jobs?view=tracked"), api("/api/jobs?view=closed"),
   ]);
-  const toApply = [...open.jobs, ...visa.jobs].filter((j) => !j.stage || j.stage === "new");
+  const toApply = [...open.jobs, ...visa.jobs].filter((j) => !j.stage || j.stage === "new").sort(byGrade);
   const jobs = [...toApply, ...tracked.jobs, ...closed.jobs];
   const options = (current) => BOARD.map((c) => `<option value="${c.key}" ${c.key === current ? "selected" : ""}>${esc(c.label || stageLabel(c.stage))}</option>`).join("");
   $("#main").innerHTML = `<div class="board">${BOARD.map((col) => {
@@ -699,12 +727,13 @@ async function renderPipeline() {
         <div class="small muted">${esc(j.company)}</div>
         <div class="job-meta small" style="margin-top:4px">
           ${j.status === "visa_list" ? `<span class="chip info">visa</span>` : ""}
-          ${col.key === "to_apply" ? `<span class="chip">fit ${j.fit}</span>${j.has_cv ? `<span class="chip good">CV</span>` : ""}${j.has_cover ? `<span class="chip good">letter</span>` : ""}` : ""}
+          ${col.key === "to_apply" ? `${gradeChip(j.fit_grade)}<span class="chip">fit ${j.fit}</span>${j.has_cv ? `<span class="chip good">CV</span>` : ""}${j.has_cover ? `<span class="chip good">letter</span>` : ""}` : ""}
           ${j.applied_at ? `<span class="chip">applied</span>` : ""}${j.emailed_at ? `<span class="chip info">emailed ${esc(day(j.emailed_at))}</span>` : ""}
           ${j.stage === "reached_out" && j.next_follow_up_at ? `<span class="chip ${new Date(j.next_follow_up_at) <= new Date() ? "warn" : ""}">follow-up ${esc(day(j.next_follow_up_at))}</span>` : ""}
-          ${j.closed_reason && col.key === "closed" ? `<span class="chip">${esc(j.closed_reason)}</span>` : ""}
+          ${j.closed_reason && col.key === "closed" ? `<span class="chip">${esc(j.closed_reason)}${j.skip_reason ? esc(": " + ((state.status?.skip_reasons || {})[j.skip_reason] || j.skip_reason)) : ""}</span>` : ""}
         </div>
-        <select data-move="${j.id}">${options(col.key)}</select>
+        <div class="row"><select data-move="${j.id}">${options(col.key)}</select>
+          ${col.key === "to_apply" ? `<button class="btn small danger" data-quick="skipped" data-id="${j.id}">Skip</button>` : ""}</div>
       </div>`).join("") || `<div class="small muted" style="margin-top:8px">Empty</div>`}</div>`;
   }).join("")}</div>`;
 }
@@ -743,13 +772,28 @@ document.addEventListener("click", async (e) => {
   const quick = e.target.closest("[data-quick]");
   const global = e.target.closest("[data-action-global]");
   try {
+    const skipReason = e.target.closest("[data-skip-reason]");
+    if (skipReason) {
+      e.stopPropagation();
+      const picker = skipReason.closest("[data-skip-job]");
+      const id = Number(picker.dataset.skipJob);
+      const detail = await busy(skipReason, "…", () => api(`/api/jobs/${id}/stage`, {
+        method: "POST", body: { stage: "closed", reason: "skipped", skip_reason: skipReason.dataset.skipReason,
+                                skip_note: picker.querySelector(".skip-note")?.value || "" },
+      }));
+      const message = `Skipped: ${skipReason.textContent}`;
+      if (state.jobId === id && $("#drawer").contains(picker)) return setDetail(detail, message);
+      toast(message);
+      return render();
+    }
+    if (quick && quick.dataset.quick === "skipped") {
+      e.stopPropagation();
+      return toggleSkipPicker(quick.closest(".row") || quick, quick.dataset.id);
+    }
     if (quick) {
       e.stopPropagation();
-      const reason = quick.dataset.quick === "skipped" ? "skipped" : undefined;
-      await busy(quick, "…", () => api(`/api/jobs/${quick.dataset.id}/stage`, {
-        method: "POST", body: { stage: reason ? "closed" : "saved", reason },
-      }));
-      toast(reason ? "Skipped" : "Saved");
+      await busy(quick, "…", () => api(`/api/jobs/${quick.dataset.id}/stage`, { method: "POST", body: { stage: "saved" } }));
+      toast("Saved");
       return render();
     }
     if (action && action.dataset.action === "check-inbox") {

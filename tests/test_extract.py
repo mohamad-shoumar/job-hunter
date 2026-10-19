@@ -7,6 +7,7 @@ from jobhunter.extract import (
     extract_required_yoe,
     extract_salary,
     extract_skills,
+    find_required_yoe,
     normalize_employment_type,
 )
 from jobhunter.text import fix_mojibake, html_to_text, normalize_words, parse_datetime
@@ -29,10 +30,40 @@ from jobhunter.text import fix_mojibake, html_to_text, normalize_words, parse_da
         # A company boast at the start of a sentence (#836).
         ("We build media tools. With more than 10 years of experience in this field and 40 employees", None),
         ("Candidates with more than 5 years of experience in Python", 5),
+        # Real postings without "experience" next to the count (2026-10-19).
+        ("5+ years building production backend systems in Python, with real async I/O", 5),
+        ("Senior experience (typically 8+ years) building and operating backend systems", 8),
+        ("Strong Python coding skills - 7+ years.", 7),
+        ("· Proficiency (5+ yrs) in Python (especially pipelines) or Typescript (large codebases a plus.", 5),
+        ("Base JD: Experience • Minimum 5 years of development and design experience in Python", 5),
+        ("Proven track record of 4-7 years in back-end API development using Python.", 4),
+        ("Experience level: 2–5 years", 2),
+        ("- Experience working with Python on web frameworks (minimum of 2 years).", 2),
+        ("3-8+ years in a customer-facing technical role", 3),
+        ("- 5+ years shipping production software, 2+ building with LLMs in production", 5),
+        # One long line: a "nice to have" in another sentence does not hide the requirement.
+        ("Kafka is a plus. Requirements: 4+ years of hands-on full-stack engineering experience", 4),
+        ("5+ years of work experience in Python and JavaScript, ideally in fast-paced startups", 5),
+        ("2+ years of Rust experience preferred", None),
+        ("Bonus points if you have 7+ years in fintech", None),
+        # Asides, benefits and company history.
+        ("- 3+ years of experience (5+ years for seniors) building backend services.", 3),
+        ("Strong experience (7+ years) building full stack web applications", 7),
+        ("A staffing firm servicing clients in America for the past 12+ years.", None),
+        ("Paid sabbatical after 5+ years with us.", None),
+        ("Founded 10+ years ago in Berlin.", None),
+        ("A team with 30+ years combined experience", None),
+        ("0–4 years of experience (recent grads welcome)", None),
     ],
 )
 def test_required_yoe(text, years):
     assert extract_required_yoe(text) == years
+
+
+def test_required_yoe_quotes_its_sentence():
+    years, quote = find_required_yoe("Great team. 5+ years building production backend systems. Python a plus.")
+    assert years == 5
+    assert quote == "5+ years building production backend systems."
 
 
 @pytest.mark.parametrize(

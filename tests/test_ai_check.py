@@ -219,6 +219,26 @@ def test_no_ai_flag_skips_the_check(tmp_path, filters):
     assert client.calls == [] and summary.ai_check is None
 
 
+def test_daily_run_also_checks_the_last_days_leftovers(tmp_path, filters):
+    """A job over yesterday's cap is checked today; one older than lookback_days is left for `jobhunter check`."""
+    (tmp_path / "config").mkdir()
+    paths = Paths(tmp_path)
+    store = JobStore(paths.db_file)
+    yesterday = stored_unclear_job(store, filters, source_job_id="y", company="Yesterday Co")
+    old = stored_unclear_job(store, filters, source_job_id="o", company="Old Co")
+    today = pipeline.local_day(NOW)
+    store.set_report_date([yesterday], (today - pipeline.timedelta(days=1)).isoformat())
+    store.set_report_date([old], (today - pipeline.timedelta(days=9)).isoformat())
+    store.mark_reported([yesterday, old], NOW)  # shown on their days, so not moved to today's report
+    store.close()
+    http = FakeHttp({himalayas.SEARCH: {"jobs": []}})
+    client = FakeClient(response(fetched(), verdict()))
+    summary, _ = pipeline.run(paths, {"himalayas": {"queries": ["backend"]}}, filters, http=http, now=NOW,
+                              ai_checker=checker(client, lookback_days=7))
+    assert summary.ai_check["checked"] == 1
+    assert "Company: Yesterday Co" in client.calls[0]["messages"][0]["content"]
+
+
 # --- DeepSeek over pages code fetched, then Claude Code with web search ----------------------
 
 GH_URL = "https://job-boards.greenhouse.io/acme/jobs/42"
