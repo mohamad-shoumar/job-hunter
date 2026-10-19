@@ -272,7 +272,11 @@ def grade_of(row) -> dict | None:
     return json.loads(value) if value else None
 
 
+# A job with no grade yet (over the cap, or an error) sorts in the middle, not below every 1/5 job.
+UNGRADED = 3
+
+
 def sort_grade(row) -> int:
-    """For sorting best first: the grade, or 0 when there is none."""
+    """For sorting best first: the grade, or UNGRADED when there is none."""
     grade = grade_of(row)
-    return grade["grade"] if grade else 0
+    return grade["grade"] if grade else UNGRADED

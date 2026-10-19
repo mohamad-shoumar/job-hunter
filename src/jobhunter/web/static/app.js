@@ -69,8 +69,9 @@ function gradeChip(g) {
   const tone = g.grade >= 4 ? "good" : g.grade <= 2 ? "warn" : "";
   return `<span class="chip ${tone}" title="${esc(g.reason)}">grade ${g.grade}/5</span>`;
 }
+// A job with no grade yet sorts in the middle (3), as on the server (fitgrade.UNGRADED).
 function byGrade(a, b) {
-  return (b.fit_grade?.grade || 0) - (a.fit_grade?.grade || 0);
+  return (b.fit_grade?.grade || 3) - (a.fit_grade?.grade || 3);
 }
 // Why you skip a job: one tap, plus an optional note. The fit grade learns from these.
 function skipPicker(id) {

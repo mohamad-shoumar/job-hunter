@@ -189,8 +189,10 @@ def assign_range(store: JobStore, summary: RunSummary, filters: Filters, now: da
 
 
 def ai_check_days(store: JobStore, checker: AiChecker, days: list[str], filters: Filters,
-                  now: datetime, summary: RunSummary) -> None:
-    """AI-check the unchecked needs_review jobs filed under `days`, newest first, up to the per-run cap."""
+                  now: datetime, summary: RunSummary) -> set[str]:
+    """AI-check the unchecked needs_review jobs filed under `days`, newest first, up to the per-run cap.
+
+    Returns the report days whose jobs changed status, so their files are written again."""
     waiting = [row for day in days for row in store.jobs_for_report(day)
                if row["status"] == NEEDS_REVIEW and row["eligibility"] == UNCLEAR and not row["ai_check_json"]]
     waiting.sort(key=lambda r: (r["posted_at"] or r["first_seen"], r["id"]), reverse=True)
@@ -199,6 +201,7 @@ def ai_check_days(store: JobStore, checker: AiChecker, days: list[str], filters:
     if len(waiting) > limit:
         result.notes.append(f"{len(waiting) - limit} more left for the next run or `jobhunter check`")
     summary.ai_check = result.to_dict()
+    return result.changed_days
 
 
 def refresh_sponsors(root_paths, filters: Filters, http: Http, now: datetime, summary: RunSummary) -> None:
@@ -267,10 +270,12 @@ def run(root_paths, sources_config: dict, filters: Filters, only: set[str] | Non
             days = assign_range(store, summary, filters, now, *date_range)
         else:
             days = assign_daily(store, summary, now)
+        # Earlier days whose jobs the look-backs below changed: their files are written again too.
+        touched: set[str] = set()
         if ai and ai_checker:
             # A daily run also looks back, so jobs over one day's cap are checked on the next days.
             check_days = days if date_range else recent_days(now, ai_checker.config.lookback_days)
-            ai_check_days(store, ai_checker, check_days, filters, now, summary)
+            touched |= ai_check_days(store, ai_checker, check_days, filters, now, summary)
         if ai and fit_grader and not date_range:
             # After the AI check (it can move a job to the shortlist), before the CVs (made best grade first).
             try:
@@ -281,6 +286,7 @@ def run(root_paths, sources_config: dict, filters: Filters, only: set[str] | Non
                     result.notes.append(f"{len(rows) - fit_grader.config.max_jobs_per_run} more left for the next "
                                         "run or `jobhunter grade`")
                 summary.fit_grade = result.to_dict()
+                touched |= result.changed_days
             except Exception as exc:  # grades only sort: the run goes on without them
                 log.exception("fit grade step failed")
                 summary.fit_grade = {"graded": 0, "grades": {}, "errors": [f"fit grade: {describe_error(exc)}"],
@@ -306,7 +312,7 @@ def run(root_paths, sources_config: dict, filters: Filters, only: set[str] | Non
         store.finish_run(run_id, summary.to_dict(), utcnow())
         paths = [
             write_report(store, root_paths.reports_dir, day, summary.to_dict(), now, filters.max_posting_age_days)
-            for day in days
+            for day in sorted(set(days) | touched)
         ] if report else []
         return summary, paths
     finally:

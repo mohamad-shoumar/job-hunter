@@ -117,7 +117,7 @@ def _job_block(n: int, row: sqlite3.Row, sightings: list[sqlite3.Row], prepared:
 
 
 def _sort_key(row: sqlite3.Row):
-    """Best AI fit grade first (fitgrade.py; none counts as 0), then how sure the Lebanon verdict is."""
+    """Best AI fit grade first (fitgrade.py; no grade yet counts as 3), then how sure the Lebanon verdict is."""
     return (-sort_grade(row), _ELIGIBILITY_ORDER.get(row["eligibility"], 2), -row["fit_score"], row["posted_at"] or "")
 
 

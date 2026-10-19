@@ -249,7 +249,7 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
             WHERE {where}
             ORDER BY COALESCE(j.report_date, substr(j.first_seen, 1, 10)) DESC,
                      CASE j.status WHEN 'shortlisted' THEN 0 ELSE 1 END,
-                     COALESCE(json_extract(j.fit_grade_json, '$.grade'), 0) DESC, j.fit_score DESC, j.id DESC
+                     COALESCE(json_extract(j.fit_grade_json, '$.grade'), 3) DESC, j.fit_score DESC, j.id DESC
             LIMIT 500
             """,
             params,

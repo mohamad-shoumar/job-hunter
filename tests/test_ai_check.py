@@ -233,10 +233,14 @@ def test_daily_run_also_checks_the_last_days_leftovers(tmp_path, filters):
     store.close()
     http = FakeHttp({himalayas.SEARCH: {"jobs": []}})
     client = FakeClient(response(fetched(), verdict()))
-    summary, _ = pipeline.run(paths, {"himalayas": {"queries": ["backend"]}}, filters, http=http, now=NOW,
-                              ai_checker=checker(client, lookback_days=7))
+    summary, reports = pipeline.run(paths, {"himalayas": {"queries": ["backend"]}}, filters, http=http, now=NOW,
+                                    ai_checker=checker(client, lookback_days=7))
     assert summary.ai_check["checked"] == 1
     assert "Company: Yesterday Co" in client.calls[0]["messages"][0]["content"]
+    # Its status changed, so yesterday's file is written again, next to today's.
+    day_before = (today - pipeline.timedelta(days=1)).isoformat()
+    assert sorted(p.name for p in reports) == [f"{day_before}.md", f"{today.isoformat()}.md"]
+    assert "AI check: cannot hire from Lebanon (1)" in (tmp_path / "reports" / f"{day_before}.md").read_text()
 
 
 # --- DeepSeek over pages code fetched, then Claude Code with web search ----------------------

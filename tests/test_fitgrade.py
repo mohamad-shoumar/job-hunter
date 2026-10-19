@@ -113,13 +113,15 @@ def test_only_open_shown_ungraded_jobs_are_graded(store, filters):
 
 
 def test_reports_list_the_best_grade_first(store, filters, tmp_path):
-    low, high = open_jobs(store, filters, 2)
+    low, high, ungraded = open_jobs(store, filters, 3)
     store.save_fit_grade(low, {"grade": 2, "reason": "Asks for 7+ years."})
     store.save_fit_grade(high, {"grade": 5, "reason": "Python backend, 3+ years."})
     store.commit()
     text = write_report(store, tmp_path, pipeline.local_day(NOW).isoformat(), None, NOW, 14).read_text()
     shortlisted = text.split("## Shortlisted")[1].split("## Needs review")[0]
-    assert shortlisted.index("Backend Engineer 1") < shortlisted.index("Backend Engineer 0")
+    # A job with no grade yet sits in the middle (3), not below the 2/5 one.
+    order = [shortlisted.index(f"Backend Engineer {i}") for i in (1, 2, 0)]
+    assert order == sorted(order)
     assert "- **Fit grade:** 5/5 — Python backend, 3+ years." in shortlisted
 
 
