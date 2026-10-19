@@ -429,7 +429,7 @@ def cmd_tailor(args) -> int:
 
 
 def cmd_cover(args) -> int:
-    """A cover letter for each job: <cv_dir>/<Name>_CoverLetter_<Company>_<MonYYYY>.md, checked against the profile."""
+    """A cover letter for each job: <cv_dir>/<Name>_CoverLetter_<Company>_<MonYYYY>.md (why this company, then yours)."""
     from .config import OutreachConfig
     from .cover import build_cover_writer, cover_for_job
 
@@ -449,8 +449,7 @@ def cmd_cover(args) -> int:
                 print(f"  ! removed by the checks: {line}")
             for line in meta["warnings"]:
                 print(f"  ? {line}")
-            if meta["gaps_named"]:
-                print(f"  says you have not worked with: {', '.join(meta['gaps_named'])}")
+            print(f"  read: {', '.join(meta['pages']) or 'the posting only'}")
     finally:
         store.close()
     return 0
@@ -632,10 +631,11 @@ def main(argv: list[str] | None = None) -> int:
 
     p = sub.add_parser(
         "cover",
-        help="write a cover letter for jobs from your profile facts, next to the tailored CVs",
-        description="The model writes the opening, one or two paragraphs citing your profile facts, and the "
-        "closing; code checks every sentence against profile/master_profile.md and leaves out one that "
-        "adds anything. Writes <Name>_CoverLetter_<Company>_<MonYYYY>.md in cv_dir (config/outreach.json).",
+        help="write a two-paragraph cover letter for jobs, next to the tailored CVs",
+        description="Paragraph 1 is why you want to join the company: the model writes it from the posting and "
+        "pages code fetches from the company's site, and code checks every name and number against them and "
+        "your profile. Paragraph 2 is cover_paragraph (config/outreach.json), word for word. Writes "
+        "<Name>_CoverLetter_<Company>_<MonYYYY>.md in cv_dir.",
     )
     p.add_argument("job_ids", type=int, nargs="+")
     p.set_defaults(func=cmd_cover)

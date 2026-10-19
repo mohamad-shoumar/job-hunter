@@ -199,15 +199,15 @@ class OutreachConfig:
     max_cvs_per_run: int = 5
     # Replaces cv.TAG_RULES for the tags it names: {"lead": {"title": [...], "posting": [...]}}.
     cv_tags: dict = field(default_factory=dict)
-    # Cover letters (cover.py): written next to the CVs in cv_dir. Empty cover_model means cv_model;
-    # "claude-code" (or "claude-code:<model>") runs the Claude Code CLI, signed in with your account.
+    # Cover letters (cover.py): written next to the CVs in cv_dir, only when you ask (the button or
+    # `jobhunter cover`). Empty cover_model means cv_model.
     cover_model: str = ""
-    # How letters read: its writer part is the model's instructions, its word lists are checked.
+    # How paragraph 1 (why this company) reads: its writer part is the model's instructions, its word lists are checked.
     cover_guidelines: str = "config/cover_letter_guidelines.md"
-    auto_cover: bool = True
+    # Paragraph 2, your own words, printed as is.
+    cover_paragraph: str = ""
+    auto_cover: bool = False
     max_covers_per_run: int = 5
-    # The one sentence about what the posting asks for and the profile does not have. Code writes it.
-    cover_gap_text: str = "I haven't worked with {gaps} yet, and I'd make learning {them} an early priority."
     # The daily run also catches up on shortlisted jobs filed this many days back that still have no
     # tailored CV or cover letter (one that failed, e.g. on a network error at wake-up).
     catch_up_days: int = 7

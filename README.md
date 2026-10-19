@@ -38,7 +38,7 @@ open reports/$(date +%F).md
 | `jobhunter contacts` | find who to email for shortlisted jobs without a contact, best fit first (`--limit N`, `--no-claude`, or job ids) |
 | `jobhunter tailor <id>` | a CV tailored to that job, in `resume/output/` (the daily run does new shortlisted jobs) |
 | `jobhunter rebuild-cv <id>` | after you edit a job's CV text in `resume/versions/`, rebuild its PDF (no AI) and list lines that say more than your profile |
-| `jobhunter cover <id>` | a cover letter for that job, next to its CV (the daily run does these too) |
+| `jobhunter cover <id>` | a two-paragraph cover letter for that job, next to its CV (only when you ask) |
 | `jobhunter inbox` | check Gmail for replies and bounces (the daily run does this too) |
 | `jobhunter check` | AI-check waiting "needs review" jobs, newest first (`--limit N`, `--recheck`, or job ids) |
 | `jobhunter grade` | AI fit grade 1-5 for open shown jobs, learned from your Applied and skipped jobs (`--regrade`, `--days N`, `--limit N`, or job ids) |
@@ -290,49 +290,39 @@ A wrong line that comes from `profile/master_profile.md` itself is better fixed
 there (then `python3 build.py sync` in `resume/`), so no future CV or cover
 letter repeats it.
 
-**Cover letters** (`src/jobhunter/cover.py`). The Cover letter box under the CV
-has **Write cover letter** and **Copy**; `jobhunter cover <id>` does the same.
-`cover_model` writes the opening, one or two paragraphs and the closing. It is
-`claude-code`: the Claude Code CLI (`claude -p`, about 25 seconds a letter),
-signed in with your Claude account, so no API key; it runs with no tools and
-none of your Claude settings, CLAUDE.md or memory. `claude-code:sonnet` picks
-its model; empty means the same model as `cv_model`. Code writes the rest (your
-contact lines from the profile, the date, "Dear <Company> Hiring Team,", the
-sign-off) and checks every sentence:
+**Cover letters** (`src/jobhunter/cover.py`). Only when you ask: the Cover
+letter box under the CV has **Write cover letter** and **Copy**, and
+`jobhunter cover <id>` does the same. The daily run writes none (`auto_cover`
+is false). A letter is two paragraphs between code's header ("Dear <Company>
+Hiring Team,") and sign-off:
 
-- the letter may only use the facts the job's CV prints: the summary, the
-  Experience bullets for the job's tags, skills, education, certifications and
-  where you live (never the salary line);
-- each paragraph names the facts it uses, and its numbers, tools and seniority
-  words must be in those facts ("800+ concurrent jobs" next to the same word);
-- the opening and closing may repeat what the posting says about the company
-  ("Novakid has 80,000 students"), but a sentence about you still names only
-  your tools; years are never above the profile's;
-- what the posting asks for that you lack is never claimed: the model picks at
-  most 1 (word for word in the posting, sharing no word with your facts, in
-  the job title or named twice, and not close to your work: no "CI/CD" gap
-  next to your test-suite quality gates), and code writes one sentence,
-  `cover_gap_text`: "I haven't worked with Kafka yet, and I'd make learning it
-  an early priority."
+1. **Why this company.** `cover_model` (DeepSeek, `deepseek-v4-pro`, about
+   $0.01) writes it from the posting and up to 3 pages code fetches from the
+   company's site: its home page, /about and /blog. The domain is the one the
+   contact lookup found, else one in the job's links, else a guess
+   (`acme.com`, kept only when the page names the company). Job boards and
+   agencies get the posting only. Code checks every sentence: each name,
+   number and word for what kind of company it is ("consultancy", "startup")
+   must be in the posting, those pages or your profile; a sentence about you
+   names only your profile's tools and years. The model also quotes the words
+   its reason rests on, and code looks for them.
+2. **Yours.** `cover_paragraph` in `config/outreach.json`, word for word,
+   never checked.
 
-How a letter reads is in `config/cover_letter_guidelines.md` (`cover_guidelines`):
-150-250 words, one main story told in plain words, no restating the posting,
-and lists of phrases that read as AI ("passionate", "proven track record",
-the em dash). Its `writer:start`/`writer:end` part is the model's
-instructions, so edit that file to change how letters read. Code checks its
-"Never use" list like a fact rule; dashes, ", ensuring ..." add-ons, two words
-from "Use at most one" and a letter over 300 words are sent back once and
-then only noted (a dash left over becomes a comma).
+How paragraph 1 reads is in `config/cover_letter_guidelines.md`
+(`cover_guidelines`): 2 or 3 sentences, at most 65 words, one specific reason,
+like a developer talking to a hiring manager, plus lists of phrases that read
+as AI ("passionate about", "cutting-edge", "I've used"). Its
+`writer:start`/`writer:end` part is the model's instructions, so edit that
+file to change how it reads. A sentence that breaks a rule is sent back once,
+then left out, and the box lists what was left out and why; length, a dash or
+a quote code cannot find is sent back once, then only noted. Plain-word claims
+("they ship weekly") pass the checks, so read paragraph 1 before sending.
 
-A letter that breaks a rule is sent back once with the reasons; a sentence
-that still breaks one is left out, and the box lists what was left out and
-why, plus names from the posting to check by eye. The letter is
-`resume/output/<Last name>_CoverLetter_<Company>_<MonYYYY>.md`, plain text to paste
-into a form or upload; a file you made by hand is never overwritten (`_2`).
-The box shows the file as it is now, so your edits stay. The daily run writes
-one for each new shortlisted job (`auto_cover`, `max_covers_per_run`, same
-catch-up), and each job in the daily report links its tailored CV and cover
-letter.
+The letter is `resume/output/<Last name>_CoverLetter_<Company>_<MonYYYY>.md`,
+plain text to paste into a form or upload; a file you made by hand is never
+overwritten (`_2`). The box shows the file as it is now, so your edits stay,
+and each job in the daily report links its tailored CV and cover letter.
 
 **The resume folder** is `resume/` in this project: `build.py` (in git),
 `resume.md`, your base CV (not in git: start from `resume.example.md`), and
