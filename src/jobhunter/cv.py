@@ -24,7 +24,8 @@ you (see CLAUDE.md):
   - the headline is one of your target roles (or the profile's headline),
     word for word, with nothing next to it ("Backend Engineer", never
     "Backend Engineer - Python & AWS");
-  - there is never a Summary section.
+  - the model never writes a summary (resume.md's own Summary paragraph is
+    copied as it is).
 
 Rewrites that break a rule are sent back once with the reasons, like the
 email. Profile bullets left out stay in the file as // comments, so you can
