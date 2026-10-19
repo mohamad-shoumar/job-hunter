@@ -291,10 +291,11 @@ there (then `python3 build.py sync` in `resume/`), so no future CV or cover
 letter repeats it.
 
 **Cover letters** (`src/jobhunter/cover.py`). Only when you ask: the Cover
-letter box under the CV has **Write cover letter** and **Copy**, and
-`jobhunter cover <id>` does the same. The daily run writes none (`auto_cover`
-is false). A letter is two paragraphs between code's header ("Dear <Company>
-Hiring Team,") and sign-off:
+letter box under the CV has **Write cover letter**, **Copy** and **Download**
+(a .txt file to upload), and `jobhunter cover <id>` does the same. The daily
+run writes none (`auto_cover` is false). A letter is just two paragraphs, with
+no header, date, greeting or sign-off (the form already has your name and the
+job):
 
 1. **Why this company.** `cover_model` (DeepSeek, `deepseek-v4-pro`, about
    $0.01) writes it from the posting and up to 3 pages code fetches from the

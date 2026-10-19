@@ -426,7 +426,8 @@ function coverSection(d) {
       ${info}
       <div class="row small" style="margin-top:8px">
         <button class="btn" data-action="cover" ${note ? `disabled title="${esc(note)}"` : `title="${esc(s.cover_model || "")} writes paragraph 1 from the posting and the company's site; code checks every sentence"`}>${c ? "Write again" : "Write cover letter"}</button>
-        ${c ? `<button class="btn" data-action="copy-cover">Copy</button>` : ""}
+        ${c ? `<button class="btn" data-action="copy-cover">Copy</button>
+        <button class="btn" data-action="download-cover" title="Save the letter as a .txt file to your Downloads">Download ↓</button>` : ""}
       </div>
       ${note ? `<div class="small muted" style="margin-top:6px">${esc(note)}</div>` : ""}
     </div>`;
@@ -636,6 +637,14 @@ async function drawerAction(action, el) {
   if (action === "copy-cover") {
     await navigator.clipboard.writeText($("#cover-text").value);
     return toast("Copied");
+  }
+  if (action === "download-cover") {
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob([$("#cover-text").value], { type: "text/plain" }));
+    link.download = (state.detail?.cover?.file || "CoverLetter.md").replace(/\.md$/, ".txt");
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    return toast(`Saved ${link.download}`);
   }
   if (action === "save-draft") return saveDraft(el);
   if (action === "copy") {

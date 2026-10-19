@@ -19,9 +19,10 @@
      word for word and never checked: you wrote it.
 
 How paragraph 1 reads is the writer part of config/cover_letter_guidelines.md.
-Code writes the rest (your name and contact lines, the date, "Dear <Company>
-Hiring Team,", the sign-off). The letter is plain text next to the CVs in
-cv_dir, named like Doe_CoverLetter_Acme_Oct2026.md, to paste or upload.
+The letter is only those two paragraphs: no header, date, greeting or sign-off
+(the form already has your name and the job). It is plain text next to the CVs
+in cv_dir, named like Doe_CoverLetter_Acme_Oct2026.md, to paste, or to save
+from the app's Download button and upload.
 """
 
 from __future__ import annotations
@@ -77,9 +78,7 @@ class LetterFacts:
     facts: list[str]  # numbered from 1 for the model; the only things a letter may say about you
     skills: set[str]
     years: float | None
-    name: str
-    contact: list[str]  # email, phone, LinkedIn, GitHub: printed by code
-    location: str | None
+    name: str  # for the file name
 
     @property
     def text(self) -> str:
@@ -141,8 +140,7 @@ def load_letter_facts(profile_path: Path, tags) -> LetterFacts:
     years = re.search(r"\bAbout (\d+(?:\.\d+)?) years\b", joined)
     return LetterFacts(
         facts=facts, skills=_skills_of(joined), years=float(years.group(1)) if years else None,
-        name=basics.get("Name", ""), location=basics.get("Location"),
-        contact=[basics[k] for k in ("Email", "Phone", "LinkedIn", "GitHub") if basics.get(k)],
+        name=basics.get("Name", ""),
     )
 
 
@@ -297,11 +295,11 @@ def check_sentence(text: str, facts: LetterFacts, job: JobText) -> list[str]:
 _WRITER_PART = re.compile(r"<!-- writer:start -->(.*?)<!-- writer:end -->", re.S)
 _DASH = re.compile(r"\s*—\s*|\s+[–-]\s+")  # an em dash, or a spaced en dash or hyphen ("end-to-end" is fine)
 DASH_ISSUE = "uses a dash (—); use a comma, a colon or a full stop"
-# "I'm applying for the X role": the header and the form already say which job, so it wastes the first line.
+# "I'm applying for the X role": the form already says which job, so it wastes the first line.
 _ANNOUNCES = re.compile(
     r"\b(?:I(?:'m| am)|I(?:'d| would) like to|I want to|I wish to|I'm writing to|I am writing to) "
     r"(?:apply|applying|be considered)\b|\bmy application (?:for|to)\b", re.I)
-# Logistics: time zone, notice, start date, where you are. The header shows the location; the rest is for the form.
+# Logistics: time zone, notice, start date, where you are. The CV and the form say those.
 _LOGISTICS_TALK = re.compile(
     r"\btime ?zones?\b|\b(?:UTC|GMT|CET|EET|EST|PST)\b|\bnotice\b|\bstart date\b|\bavailable to start\b"
     r"|\bcan start\b|\bbased (?:in|out of)\b|\b(?:work|working|live|living) (?:remotely )?from\b|\bhours overlap\b"
@@ -466,8 +464,8 @@ def opening_from(answer: dict, facts: LetterFacts, job: JobText, sources: list[t
 
 SYSTEM = """\
 You write the first paragraph of a software engineer's cover letter: why they \
-want to join this company. Code adds the greeting, then a second paragraph the \
-engineer wrote, then the sign-off, and checks every sentence you write.
+want to join this company. It opens the letter (there is no greeting); code adds \
+a second paragraph the engineer wrote, and checks every sentence you write.
 
 Return:
 - paragraph: the paragraph.
@@ -574,25 +572,9 @@ def build_cover_writer(config: OutreachConfig, claude=None) -> tuple[CoverWriter
 # --- the file ------------------------------------------------------------------------------
 
 
-_TITLE_NOISE = re.compile(r"\s*[(\[][^)\]]*(?:remote|m/f|f/m|w/m|/d\b)[^)\]]*[)\]]|\s+[-–—|]\s+remote\b.*$", re.I)
-
-
-def letter_title(title: str) -> str:
-    """'Backend Engineer (Remote, m/f/d)' -> 'Backend Engineer'. The rest of the title stays as posted."""
-    return _TITLE_NOISE.sub("", title).strip() or title
-
-
-def render_letter(body: list[str], facts: LetterFacts, company: str, title: str, now: datetime) -> str:
-    day = now.astimezone()
-    head = [facts.name, " | ".join(facts.contact), f"{facts.location} (Remote)" if facts.location else ""]
-    return "\n".join([
-        *[h for h in head if h], "",
-        f"{day:%B} {day.day}, {day:%Y}", "",
-        f"{company} Hiring Team", letter_title(title), "",
-        f"Dear {company} Hiring Team,", "",
-        "\n\n".join(body), "",
-        "Best regards,", facts.name,
-    ]) + "\n"
+def render_letter(body: list[str]) -> str:
+    """Just the paragraphs: the form already has your name, the date and the job."""
+    return "\n\n".join(body) + "\n"
 
 
 def _words_of(text: str) -> int:
@@ -647,7 +629,7 @@ def cover_for_job(store: JobStore, job_id: int, writer: CoverWriter, profile_pat
     if not opening.sentences:  # nothing worth sending: write no file
         why = "; ".join(opening.removed[:3]) or "the answer was empty"
         raise CoverError(f"No cover letter written: nothing in paragraph 1 passed the checks ({why[:400]})")
-    text = render_letter([p for p in (opening.text, second) if p], facts, company, job["title"] or "", now)
+    text = render_letter([p for p in (opening.text, second) if p])
     folder = Path(config.cv_dir).expanduser()
     folder.mkdir(parents=True, exist_ok=True)
     name = old["file"] if old else _new_name(folder, facts.name.split()[-1], company, now)

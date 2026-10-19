@@ -51,8 +51,8 @@ def test_the_letter_uses_the_facts_the_cv_prints():
     assert "Lead a team of 5" not in text  # the [lead] bullet: only for lead jobs, like on the CV
     assert "Lead a team of 5" in load_letter_facts(PROFILE_FILE, {"lead"}).text
     assert "4200" not in text and "TODO" not in text and "7788" not in text  # never salary, notes or contact
-    assert FACTS.years == 3.3 and FACTS.name == "Mohamad Shoumar" and FACTS.location == "Beirut, Lebanon"
-    assert FACTS.contact[0] == "me@example.com" and "kafka" not in FACTS.skills
+    assert FACTS.years == 3.3 and FACTS.name == "Mohamad Shoumar"
+    assert "kafka" not in FACTS.skills
 
 
 @pytest.mark.parametrize("path", YOUR_PROFILES)
@@ -61,7 +61,7 @@ def test_your_profile_gives_a_letter_something_to_say(path, monkeypatch):
     monkeypatch.setenv("MY_NAME", "Jane Doe")
     monkeypatch.setenv("MY_EMAIL", "jane@example.com")
     facts = load_letter_facts(path, set())
-    assert facts.name == "Jane Doe" and facts.contact[0] == "jane@example.com" and len(facts.facts) >= 5
+    assert facts.name == "Jane Doe" and len(facts.facts) >= 5
     assert not any("TODO" in f or "Compensation" in f or "(Confirmed" in f for f in facts.facts)
 
 
@@ -215,9 +215,7 @@ def test_the_letter_is_why_this_company_then_your_paragraph(tmp_path, filters):
     path = tmp_path / "output" / "Shoumar_CoverLetter_Acme_Sep2026.md"
     assert meta["file"] == path.name and meta["pages"] == ["https://acme.com"] and meta["quote_found_at"]
     text = path.read_text()
-    assert text.startswith("Mohamad Shoumar\nme@example.com | +1 555 010 7788 | ")
-    assert "\nSeptember 25, 2026\n" in text and "\nAcme Hiring Team\nSenior Backend Engineer (Python)\n" in text
-    assert f"\nDear Acme Hiring Team,\n\n{GOOD['paragraph']}\n\n{SECOND}\n\nBest regards,\nMohamad Shoumar\n" in text
+    assert text == f"{GOOD['paragraph']}\n\n{SECOND}\n"  # only the two paragraphs: no header, greeting or sign-off
     app = tracking.get_application(store, job_id)
     assert json.loads(app["cover_letter_json"])["text"] == text and app["stage"] == tracking.NEW
     assert [e["detail"] for e in tracking.events_for(store, job_id)][-1] == f"Cover letter written: {path.name}"
@@ -233,7 +231,7 @@ def test_your_paragraph_prints_word_for_word_unchecked(tmp_path, filters):
     job_id = store_job(store, filters, description=POSTING)
     mine = "In a fast-paced  startup I leverage   multi-agent workflows."
     meta = cover_for_job(store, job_id, writer(GOOD), PROFILE_FILE, config_for(tmp_path, cover_paragraph=mine), NOW)
-    assert "\n\nIn a fast-paced startup I leverage multi-agent workflows.\n\n" in meta["text"]  # spaces tidied
+    assert meta["text"].endswith("\n\nIn a fast-paced startup I leverage multi-agent workflows.\n")  # spaces tidied
     alone = cover_for_job(store, job_id, writer(GOOD), PROFILE_FILE, config_for(tmp_path, cover_paragraph=""), NOW)
     assert "paragraph 1 only" in " ".join(alone["notes"])
 
@@ -333,9 +331,9 @@ def test_write_cover_letter_from_the_page(cover_client):
     assert client.post("/api/jobs/1/cover", json={}).status_code == 403  # needs the token
     detail = client.post("/api/jobs/1/cover", json={}, headers=AUTH).json()
     cover = detail["cover"]
-    assert cover["file"] == "Shoumar_CoverLetter_Acme_Sep2026.md" and "Dear Acme Hiring Team," in cover["text"]
+    assert cover["file"] == "Shoumar_CoverLetter_Acme_Sep2026.md" and cover["text"].startswith(GOOD["paragraph"])
     assert GOOD["paragraph"] in cover["text"] and "At CoinQuant, I've helped build" in cover["text"]
     path = home / "resume" / "output" / cover["file"]  # cv_dir is relative: inside the project
-    path.write_text(path.read_text().replace("Best regards", "Kind regards"))
+    path.write_text(path.read_text() + "\nKind regards\n")
     assert "Kind regards" in client.get("/api/jobs/1").json()["cover"]["text"]  # your edits show
     assert client.get("/api/jobs").json()["jobs"][0]["has_cover"] is True
