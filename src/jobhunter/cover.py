@@ -66,6 +66,15 @@ _COMPANY_KIND = re.compile(
     r"family-owned|bootstrapped|venture-backed|VC-backed|Series [A-E]|public company|publicly traded)\b", re.I)
 
 
+# Paragraph 1 says why this company, never what you did: paragraph 2 does that, and a claim here is easy to make up.
+_PAST_WORK = re.compile(
+    r"\bI(?:'ve| have)?(?: also| recently| mostly)? (?:built|architected|designed|led|shipped|owned|managed|created|"
+    r"developed|implemented|scaled|delivered|automated|migrated|launched|maintained|run|ran)\b"
+    r"|\bmy (?:experience|work at|team|track)\b|\bsimilar (?:work|systems?|problems?|challenges?|transitions?)\b", re.I)
+PAST_WORK_ISSUE = "describes your past work; paragraph 2 does that. Say why this company's work interests you"
+_NUMBER = re.compile(r"\d")
+
+
 class CoverError(tracking.TrackingError):
     """Shown to you as is."""
 
@@ -79,6 +88,7 @@ class LetterFacts:
     skills: set[str]
     years: float | None
     name: str  # for the file name
+    employers: list[str] = field(default_factory=list)  # paragraph 1 never names them: paragraph 2 tells your work
 
     @property
     def text(self) -> str:
@@ -141,6 +151,7 @@ def load_letter_facts(profile_path: Path, tags) -> LetterFacts:
     return LetterFacts(
         facts=facts, skills=_skills_of(joined), years=float(years.group(1)) if years else None,
         name=basics.get("Name", ""),
+        employers=list(dict.fromkeys(e for _, employer in roles if (e := re.sub(r"\s*\(.*?\)", "", employer).strip()))),
     )
 
 
@@ -284,7 +295,7 @@ def check_sentence(text: str, facts: LetterFacts, job: JobText) -> list[str]:
     known = f"{facts.text}\n{job.posting}".lower()
     for token in dict.fromkeys(_capitalized_words(text)):
         low = token.lower()
-        if low in known or low in _CALENDAR or any(low in n.lower() for n in job.names) or _OFFSET.fullmatch(token):
+        if low in known or low.split("-")[0] in known or low in _CALENDAR or any(low in n.lower() for n in job.names) or _OFFSET.fullmatch(token):
             continue
         problems.append(f'names "{token}", which is in neither your profile nor the posting or the company\'s pages')
     return problems
@@ -452,11 +463,17 @@ def opening_from(answer: dict, facts: LetterFacts, job: JobText, sources: list[t
     checked = []
     for s in sentences(answer.get("paragraph")):
         more, issues, once = check_style(s, job, style)
+        if _PAST_WORK.search(s) or any(re.search(rf"\b{re.escape(e)}\b", s, re.I) for e in facts.employers):
+            more.append(PAST_WORK_ISSUE)
+        if _NUMBER.search(job.without_names(s)):
+            issues.append("quotes a number from their posting or site; pick what makes the work interesting, "
+                          "not their headline numbers")
         checked.append(Checked(s, check_sentence(s, facts, job) + more, issues, once))
     quote = " ".join(str(answer.get("quote") or "").split())
     return Opening(
         sentences=checked, quote=quote, found_at=find_quote(quote, sources) if quote else None,
-        notes=[" ".join(str(n).split()) for n in answer.get("notes") or [] if str(n).strip()][:2],
+        notes=[f"Reason: {r}" for r in [" ".join(str(answer.get("reason") or "").split())] if r]
+        + [" ".join(str(n).split()) for n in answer.get("notes") or [] if str(n).strip()][:2],
     )
 
 
@@ -468,7 +485,8 @@ want to join this company. It opens the letter (there is no greeting); code adds
 a second paragraph the engineer wrote, and checks every sentence you write.
 
 Return:
-- paragraph: the paragraph.
+- reason: first, the ONE specific reason, in under 15 words.
+- paragraph: the paragraph, built on that reason.
 - quote: the exact words, copied from the posting or one of the company's pages, \
 that your one reason rests on (at least 4 words). Code looks for them there.
 - notes: 0 to 2 short lines for the engineer: the detail you picked and where it was.
@@ -478,10 +496,8 @@ Hard rules. Code removes a sentence that breaks one:
 name a product, customer, number, tool, person or blog post that is not in them, \
 and never say what kind of company it is (a consultancy, a startup, fintech, \
 SaaS) unless they do.
-- About the engineer, use only the listed facts. Never add a tool, number, \
-employer, title, years, feeling or habit that is not in them, and never merge \
-two facts into one claim (a team the engineer leads and a system they built are \
-separate facts).
+- Never describe the engineer's past work, name their employer, or say they \
+have relevant or similar experience: their own second paragraph does that.
 - No phrase from the "Never use" list below. Never announce the application or \
 talk about time zone, notice or location.
 
@@ -500,15 +516,16 @@ def system_prompt(style: Style) -> str:
 SCHEMA = {
     "type": "object",
     "properties": {
+        "reason": {"type": "string"},
         "paragraph": {"type": "string"},
         "quote": {"type": "string"},
         "notes": {"type": "array", "items": {"type": "string"}},
     },
-    "required": ["paragraph", "quote", "notes"],
+    "required": ["reason", "paragraph", "quote", "notes"],
     "additionalProperties": False,
 }
 
-EXAMPLE = json.dumps({"paragraph": "...", "quote": "...", "notes": ["..."]})
+EXAMPLE = json.dumps({"reason": "...", "paragraph": "...", "quote": "...", "notes": ["..."]})
 
 
 def _prompt(job, company: str, facts: LetterFacts, pages: list[tuple[str, str]], second: str) -> str:
@@ -521,8 +538,6 @@ def _prompt(job, company: str, facts: LetterFacts, pages: list[tuple[str, str]],
         lines += [f"--- {url} ---", text]
     if not pages:
         lines.append("(none could be read: work from the posting only)")
-    lines += ["", "Facts about the engineer (the only things you may say about them):",
-              *[f"- {fact}" for fact in facts.facts]]
     if second:
         lines += ["", "The second paragraph, which the engineer wrote and which follows yours word for word "
                       "(do not repeat it):", second]
@@ -542,10 +557,12 @@ class CoverWriter:
         messages: list[dict] = [{"role": "user", "content": _prompt(job, company, facts, pages, second)}]
         usage = Usage()
         opening, attempt = None, 0
-        for attempt in (1, 2):
+        for attempt in (1, 2, 3):
             answer = self.model.ask(system_prompt(self.style), messages, SCHEMA, usage, EXAMPLE, max_tokens=1024)
             opening = opening_from(answer, facts, job_text, sources, self.style)
-            if not opening.to_fix:
+            # A third try only when what would be left after dropping the bad sentences is too short to send.
+            if not opening.to_fix or (attempt == 2 and len([c for c in opening.sentences if not c.problems])
+                                      >= MIN_SENTENCES):
                 break
             messages += [
                 {"role": "assistant", "content": json.dumps(answer)},

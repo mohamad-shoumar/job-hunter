@@ -33,9 +33,18 @@ What to look for, in this order:
 1. What interesting technical or business problem is the company solving?
 2. What makes that problem challenging or interesting from an engineering
    perspective?
-3. How does it connect to my experience in backend engineering, startups,
-   financial technology, AI-native development, or automation? Only what my
-   listed facts say.
+3. How does it connect to what I like working on: backend engineering,
+   startups, financial technology, AI-native development, automation?
+
+This paragraph is about them and why the work interests me. It is not a
+pitch. The second paragraph (in the prompt) already says what I've done, so
+here:
+
+- Never describe my past work: no "I built", "I architected", "I led", no
+  employer name, no "my experience", no "similar" work. Code removes it.
+- At most a few words on what I like working on ("I like backend problems
+  where correctness matters"), never what I achieved.
+- Never say I'm a good fit, qualified, or have relevant experience.
 
 ## 2. Writing rules
 
@@ -46,11 +55,9 @@ What to look for, in this order:
 - Prefer interesting engineering problems, product challenges, or ways of
   working over generic company values.
 - Mention a concrete detail from the posting or the pages, but only if it
-  fits naturally.
-- Connect that detail to my professional interests or experience by naming
-  one thing I built, in my facts' own words. Never say I've already done the
-  company's kind of work ("a problem I've been working on", "the kind of work
-  I already do", "maps directly to") unless a fact says exactly that.
+  fits naturally. Pick a detail about the work, not their headline numbers
+  (users, countries, funding, team size): quoting those reads like a summary
+  of their website.
 - Don't pretend I've used their product, followed them for years, or admired
   them. There is no evidence of that.
 - Don't invent emotional attachment or enthusiasm.
@@ -62,8 +69,24 @@ What to look for, in this order:
 - Don't force a personal connection if none exists. A specific, intellectually
   honest interest in their work is enough.
 - No em dash (—), no exclamation marks, no questions.
-- The second paragraph (in the prompt) follows yours: don't repeat what it
-  says.
+
+## Examples of the voice
+
+These are for made-up companies, to show the tone and the shape. Never reuse
+their wording or their details.
+
+- A payroll API: "Payroll looks dull until you see that every run has to
+  reconcile to the cent against a different set of tax rules. I like backend
+  work where being correct matters more than being clever, and that's about
+  as pure a version of it as I've seen."
+- A warehouse robotics startup: "Re-planning robot routes when orders change
+  after picking has started means the system has to keep changing its mind in
+  real time. That's a far more interesting backend problem than moving data
+  between services, and I'd like a go at it."
+- A small dev tools team: "Being one of two engineers who decide how the
+  whole API looks, with the founders in the same conversations, is the kind
+  of setup I want. You see the effect of every decision quickly, and nothing
+  gets lost in a handoff."
 
 ## 3. Human authenticity test
 
@@ -185,6 +208,17 @@ Code checks every sentence against these lists. Matching ignores case.
 - ties directly
 - ties into
 - connects directly
+- enjoy solving
+- got me
+- relevant experience
+- my experience
+- I have experience
+- well-suited
+- well suited
+- good fit
+- great fit
+- qualified
+- coherent
 - maps directly
 - the kind of work I already do
 - I'd love to

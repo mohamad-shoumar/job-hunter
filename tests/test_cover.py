@@ -32,11 +32,12 @@ JOB = JobText.of("Senior Backend Engineer (Python)", POSTING, "Acme", PAGES)
 SECOND = "At CoinQuant, I've helped build and ship production systems. I'd bring that to your team."
 
 GOOD = {
-    "paragraph": "Acme runs payments for 2,000 merchants, and getting money to the right place every time is a "
-                 "backend problem I'd like to work on. Most of what I've built at CoinQuant runs on AWS, so it's "
-                 "close to the work I want to keep doing.",
-    "quote": "runs payments for 2,000 merchants",
-    "notes": ["Picked the payments scale from the posting."],
+    "reason": "Payments have to land in the right place every time.",
+    "paragraph": "Acme runs payments for merchants, and getting money to the right place every time is a "
+                 "backend problem I'd like to work on. I like work where being correct matters more than being "
+                 "clever.",
+    "quote": "Acme runs payments for 2,000 merchants",
+    "notes": ["Picked the payments work from the posting."],
 }
 BAD = {**GOOD, "paragraph": "I've used Acme Wallet for years and ran Kubernetes for 1000+ services. " + GOOD["paragraph"]}
 
@@ -176,7 +177,7 @@ def test_a_bad_paragraph_is_sent_back_once_with_the_reasons(filters):
     assert opening.found_at == "the posting"
     asked = w.model.claude.calls[0]["messages"][0]["content"]
     assert "--- https://acme.com ---\nAcme. Payouts in 40 countries." in asked and SECOND in asked
-    assert "- About 3.3 years" in asked and "4200" not in asked
+    assert "About 3.3 years" not in asked and "4200" not in asked  # your facts are for the checks, not the writer
     sent_back = w.model.claude.calls[1]["messages"][-1]["content"]
     assert "Wallet" in sent_back and "kubernetes" in sent_back and "I've used" in sent_back
 
@@ -184,19 +185,42 @@ def test_a_bad_paragraph_is_sent_back_once_with_the_reasons(filters):
 def test_a_sentence_that_stays_bad_is_left_out_and_said_why(filters):
     store = JobStore(":memory:")
     opening, _, attempts = writer(BAD, BAD).write(job_row(store, filters), "Acme", FACTS, PAGES, SECOND)
-    assert attempts == 2 and len(opening.removed) == 1 and "Acme Wallet" in opening.removed[0]
+    assert attempts == 2 and len(opening.removed) == 1 and "Acme Wallet" in opening.removed[0]  # 2 good ones left
     assert opening.text == GOOD["paragraph"]  # the good sentences stay
 
 
 def test_length_and_an_unfound_quote_are_sent_back_then_only_noted(filters):
     store = JobStore(":memory:")
     long = {**GOOD, "paragraph": GOOD["paragraph"] + " Acme runs payments for 2,000 merchants, and I like "
-            "that kind of backend work a lot because the services have to be right. That is the reason.",
+            "that kind of backend work a lot because the services have to be right every single time for every "
+            "merchant, every day, in every country they run in. That is the reason.",
             "quote": "we love our users"}
     opening, _, attempts = writer(long, long).write(job_row(store, filters), "Acme", FACTS, PAGES)
     assert attempts == 2 and opening.removed == []
     issues = " ".join(opening.style_issues)
     assert "4 sentences" in issues and "words; keep it to 65" in issues and "quote is not word for word" in issues
+    assert "headline numbers" in issues  # "2,000 merchants": their numbers, not why the work interests you
+
+
+@pytest.mark.parametrize("text", [
+    "At CoinQuant I architected scalable systems and led a team.",
+    "I've built event-driven platforms on AWS, so this fits.",
+    "My experience with queues would help here.",
+    "That is close to similar transitions I went through.",
+])
+def test_paragraph_1_never_describes_your_past_work(text, filters):
+    """Paragraph 2 does that; a claim here is easy to make up ("led a team through similar transitions")."""
+    store = JobStore(":memory:")
+    answer = {**GOOD, "paragraph": f"{GOOD['paragraph']} {text}"}
+    opening, _, attempts = writer(answer, answer).write(job_row(store, filters), "Acme", FACTS, PAGES)
+    assert attempts == 2 and "describes your past work" in opening.removed[0] and opening.text == GOOD["paragraph"]
+
+
+def test_a_third_try_when_too_little_would_be_left(filters):
+    store = JobStore(":memory:")
+    bad = {**GOOD, "paragraph": "At CoinQuant I built a ledger. I've led a team of 5."}
+    opening, _, attempts = writer(bad, bad, GOOD).write(job_row(store, filters), "Acme", FACTS, PAGES)
+    assert attempts == 3 and opening.text == GOOD["paragraph"]
 
 
 # --- the file ------------------------------------------------------------------------------------
@@ -240,7 +264,7 @@ def test_an_answer_with_nothing_usable_writes_nothing(tmp_path, filters):
     store = JobStore(":memory:")
     job_id = store_job(store, filters, description=POSTING)
     with pytest.raises(CoverError, match="No cover letter written"):
-        cover_for_job(store, job_id, writer({}, {}), PROFILE_FILE, config_for(tmp_path), NOW)
+        cover_for_job(store, job_id, writer({}, {}, {}), PROFILE_FILE, config_for(tmp_path), NOW)
     assert not list((tmp_path / "output").glob("*.md"))
     assert tracking.get_application(store, job_id)["cover_letter_json"] is None
 

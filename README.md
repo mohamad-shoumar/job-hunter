@@ -305,8 +305,9 @@ job):
    agencies get the posting only. Code checks every sentence: each name,
    number and word for what kind of company it is ("consultancy", "startup")
    must be in the posting, those pages or your profile; a sentence about you
-   names only your profile's tools and years. The model also quotes the words
-   its reason rests on, and code looks for them.
+   names only your profile's tools and years, and never describes your past
+   work ("I built", "my experience", your employer): paragraph 2 does that.
+   The model also quotes the words its reason rests on, and code looks for them.
 2. **Yours.** `cover_paragraph` in `config/outreach.json`, word for word,
    never checked.
 
