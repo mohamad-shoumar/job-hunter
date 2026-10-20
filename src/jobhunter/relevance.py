@@ -12,13 +12,16 @@ Three kinds of exclusion:
   title_exclude_single_role   specialties ("frontend", "ios", "qa"). Skipped
                               when the title names a second role that is a
                               target: "Frontend / Backend Engineer" passes.
+
+AI and forward-deployed roles (junior_only) are wanted only at junior level: a
+"senior"/"lead" title or a lower years ask rejects them, quoted.
 """
 
 from __future__ import annotations
 
 import re
 
-from .config import Filters
+from .config import Filters, JuniorOnly
 from .extract import find_required_yoe
 from .models import IRRELEVANT, MATCH, MAYBE, Assessment, Job
 from .text import has_phrase, normalize_words
@@ -88,6 +91,21 @@ def check_title(raw_title: str, filters: Filters) -> tuple[bool, str, str]:
     return False, "Title is not a target role", "title_not_target"
 
 
+def junior_only_role(title: str, rules: JuniorOnly) -> str | None:
+    """The AI or forward-deployed role a normalized title names, if it is one.
+
+    None when the title also names a role from unless_title_names: "Senior
+    Python / AI Backend Engineer" is a backend role and keeps the usual rules.
+    """
+    if _first(title, rules.unless_title_names):
+        return None
+    role = _first(title, rules.roles)
+    if role:
+        return role
+    ai_role = _AI_ROLE.search(title)
+    return ai_role.group(0) if ai_role else None
+
+
 def fit_score(job: Job, filters: Filters) -> int:
     return sum(filters.fit_weights.get(skill, 0) for skill in job.skills)
 
@@ -102,6 +120,18 @@ def assess_relevance(job: Job, filters: Filters) -> tuple[Assessment, int]:
     yoe = job.required_yoe
     found = find_required_yoe(job.description) if yoe is not None else None
     said = f': "{found[1]}"' if found and found[0] == yoe else ""
+    rules = filters.junior_only
+    title = normalize_words(_GENDER_MARKER.sub(" ", job.title or ""))
+    role = junior_only_role(title, rules) if rules else None
+    if role:
+        word = _first(title, rules.title_words)
+        if word:
+            return Assessment(IRRELEVANT, [f'"{role}" roles are junior-only, and the title says "{word}"'],
+                              "junior_only"), score
+        limit = rules.reject_if_required_yoe_at_least
+        if yoe is not None and limit and yoe >= limit:
+            return Assessment(IRRELEVANT, [f'"{role}" roles are junior-only, and it asks for {yoe}+ years{said}'],
+                              "junior_only"), score
     if yoe is not None and filters.reject_if_required_yoe_at_least and yoe >= filters.reject_if_required_yoe_at_least:
         return Assessment(IRRELEVANT, [f"Asks for {yoe}+ years of experience{said}"], "too_senior"), score
     if yoe is not None and filters.stretch_yoe_at_least and yoe >= filters.stretch_yoe_at_least:

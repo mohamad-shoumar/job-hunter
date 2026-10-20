@@ -94,3 +94,39 @@ def test_years_reason_quotes_the_posting(filters):
 def test_fit_score_counts_profile_skills(filters):
     _, score = assess_relevance(enrich(make_job()), filters)
     assert score >= 3 + 3 + 2 + 2  # python, fastapi, postgresql, aws
+
+
+# AI and forward-deployed roles only at junior level (the user's call 2026-10-20).
+@pytest.mark.parametrize(
+    "title, description, reason",
+    [
+        ("Senior AI Engineer", "Python.", '"ai engineer" roles are junior-only, and the title says "senior"'),
+        ("Sr. Forward Deployed Engineer", "Python.",
+         '"forward deployed" roles are junior-only, and the title says "senior"'),
+        ("Lead AI Deployment Engineer", "Python.", '"ai deployment engineer" roles are junior-only, and the title says "lead"'),
+        ("AI Automation Engineer", "3+ years building automation workflows. Python.",
+         '"ai automation" roles are junior-only, and it asks for 3+ years: "3+ years building automation workflows."'),
+        ("Forward Deployed Engineer", "You bring 5+ years of engineering experience.",
+         '"forward deployed" roles are junior-only, and it asks for 5+ years: '
+         '"You bring 5+ years of engineering experience."'),
+    ],
+)
+def test_ai_and_forward_deployed_roles_are_junior_only(title, description, reason, filters):
+    assessment, _ = assess_relevance(enrich(make_job(title=title, description=description)), filters)
+    assert (assessment.verdict, assessment.code, assessment.reasons) == (IRRELEVANT, "junior_only", [reason])
+
+
+@pytest.mark.parametrize(
+    "title, description",
+    [
+        ("AI Engineer", "2+ years of software engineering. Python."),
+        ("Forward Deployed Engineer", "Python and customers."),  # no years stated: kept
+        # The other target roles keep the usual rules.
+        ("Senior Backend Engineer", "3+ years of Python."),
+        ("Solutions Engineer", "4+ years of Python."),
+        ("Senior Python / AI Backend Engineer", "Python."),
+    ],
+)
+def test_junior_only_leaves_the_rest(title, description, filters):
+    assessment, _ = assess_relevance(enrich(make_job(title=title, description=description)), filters)
+    assert assessment.verdict != IRRELEVANT

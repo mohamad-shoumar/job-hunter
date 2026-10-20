@@ -110,6 +110,24 @@ def load_json(path: Path) -> dict:
 
 
 @dataclass
+class JuniorOnly:
+    """Roles applied to only at junior level (AI, forward deployed): see relevance.py."""
+    roles: list[str] = field(default_factory=list)
+    unless_title_names: list[str] = field(default_factory=list)
+    title_words: list[str] = field(default_factory=list)
+    reject_if_required_yoe_at_least: int | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict | None) -> JuniorOnly | None:
+        if not data:
+            return None
+        def words(key: str) -> list[str]:
+            return [w for w in (normalize_words(x) for x in data.get(key, [])) if w]
+        return cls(words("roles"), words("unless_title_names"), words("title_words"),
+                   data.get("reject_if_required_yoe_at_least"))
+
+
+@dataclass
 class Filters:
     max_posting_age_days: int | None
     reject_if_required_yoe_at_least: int | None
@@ -128,6 +146,8 @@ class Filters:
     relocation: Relocation | None = None
     # Countries you would move to on a work visa (visa.py): their jobs go to the separate visa list.
     visa: VisaRules | None = None
+    # AI and forward-deployed roles: rejected unless junior (relevance.py).
+    junior_only: JuniorOnly | None = None
 
     @classmethod
     def from_dict(cls, data: dict) -> Filters:
@@ -149,6 +169,7 @@ class Filters:
             agencies=AgencyRules.from_dict(data.get("agencies")),
             relocation=Relocation.from_dict(data.get("relocation")),
             visa=VisaRules.from_dict(data.get("visa_list")),
+            junior_only=JuniorOnly.from_dict(data.get("junior_only")),
         )
 
     @classmethod

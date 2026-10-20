@@ -114,6 +114,17 @@
     "quant developer", "quantitative developer"
   ],
 
+  "_junior_only": "AI and forward-deployed roles you apply to only at junior level (the user's call 2026-10-20; backend, software and solutions roles keep the years rules above). A title is one when it has a word from `roles` or is an AI engineering role (relevance.py), unless it also names one of `unless_title_names` ('Senior Python / AI Backend Engineer' is a backend role). Rejected (code junior_only), quoted: a word from `title_words` in the title, or a stated years ask at or above reject_if_required_yoe_at_least. The years can be in any field ('3+ years of software, 1+ with LLMs' counts as 3). No years stated is kept.",
+  "junior_only": {
+    "roles": [
+      "forward deployed", "applied ai", "ai engineer", "ai developer", "ai automation", "agent engineer",
+      "agents engineer", "llm engineer", "genai engineer", "ai platform engineer"
+    ],
+    "unless_title_names": ["backend", "fullstack"],
+    "title_words": ["senior", "lead"],
+    "reject_if_required_yoe_at_least": 3
+  },
+
   "_title_exclude": "Seniority and job-function words. Any of these rejects the title, with no exceptions.",
   "title_exclude": [
     "manager", "director", "vp", "vice president", "head of", "chief", "cto",

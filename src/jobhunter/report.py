@@ -31,6 +31,8 @@ _REJECT_GROUPS = [
      "The title has none of the `title_include` keywords in `config/filters.json` "
      "(backend, software engineer, python, AI engineer, full stack, ...)."),
     ("too_senior", "Asks for too many years", "At or above `reject_if_required_yoe_at_least`."),
+    ("junior_only", "AI or forward-deployed role above junior",
+     "`junior_only` in `config/filters.json`: a senior/lead title, or years at or above its limit. Quoted."),
     ("not_remote", "Not remote", "Onsite or hybrid, outside the countries you would move to."),
     ("local_only", "Only for nationals or people already there",
      "A country you would move to, but the posting wants nationals or a visa you already hold. Quoted."),
