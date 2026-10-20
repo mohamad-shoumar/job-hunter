@@ -288,7 +288,7 @@ def test_relative_folders_are_inside_the_project_and_letters_are_not_automatic(t
     assert config.cover_model == "" and config.auto_cover is False and config.cover_paragraph == ""
     assert config.cover_guidelines == str(tmp_path.resolve() / "config" / "cover_letter_guidelines.md")
     shipped = OutreachConfig.load(ROOT / "config" / "outreach.json")
-    assert shipped.auto_cover is False and shipped.cover_model.startswith("deepseek") and shipped.cover_paragraph
+    assert shipped.auto_cover is False and shipped.cover_model == "claude-code" and shipped.cover_paragraph
 
 
 # --- the daily run and the report ---------------------------------------------------------------

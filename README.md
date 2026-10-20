@@ -297,8 +297,8 @@ run writes none (`auto_cover` is false). A letter is just two paragraphs, with
 no header, date, greeting or sign-off (the form already has your name and the
 job):
 
-1. **Why this company.** `cover_model` (DeepSeek, `deepseek-v4-pro`, about
-   $0.01) writes it from the posting and up to 3 pages code fetches from the
+1. **Why this company.** `cover_model` (`claude-code`: the Claude Code CLI with
+   your Claude login, no API key, about 25 seconds) writes it from the posting and up to 3 pages code fetches from the
    company's site: its home page, /about and /blog. The domain is the one the
    contact lookup found, else one in the job's links, else a guess
    (`acme.com`, kept only when the page names the company). Job boards and

@@ -7,7 +7,7 @@ config/outreach.json), printed word for word, so nothing here applies to it.
 How this file is used:
 
 - The part between `writer:start` and `writer:end` is written to the model
-  (`cover_model`, DeepSeek) after the rules in `cover.py`'s `SYSTEM`. Change
+  (`cover_model`, Claude Code) after the rules in `cover.py`'s `SYSTEM`. Change
   how the paragraph reads by editing this file, not the code.
 - The facts rules do not live here. They stay in code (`check_sentence`): about
   the company, every name and number must be in the posting or the pages code
@@ -87,6 +87,9 @@ like a short Slack message to a friend saying why you applied.
   agents", "the PDF parsing"), not an abstraction of it ("autonomy",
   "technical ownership", "system-design twist").
 - Plain verbs and plain words. It's fine if it sounds a bit ordinary.
+- A sentence on what I like is optional. Don't end every paragraph with "I
+  like backend work where ...": often the reason alone is enough. Match the
+  role: a web or frontend job is not "backend work".
 
 ## Examples of the voice
 

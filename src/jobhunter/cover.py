@@ -1,6 +1,6 @@
 """A cover letter for one job: two paragraphs, only when you ask for one.
 
-  1. Why you want to join this company: written by the model (DeepSeek) from
+  1. Why you want to join this company: written by the model (cover_model, Claude Code) from
      the posting and a few pages code fetches from the company's website
      (its home page, /about, /blog). Code checks every sentence:
        - about the company, every number and name must be in the posting or
