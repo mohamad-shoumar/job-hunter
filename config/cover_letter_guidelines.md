@@ -70,29 +70,45 @@ here:
   honest interest in their work is enough.
 - No em dash (—), no exclamation marks, no questions.
 
+## Plain, not clever
+
+What makes a paragraph read as AI is mostly being clever. Write it flat,
+like a short Slack message to a friend saying why you applied.
+
+- No one-liners or sayings: "boring in the best way", "where every endpoint
+  has to be right", "careful engineering really pays off".
+- No comparisons to make the job sound special: "harder than most", "a
+  different kind of", "far more interesting than", "X, not just Y".
+- No "the kind of", "that kind of", "this kind of".
+- No setup and reveal: "looks dull until", "the real challenge is", a colon
+  before the point.
+- No sentence that sums up or rounds off the paragraph.
+- Name the actual thing in their words or simpler ones ("the booking
+  agents", "the PDF parsing"), not an abstraction of it ("autonomy",
+  "technical ownership", "system-design twist").
+- Plain verbs and plain words. It's fine if it sounds a bit ordinary.
+
 ## Examples of the voice
 
-These are for made-up companies, to show the tone and the shape. Never reuse
+These are for made-up companies, to show how plain it should be. Never reuse
 their wording or their details.
 
-- A payroll API: "Payroll looks dull until you see that every run has to
-  reconcile to the cent against a different set of tax rules. I like backend
-  work where being correct matters more than being clever, and that's about
-  as pure a version of it as I've seen."
-- A warehouse robotics startup: "Re-planning robot routes when orders change
-  after picking has started means the system has to keep changing its mind in
-  real time. That's a far more interesting backend problem than moving data
-  between services, and I'd like a go at it."
-- A small dev tools team: "Being one of two engineers who decide how the
-  whole API looks, with the founders in the same conversations, is the kind
-  of setup I want. You see the effect of every decision quickly, and nothing
-  gets lost in a handoff."
+- A payroll API: "I'd like to work on the tax side of your payroll API.
+  Getting every run to reconcile against different tax rules sounds fiddly,
+  and I like backend work where the numbers have to be exactly right."
+- A warehouse robotics startup: "The route re-planning work is what caught
+  my eye. Orders change after picking has started, so the system has to
+  update plans while robots are moving, and I'd like to work on that."
+- A small dev tools team: "I like that the two engineers here decide how the
+  whole API works, with the founders involved. I'd rather work on a small
+  team like that than be one of fifty people on a roadmap."
 
 ## 3. Human authenticity test
 
 Before you answer, ask: "Would a pragmatic developer actually say this in a
 casual conversation with the hiring manager?" If it sounds polished, generic,
-flattering, or AI-generated, rewrite it more naturally.
+flattering, clever or AI-generated, rewrite it flatter. Read it out loud in
+your head: if a sentence sounds like a tagline, cut it.
 
 ## 4. Words that read as AI
 
@@ -208,6 +224,14 @@ Code checks every sentence against these lists. Matching ignores case.
 - ties directly
 - ties into
 - connects directly
+- the kind of
+- that kind of
+- this kind of
+- in the best way
+- harder problem than
+- a different kind of
+- really pays off
+- not just
 - enjoy solving
 - got me
 - relevant experience

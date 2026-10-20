@@ -374,6 +374,8 @@ def check_style(text: str, job: JobText, style: Style) -> tuple[list[str], list[
         issues.append(f'ends with a ", {tail.group(1)} ..." add-on; make it its own sentence or cut it')
     if "!" in text or "?" in text:
         issues.append("has an exclamation mark or a question")
+    if re.search(r":(?!\d)", text):
+        issues.append("uses a colon to set up a point; say it plainly in its own sentence")
     return problems, issues, [w for w in style.at_most_one if uses(w)]
 
 

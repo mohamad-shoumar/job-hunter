@@ -192,7 +192,7 @@ def test_a_sentence_that_stays_bad_is_left_out_and_said_why(filters):
 def test_length_and_an_unfound_quote_are_sent_back_then_only_noted(filters):
     store = JobStore(":memory:")
     long = {**GOOD, "paragraph": GOOD["paragraph"] + " Acme runs payments for 2,000 merchants, and I like "
-            "that kind of backend work a lot because the services have to be right every single time for every "
+            "backend work a lot because the services have to be right every single time for every "
             "merchant, every day, in every country they run in. That is the reason.",
             "quote": "we love our users"}
     opening, _, attempts = writer(long, long).write(job_row(store, filters), "Acme", FACTS, PAGES)
