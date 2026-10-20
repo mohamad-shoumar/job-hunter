@@ -108,7 +108,8 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
   "Preliminary questions" page after Next: industries Financial services + Computers and
   information technology, function Engineering, 3 - 5 years, the floor bracket for monthly salary
   (3,000 - 3,500), languages from the profile's "Spoken languages" line, visa No,
-  gender and community "Prefer not to say/answer", disability left empty, privacy box ticked.
+  gender, community and disability from the profile's self-identification section (below),
+  privacy box ticked.
 - **LinkedIn Easy Apply** (the user is already signed in to LinkedIn in Chrome):
   - Use it only when the LinkedIn job page shows an **Easy Apply** button. A plain **Apply** button
     goes to the company site: follow it and fill that form instead.
@@ -147,8 +148,12 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
     empty for the user to click themselves, and list it in the report as "AI question left for
     you". The job stays in To apply.
   - **Disability, medical needs, accommodations or adjustments:** No / none needed.
-  - **Gender, race, veteran and other voluntary questions:** "Prefer not to say" / "Decline to
-    self-identify" when that option exists.
+  - **Gender, sexual orientation, race and other voluntary (EEO) questions:** answer from the
+    profile's "Voluntary self-identification (forms only)" section, word for word in meaning, and
+    never "Prefer not to say" for a question it covers (the user's call, 2026-10-21). Those answers
+    live only in the profile (not in git): never copy them into a tracked file. A voluntary
+    question the section doesn't cover: leave it empty for the user (pick "Prefer not to say" only
+    if the field is required) and list it in the report.
   - **How did you hear about us:** pick **Other** ("Other (please specify)" or the like) and write
     "An AI job hunter tool I built in-house" in its text box. A free-text question gets the same
     words. If the list has no Other option, pick the closest choice ("Job board") and note it.
