@@ -3,13 +3,15 @@
 Verdicts:
   eligible  the posting says so (Lebanon listed, or open worldwide)
   likely    a region/time zone that includes Lebanon, or an employer-of-record hint
-  unclear   remote, but nothing decisive - or the signals contradict each other
+  unclear   remote, but nothing decisive - or a restriction the posting itself doubts
   rejected  onsite/hybrid, or limited to places that do not include Lebanon
 
-The rules only reject on evidence they can quote back. When a positive and a
-negative signal disagree ("Worldwide" in the location field, "must be based in
-the US" in the text) the answer is `unclear`, not a guess. `unclear` jobs are
-the ones an LLM or a human should look at.
+The rules only reject on evidence they can quote back. A location that fits,
+narrowed somewhere else ("Worldwide" in the location field, "must be based in
+the US" in the text), is rejected, quoting both: the narrower rule is the one
+that applies (the user's call, 2026-10-22). A restriction the posting doubts
+("Remote - Europe (UTC-1 to UTC+3)") stays `unclear`. `unclear` jobs are the
+ones an LLM or a human should look at.
 
 "Remote" alone never counts as international: it is `unclear`.
 """
@@ -105,6 +107,8 @@ _ROLE_WORLDWIDE = re.compile(
     re.I,
 )
 _LEBANON_PROSE = re.compile(r"\b(?:lebanon|beirut)\b", re.I)
+# "The salary range listed for this role applies to US-based candidates only": about pay, not who may apply.
+_PAY_RANGE = re.compile(r"\b(?:salary|pay|compensation)\s+(?:ranges?|bands?)\b", re.I)
 
 
 def _snippet(text: str, start: int, end: int, width: int = 160) -> str:
@@ -152,7 +156,7 @@ class DescriptionSignals:
         self.eor = extract_eor_mentions(text)
         self.contractor = extract_contractor_mentions(text)
         self.timezone = timezone_signal(text)
-        self.restrictions = list(dict.fromkeys(self.restrictions))
+        self.restrictions = list(dict.fromkeys(r for r in self.restrictions if not _PAY_RANGE.search(r)))
         self.place_positives = list(dict.fromkeys(self.place_positives))
 
     @property
@@ -200,10 +204,9 @@ def assess_eligibility(job: Job, relocation: Relocation | None = None, visa: Vis
 
     # In a country you would move to, on-site is fine; so is "Remote (UAE)", which means living there.
     # A region that includes Lebanon ("EMEA, Dubai") is still the remote path below.
-    if relocation:
-        place = relocation.place_in(field_texts + [m.evidence for m in title_matches])
-        if place and (job.remote_status in (ONSITE, HYBRID) or not any(m.kind in POSITIVE_KINDS for m in everything)):
-            return assess_relocation(job, place, relocation)
+    place = relocation.place_in(field_texts + [m.evidence for m in title_matches]) if relocation else None
+    if place and (job.remote_status in (ONSITE, HYBRID) or not any(m.kind in POSITIVE_KINDS for m in everything)):
+        return assess_relocation(job, place, relocation)
     # On-site or hybrid in a country you would need a work visa for ("London"): the visa list decides.
     found = visa.place_in(field_texts + [m.evidence for m in title_matches]) if visa else None
     if found and job.remote_status in (ONSITE, HYBRID):
@@ -214,6 +217,9 @@ def assess_eligibility(job: Job, relocation: Relocation | None = None, visa: Vis
         return Assessment(NOT_ELIGIBLE, [f'Not remote ({job.remote_status}): "{where}"'], "not_remote")
 
     remote = _assess_remote(job, field_texts, field_matches, title_matches)
+    # "Middle East", but: location "UAE": limited to people living in the UAE, so the relocation rules decide.
+    if place and remote.code == "location_conflict":
+        return assess_relocation(job, place, relocation)
     # A remote job open to Lebanon stays one ("Berlin / REMOTE (CET ±3)"). Only one limited to
     # people living there ("Remote (UK)") means moving, so the visa list decides.
     if found and remote.verdict == NOT_ELIGIBLE:
@@ -245,7 +251,7 @@ def _assess_remote(job: Job, field_texts: list[str], field_matches: list[PlaceMa
     if positive:
         # Alternatives inside one place (a list of locations, one field) are
         # an OR, so a positive wins there. A restriction from somewhere else
-        # (the title, the description) contradicts it.
+        # (the title, the description) narrows it, and the narrower rule applies.
         conflicts = list(desc.restrictions) + ([tz_conflict] if tz_conflict else [])
         if title_restricted and not title_positive:
             conflicts.append(f"title: {_quote(title_restricted)}")
@@ -254,9 +260,9 @@ def _assess_remote(job: Job, field_texts: list[str], field_matches: list[PlaceMa
         kinds = {m.kind for m in positive}
         if conflicts:
             return Assessment(
-                UNCLEAR,
+                NOT_ELIGIBLE,
                 [f"Location says {_quote(positive)}, but: " + " | ".join(conflicts)] + notes,
-                "conflict",
+                "location_conflict",
             )
         if WORLDWIDE in kinds:
             return Assessment(ELIGIBLE, [f"Open worldwide: {_quote(positive)}"] + notes, "worldwide")

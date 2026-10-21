@@ -19,6 +19,8 @@ jobs.ai_check_json is the AI web check's finding (ai_check.py). It is kept
 apart from the rule verdict so `reclassify` can combine the two again.
 jobs.fit_grade_json is the AI fit grade (fitgrade.py): only for sorting, never
 part of the status, so `reclassify` leaves it alone.
+jobs.date_check_json is where an undated job's posting date was found (posted_date.py); the date itself
+goes into posted_at, which a later sighting only fills when empty.
 """
 
 from __future__ import annotations
@@ -30,7 +32,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from .identity import ats_key_from_url, fingerprint
-from .models import AiCheck, Classification, Job
+from .models import AiCheck, Classification, DateCheck, Job
 from .text import iso, parse_datetime
 
 SCHEMA = """
@@ -218,7 +220,7 @@ CREATE TABLE IF NOT EXISTS kv (
 """
 
 # Columns added after the first release, for databases created before them.
-_ADDED_COLUMNS = {"report_date": "TEXT", "ai_check_json": "TEXT", "fit_grade_json": "TEXT"}
+_ADDED_COLUMNS = {"report_date": "TEXT", "ai_check_json": "TEXT", "fit_grade_json": "TEXT", "date_check_json": "TEXT"}
 _ADDED_APPLICATION_COLUMNS = ("cv_file", "cv_tailored_json", "cover_letter_json", "skip_reason", "skip_note")
 
 # Filled from a later sighting only when the stored value is empty.
@@ -296,6 +298,7 @@ def row_to_job(row: sqlite3.Row) -> Job:
         first_seen=parse_datetime(row["first_seen"]),
         last_seen=parse_datetime(row["last_seen"]),
         ai_check=AiCheck(**json.loads(row["ai_check_json"])) if row["ai_check_json"] else None,
+        date_check=DateCheck(**json.loads(row["date_check_json"])) if row["date_check_json"] else None,
     )
 
 
@@ -443,6 +446,11 @@ class JobStore:
     def save_ai_check(self, job_id: int, check: AiCheck) -> None:
         self.conn.execute("UPDATE jobs SET ai_check_json = ? WHERE id = ?", (json.dumps(asdict(check)), job_id))
 
+    def save_date_check(self, job_id: int, check: DateCheck) -> None:
+        """The evidence, and the date it found when the job still has none."""
+        self.conn.execute("UPDATE jobs SET date_check_json = ?, posted_at = COALESCE(posted_at, ?) WHERE id = ?",
+                          (json.dumps(asdict(check)), check.posted_at, job_id))
+
     def save_fit_grade(self, job_id: int, grade: dict) -> None:
         self.conn.execute("UPDATE jobs SET fit_grade_json = ? WHERE id = ?", (json.dumps(grade), job_id))
 
@@ -458,6 +466,14 @@ class JobStore:
 
     def all_jobs(self) -> list[sqlite3.Row]:
         return self.conn.execute("SELECT * FROM jobs ORDER BY id").fetchall()
+
+    def needs_date_check(self, recheck: bool = False) -> list[sqlite3.Row]:
+        """Undated jobs waiting for review, newest first. `recheck` includes ones searched before without luck."""
+        unchecked = "" if recheck else " AND date_check_json IS NULL"
+        return self.conn.execute(
+            f"SELECT * FROM jobs WHERE status = 'needs_review' AND posted_at IS NULL{unchecked} "
+            "ORDER BY first_seen DESC, id DESC"
+        ).fetchall()
 
     def needs_ai_check(self, recheck: bool = False) -> list[sqlite3.Row]:
         """Jobs waiting for review because the rules could not tell about Lebanon, newest

@@ -48,7 +48,7 @@ _SPONSOR_WORD = re.compile(r"\bsponsor(?:s|ed|ing|ship|ships)?\b", re.I)
 # An offer: the visa words together, never "sponsorship" alone.
 _OFFER = re.compile(
     r"\bvisas?\s+(?:sponsor(?:ship|s|ed|ing)?|support|assistance|services|help|application\s+support)\b"
-    r"|\bsponsor(?:s|ing|ship\s+(?:for|of))?\s+(?:\w+\s+){0,3}?(?:visas?|work\s+permits?)\b"
+    r"|\bsponsor(?:s|ing|ship\s+(?:for|of))?\s+(?:\w[\w-]*\s+){0,3}?(?:visas?|work\s+permits?)\b"  # "H-1B visas"
     r"|\bsupports?\s+(?:\w+\s+){0,2}?visas?\b"
     r"|\brelocation\s+(?:and|&|/|and/or)\s+visas?\b|\bvisas?\s+(?:and|&|/)\s+relocation\b"
     r"|\b(?:skilled\s+worker|blue\s+card|highly\s+skilled\s+migrant|kennismigrant|critical\s+skills|global\s+talent)"

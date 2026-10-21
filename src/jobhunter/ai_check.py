@@ -18,8 +18,10 @@ The quote is then checked in code: it must appear word for word in the job
 description or in text the API returned from a page Claude opened (or, for
 DeepSeek and Claude Code, a page code fetched). Only a
 verified quote changes a job's status (see classify.apply_ai_check):
-`cannot_hire` rejects it, `can_hire` shortlists it as `likely`. Anything else
-leaves it in needs_review with the finding attached.
+`cannot_hire` rejects it, `can_hire` shortlists it as `likely`, and so does
+`sponsors_visa` when visa.read_posting also reads the quote as a visa offer (a
+work visa in any country: the user's call 2026-10-22). Anything else leaves it
+in needs_review with the finding attached.
 
 Results are stored in jobs.ai_check_json, so `reclassify` keeps them, and a
 job is checked once unless asked again (`jobhunter check --recheck`).
@@ -42,13 +44,14 @@ from .classify import classify, recheck_age
 from .config import Filters
 from .eligibility import assess_eligibility
 from .llm import CLAUDE_CODE, JsonModel, Usage, error_line, find_quote, forced_tool_choice, json_model, pages_read, plain
-from .models import CAN_HIRE, CANNOT_HIRE, UNKNOWN_HIRE, AiCheck, Classification, Job
+from .models import CAN_HIRE, CANNOT_HIRE, SPONSORS_VISA, UNKNOWN_HIRE, AiCheck, Classification, Job
 from .store import JobStore, row_to_job
 from .text import html_to_text, iso
 
 log = logging.getLogger(__name__)
 
 JOB_DESCRIPTION = "job description"
+DECISIVE = (CAN_HIRE, SPONSORS_VISA, CANNOT_HIRE)
 MAX_REQUESTS = 6  # per job: pause_turn continuations, plus one nudge to record the verdict
 DESCRIPTION_CHARS = 8000
 
@@ -67,15 +70,23 @@ says what the job board did not, e.g. "Remote - US". Make sure it is the same \
 role: a company may post one title for the US and another for EMEA.
 2. The company's general policy: a careers page, handbook or FAQ that says \
 where it hires.
+3. Whether it sponsors work visas: the posting, or the careers page or FAQ, \
+for roles like this one.
 
 Verdicts:
-- cannot_hire: the evidence limits this role, or all of the company's hiring, \
-to places that do not include Lebanon: a country list, "US only", "must be \
-based in the EU", required time zones that exclude UTC+2/UTC+3, a list of \
-employer-of-record countries without Lebanon.
 - can_hire: the evidence explicitly allows Lebanon, anywhere/worldwide, or a \
 region that includes Lebanon (EMEA, Middle East, "UTC+2 to UTC+4"), and \
 nothing narrower applies to this role.
+- sponsors_visa: not can_hire, but the evidence says the company sponsors a \
+work visa or work permit for this role or roles like it, in any country, e.g. \
+"We offer visa sponsorship and relocation support". "Sponsorship" alone, \
+relocation help that names no visa, or "we cannot sponsor" do not count. The \
+quote must be the sentence that offers the visa.
+- cannot_hire: the evidence limits this role, or all of the company's hiring, \
+to places that do not include Lebanon: a country list, "US only", "must be \
+based in the EU", required time zones that exclude UTC+2/UTC+3, a list of \
+employer-of-record countries without Lebanon; and you found no visa \
+sponsorship.
 - unknown: anything else. A salary in USD, a US headquarters, US benefits or \
 "US preferred" are not evidence. Neither is a job board's own "Worldwide" or \
 "Anywhere" label. Say unknown rather than guess.
@@ -99,7 +110,7 @@ RECORD_VERDICT = {
     "input_schema": {
         "type": "object",
         "properties": {
-            "verdict": {"type": "string", "enum": [CAN_HIRE, CANNOT_HIRE, UNKNOWN_HIRE]},
+            "verdict": {"type": "string", "enum": [CAN_HIRE, SPONSORS_VISA, CANNOT_HIRE, UNKNOWN_HIRE]},
             "reason": {"type": "string", "description": "One plain sentence."},
             "quote": {"type": "string", "description": "Exact text from the page or the job description."},
             "source_url": {"type": "string", "description": "The page the quote is from, or 'job description'."},
@@ -127,6 +138,9 @@ class AiCheckConfig:
     max_fetches_per_job: int = 3
     max_page_tokens: int = 12000
     workers: int = 4
+    # Undated needs_review jobs: look up when they were posted (posted_date.py), before the check above.
+    find_dates: bool = True
+    max_dates_per_run: int = 25
 
     @classmethod
     def load(cls, path: Path) -> AiCheckConfig:
@@ -192,7 +206,7 @@ class AiChecker:
         if answer is None:
             raise RuntimeError(f"no verdict after {MAX_REQUESTS} requests")
 
-        verdict = answer.get("verdict") if answer.get("verdict") in (CAN_HIRE, CANNOT_HIRE) else UNKNOWN_HIRE
+        verdict = answer.get("verdict") if answer.get("verdict") in DECISIVE else UNKNOWN_HIRE
         quote = " ".join(str(answer.get("quote") or "").split())
         stated_url = str(answer.get("source_url") or "").strip()
         found_at = find_quote(quote, pages, stated_url) if verdict != UNKNOWN_HIRE else None
@@ -316,7 +330,7 @@ def _pages_message(job: Job, rule_reason: str, pages: list[tuple[str, str]]) -> 
 
 def _result(answer: dict, pages: list[tuple[str, str]], model: str, now: datetime, usage: Usage,
             searches: int = 0) -> AiCheck:
-    verdict = answer.get("verdict") if answer.get("verdict") in (CAN_HIRE, CANNOT_HIRE) else UNKNOWN_HIRE
+    verdict = answer.get("verdict") if answer.get("verdict") in DECISIVE else UNKNOWN_HIRE
     quote = " ".join(str(answer.get("quote") or "").split())
     stated_url = str(answer.get("source_url") or "").strip()
     found_at = find_quote(quote, pages, stated_url) if verdict != UNKNOWN_HIRE else None

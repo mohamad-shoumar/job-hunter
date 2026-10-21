@@ -230,6 +230,13 @@ def render(day: str, rows: list[sqlite3.Row], sightings: dict[int, list[sqlite3.
         for name, s in sorted(summary.get("sources", {}).items()):
             out.append(f"| {name} | {s['fetched']} | {s['new']} | {len(s['errors'])} |")
         out.append("")
+        dates = summary.get("date_check")
+        if dates:
+            found = ", ".join(f"{n} {v}" for v, n in sorted(dates["found"].items())) or "none"
+            out += [f"**Posting dates** (job pages, then {dates['model']}): {dates['checked']} undated jobs "
+                    f"looked up ({found})", ""]
+            out += [f"- {_cell(line)}" for line in dates["notes"] + dates["errors"]]
+            out += [""] if dates["notes"] or dates["errors"] else []
         ai = summary.get("ai_check")
         if ai:
             verdicts = ", ".join(f"{n} {v.replace('_', ' ')}" for v, n in sorted(ai["verdicts"].items())) or "none"

@@ -54,14 +54,25 @@ def test_description_residency_rule_rejects_when_location_is_silent():
     assert (a.verdict, a.code) == (NOT_ELIGIBLE, "residency_required")
 
 
-def test_worldwide_field_contradicted_by_description_is_unclear():
+def test_worldwide_field_narrowed_by_description_is_rejected_quoting_both():
+    # The narrower rule applies (the user's call, 2026-10-22).
     a = verdict(allowed_locations=["Worldwide"], description="Candidates must be based in the UK.")
-    assert (a.verdict, a.code) == (UNCLEAR, "conflict")
+    assert (a.verdict, a.code) == (NOT_ELIGIBLE, "location_conflict")
+    assert a.reasons[0] == 'Location says "Worldwide", but: Candidates must be based in the UK'
 
 
-def test_title_restriction_contradicts_worldwide_field():
+def test_title_restriction_narrows_worldwide_field():
     a = verdict(title="Backend Engineer (US only)", allowed_locations=["Worldwide"])
-    assert a.verdict == UNCLEAR
+    assert (a.verdict, a.code) == (NOT_ELIGIBLE, "location_conflict")
+
+
+def test_a_salary_range_for_us_candidates_is_not_a_location_rule():
+    # Five stored postings: "US - Remote, EMEA - Remote" with this note were held back as a conflict.
+    a = verdict(allowed_locations=["UNITED STATES - Remote, EMEA - Remote, LATAM - Remote"],
+                description="The salary range listed for this role applies to US-based candidates only.")
+    assert (a.verdict, a.code) == (LIKELY, "region_ok")
+    rule = verdict(allowed_locations=["EMEA - Remote"], description="This role is open to US-based candidates only.")
+    assert rule.code == "location_conflict"
 
 
 def test_restriction_questioned_by_employer_of_record_is_unclear():
@@ -107,7 +118,7 @@ def test_work_from_anywhere_in_the_us_is_not_worldwide():
 
 def test_himalayas_timezone_window_without_lebanon():
     worldwide = verdict(allowed_locations=["Worldwide"], allowed_utc_offsets=[-8, -7, -6, -5])
-    assert worldwide.verdict == UNCLEAR
+    assert (worldwide.verdict, worldwide.code) == (NOT_ELIGIBLE, "location_conflict")
     silent = verdict(location_raw=None, allowed_utc_offsets=[-8, -5], description="")
     assert (silent.verdict, silent.code) == (NOT_ELIGIBLE, "timezone_restricted")
 
@@ -123,7 +134,7 @@ def test_long_country_list_in_description_is_read():
         "Canada (Ontario or British Columbia), Netherlands, Poland, or Czech Republic."
     )
     a = verdict(allowed_locations=["Anywhere in the World"], description=rule)
-    assert (a.verdict, a.code) == (UNCLEAR, "conflict")
+    assert (a.verdict, a.code) == (NOT_ELIGIBLE, "location_conflict")
     assert "Czech Republic" in a.reasons[0]
     silent = verdict(location_raw="Remote", description=rule)
     assert (silent.verdict, silent.code) == (NOT_ELIGIBLE, "residency_required")

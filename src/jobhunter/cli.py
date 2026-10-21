@@ -13,6 +13,7 @@ from pathlib import Path
 
 from . import pipeline
 from .ai_check import build_checker, check_jobs
+from .posted_date import build_finder, find_dates
 from .classify import classify, recheck_age
 from .config import Filters, Paths, load_dotenv, load_json, resolve_root
 from .extract import enrich
@@ -85,6 +86,13 @@ def cmd_run(args) -> int:
         print(f"{name:16} {stats.fetched:5} listings  {stats.new:4} new{flag}")
     breakdown = ", ".join(f"{v} {k}" for k, v in summary.new_by_status.most_common())
     print(f"\n{summary.new} new jobs" + (f": {breakdown}" if breakdown else "") + "\n")
+    if summary.date_check:
+        dc = summary.date_check
+        found = ", ".join(f"{n} {v}" for v, n in dc["found"].items()) or "none"
+        print(f"Posting dates: {dc['checked']} undated jobs looked up ({found})")
+        for line in dc["notes"] + dc["errors"]:
+            print(f"  {line}")
+        print()
     if summary.ai_check:
         ai = summary.ai_check
         verdicts = ", ".join(f"{n} {v}" for v, n in ai["verdicts"].items()) or "none"
@@ -289,6 +297,58 @@ def cmd_check(args) -> int:
     return 1 if result.errors and not result.checked else 0
 
 
+def cmd_dates(args) -> int:
+    """Posting dates for undated needs_review jobs: given ids, or the ones not looked up yet, newest first."""
+    paths, _, filters = _load(args)
+    finder, note = build_finder(paths.ai_check_file, require_enabled=False)
+    if note:
+        print(note)
+    now = utcnow()
+    store = JobStore(paths.db_file)
+    try:
+        if args.job_ids:
+            rows = []
+            for job_id in args.job_ids:
+                row = store.get(job_id)
+                if row is None:
+                    print(f"#{job_id}: no such job")
+                elif row["posted_at"] and not row["date_check_json"]:
+                    print(f"#{job_id}: skipped, its source gave a date ({row['posted_at'][:10]})")
+                else:
+                    rows.append(row)
+            waiting = len(rows)
+        else:
+            rows = store.needs_date_check(recheck=args.recheck)
+            waiting = len(rows)
+            rows = rows[: args.limit or finder.config.max_dates_per_run]
+        if not rows:
+            print("nothing to look up")
+            return 0
+        print(f"looking up {len(rows)} of {waiting} undated jobs (job pages, then {finder.label})\n")
+
+        def show(row, check, cls):
+            print(f"#{row['id']:<5} {row['company']} — {row['title']}")
+            print(f"       {check.posted_at[:10] if check.posted_at else 'no date'} -> {cls.status}: {check.reason}")
+            if check.quote:
+                print(f'       "{check.quote}" ({check.source_url})')
+
+        result = find_dates(store, finder, rows, filters, now, on_result=show)
+        rebuilt = [write_report(store, paths.reports_dir, day, store.last_run_stats(), now, filters.max_posting_age_days)
+                   for day in sorted(result.changed_days)]
+    finally:
+        store.close()
+    print(f"\n{result.checked} looked up")
+    for change, count in result.status_changes.most_common():
+        print(f"{count:5}  {change}")
+    for line in result.notes + result.errors:
+        print(f"  {line}")
+    if waiting > len(rows):
+        print(f"{waiting - len(rows)} more waiting: run it again, or pass --limit")
+    for path in rebuilt:
+        print(f"rebuilt {path}")
+    return 1 if result.errors and not result.checked else 0
+
+
 def cmd_reclassify(args) -> int:
     paths, _, filters = _load(args)
     store = JobStore(paths.db_file)
@@ -359,6 +419,13 @@ def cmd_show(args) -> int:
         print(f"  - {ai['reason']}")
         if ai["quote"]:
             print(f'  - "{ai["quote"]}" ({ai["source_url"]})')
+    if row["date_check_json"]:
+        dc = json.loads(row["date_check_json"])
+        print(f"posting date: {dc['posted_at'][:10] if dc['posted_at'] else 'not found'}"
+              f"  [{dc['found_by']}, {dc['checked_at'][:10]}]")
+        print(f"  - {dc['reason']}")
+        if dc["quote"]:
+            print(f'  - "{dc["quote"]}" ({dc["source_url"]})')
     print(f"relevance: {row['relevance']}  fit {row['fit_score']}")
     for reason in json.loads(row["relevance_reasons_json"]):
         print(f"  - {reason}")
@@ -655,6 +722,19 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--limit", type=int, metavar="N", help="check at most N jobs (default: max_jobs_per_run)")
     p.add_argument("--recheck", action="store_true", help="include jobs already checked (unknown or unverified)")
     p.set_defaults(func=cmd_check)
+
+    p = sub.add_parser(
+        "dates",
+        help="find when undated needs_review jobs were posted (job pages, then web search; config/ai_check.json)",
+        description="Code reads the schema.org datePosted on the job's own pages; when none has one, web_model "
+        "(Claude Code) searches the web and quotes the words that state the date. Code finds the quote on the page "
+        "and reads the date from it, then the age rule judges the job. Without ids: the undated needs_review jobs "
+        "not looked up yet, newest first, up to max_dates_per_run.",
+    )
+    p.add_argument("job_ids", type=int, nargs="*", help="look up these jobs (again, if already looked up)")
+    p.add_argument("--limit", type=int, metavar="N", help="look up at most N jobs (default: max_dates_per_run)")
+    p.add_argument("--recheck", action="store_true", help="include jobs looked up before without finding a date")
+    p.set_defaults(func=cmd_dates)
 
     p = sub.add_parser(
         "grade",

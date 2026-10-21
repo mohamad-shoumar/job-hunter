@@ -44,6 +44,13 @@ def test_remote_for_people_in_the_uae_counts_as_moving_there(filters):
     assert emea.eligibility.code == "region_ok"
 
 
+def test_a_region_narrowed_to_the_uae_is_judged_as_moving_there(filters):
+    # "Middle East" in the title, "UAE" as the location: limited to people living there.
+    result = _classify(filters, remote_status=REMOTE, title="Backend Engineer (Middle East)", allowed_locations=["UAE"])
+    assert result.status == SHORTLISTED and result.eligibility.code == "relocation"
+    assert result.eligibility.reasons[0].startswith('Remote, for people living in "UAE"')
+
+
 def test_lebanon_listed_wins(filters):
     result = _classify(filters, remote_status=HYBRID, allowed_locations=["Dubai", "Beirut, Lebanon"])
     assert result.eligibility.code == "lebanon_listed"

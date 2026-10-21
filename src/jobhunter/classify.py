@@ -23,6 +23,7 @@ from .models import (
     NOT_ELIGIBLE,
     REJECTED,
     SHORTLISTED,
+    SPONSORS_VISA,
     UNCLEAR,
     UNKNOWN_HIRE,
     VISA_LIST,
@@ -34,6 +35,7 @@ from .models import (
 )
 from .relevance import assess_relevance
 from .text import parse_datetime
+from .visa import read_posting
 
 # A 401(k) is a US-only retirement plan: a remote job that offers one is remote within the US,
 # whatever its location says. Rejected on sight (the user's call, 2026-10-19), even with "Worldwide"
@@ -75,8 +77,14 @@ def apply_ai_check(rule: Assessment, check: AiCheck) -> Assessment:
         return Assessment(NOT_ELIGIBLE, [f"AI check: {check.reason} {evidence}", *rule_reasons], "ai_cannot_hire")
     if check.verified and check.verdict == CAN_HIRE:
         return Assessment(LIKELY, [f"AI check: {check.reason} {evidence}", *rule_reasons], "ai_can_hire")
+    # The visa rules read the quote too: "sponsorship" alone, or "we cannot sponsor", is no offer.
+    offer = read_posting(check.quote) if check.verdict == SPONSORS_VISA else None
+    if check.verified and offer and offer.offers and not offer.refusals:
+        return Assessment(LIKELY, [f"AI check: {check.reason} {evidence}", *rule_reasons], "ai_sponsors_visa")
     if check.verdict == UNKNOWN_HIRE:
         note = f"AI check found nothing decisive: {check.reason}"
+    elif check.verified and offer:
+        note = f"AI check says it sponsors a visa, but its quote does not offer one, so it is not used: {evidence} {check.reason}"
     else:
         said = check.verdict.replace("_", " ")
         note = f"AI check says {said}, but its quote was not found on the page, so it is not used: {evidence} {check.reason}"
@@ -128,6 +136,11 @@ def classify(job: Job, filters: Filters, now: datetime, check_age: bool = True) 
                                    relevance.code)
         return Classification(VISA_LIST, eligibility, relevance, score)
     status = SHORTLISTED if eligibility.verdict in (ELIGIBLE, LIKELY) else NEEDS_REVIEW
+    found = job.date_check
+    if found and found.posted_at and job.posted_at:
+        relevance = Assessment(relevance.verdict, [*relevance.reasons, f'Posting date {found.posted_at[:10]} '
+                                                   f'found on a page: "{found.quote}" ({found.source_url})'],
+                               relevance.code)
     if status == SHORTLISTED and not job.posted_at:
         # An unknown age is not a fresh one: some sources re-list months-old jobs undated.
         status = NEEDS_REVIEW

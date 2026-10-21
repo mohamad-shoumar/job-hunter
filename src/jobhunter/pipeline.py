@@ -29,6 +29,7 @@ from .extract import enrich
 from .fitgrade import FitGrader, build_grader, grade_jobs, to_grade
 from .http import Http, wait_for_network
 from .models import NEEDS_REVIEW, UNCLEAR, Job
+from .posted_date import DateFinder, build_finder, find_dates
 from .outreach import run_outreach
 from .report import write_report
 from .sources import Source, SourceResult, build_sources
@@ -56,6 +57,7 @@ class RunSummary:
     reject_codes: Counter = field(default_factory=Counter)
     config_notes: list[str] = field(default_factory=list)
     ai_check: dict | None = None
+    date_check: dict | None = None
     fit_grade: dict | None = None
     outreach: dict | None = None
     boards: dict | None = None
@@ -80,6 +82,7 @@ class RunSummary:
             "reject_codes": dict(self.reject_codes),
             "config_notes": self.config_notes,
             "ai_check": self.ai_check,
+            "date_check": self.date_check,
             "fit_grade": self.fit_grade,
             "outreach": self.outreach,
             "boards": self.boards,
@@ -213,6 +216,22 @@ def assign_range(store: JobStore, summary: RunSummary, filters: Filters, now: da
     return sorted(set(days_between(start, end)) | touched_days)
 
 
+def date_check_days(store: JobStore, finder: DateFinder, days: list[str], filters: Filters,
+                    now: datetime, summary: RunSummary) -> set[str]:
+    """Look up when the undated needs_review jobs filed under `days` were posted, newest first, up to the cap.
+
+    Before the AI check, so one that turns out too old is rejected without it. Returns the changed report days."""
+    waiting = [row for day in days for row in store.jobs_for_report(day)
+               if row["status"] == NEEDS_REVIEW and not row["posted_at"] and not row["date_check_json"]]
+    waiting.sort(key=lambda r: (r["first_seen"], r["id"]), reverse=True)
+    limit = finder.config.max_dates_per_run
+    result = find_dates(store, finder, waiting[:limit], filters, now)
+    if len(waiting) > limit:
+        result.notes.append(f"{len(waiting) - limit} more left for the next run or `jobhunter dates`")
+    summary.date_check = result.to_dict()
+    return result.changed_days
+
+
 def ai_check_days(store: JobStore, checker: AiChecker, days: list[str], filters: Filters,
                   now: datetime, summary: RunSummary) -> set[str]:
     """AI-check the unchecked needs_review jobs filed under `days`, newest first, up to the per-run cap.
@@ -244,8 +263,8 @@ def run(root_paths, sources_config: dict, filters: Filters, only: set[str] | Non
         skip: set[str] | None = None, report: bool = True, http: Http | None = None, now: datetime | None = None,
         date_range: tuple[date, date] | None = None, ai: bool = True,
         ai_checker: AiChecker | None = None, outreach: bool = True,
-        fit_grader: FitGrader | None = None) -> tuple[RunSummary, list[Path]]:
-    """ai=False skips every model call. ai_checker and fit_grader override the ones built from
+        fit_grader: FitGrader | None = None, date_finder: DateFinder | None = None) -> tuple[RunSummary, list[Path]]:
+    """ai=False skips every model call. ai_checker, date_finder and fit_grader override the ones built from
     config/ai_check.json and config/fit_grade.json.
 
     outreach=False skips contacts, drafts and the inbox check (outreach.py). `skip` leaves those sources out
@@ -255,6 +274,10 @@ def run(root_paths, sources_config: dict, filters: Filters, only: set[str] | Non
     sources, config_notes = build_sources(sources_config)
     if ai and ai_checker is None:
         ai_checker, note = build_checker(root_paths.ai_check_file)
+        if note:
+            config_notes.append(note)
+    if ai and date_finder is None:
+        date_finder, note = build_finder(root_paths.ai_check_file)
         if note:
             config_notes.append(note)
     if ai and fit_grader is None:
@@ -303,6 +326,9 @@ def run(root_paths, sources_config: dict, filters: Filters, only: set[str] | Non
             days = assign_daily(store, summary, now)
         # Earlier days whose jobs the look-backs below changed: their files are written again too.
         touched: set[str] = set()
+        if ai and date_finder:
+            date_days = days if date_range else recent_days(now, date_finder.config.lookback_days)
+            touched |= date_check_days(store, date_finder, date_days, filters, now, summary)
         if ai and ai_checker:
             # A daily run also looks back, so jobs over one day's cap are checked on the next days.
             check_days = days if date_range else recent_days(now, ai_checker.config.lookback_days)

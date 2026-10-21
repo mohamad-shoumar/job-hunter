@@ -35,6 +35,8 @@ IRRELEVANT = "rejected"
 CAN_HIRE = "can_hire"
 CANNOT_HIRE = "cannot_hire"
 UNKNOWN_HIRE = "unknown"
+# Not remote from Lebanon, but the company sponsors a work visa to move for it (any country: the user's call 2026-10-22).
+SPONSORS_VISA = "sponsors_visa"
 
 # Final status, which decides where a job shows up
 SHORTLISTED = "shortlisted"
@@ -80,13 +82,14 @@ class Job:
     first_seen: datetime | None = None
     last_seen: datetime | None = None
     ai_check: AiCheck | None = None
+    date_check: DateCheck | None = None
 
 
 @dataclass
 class AiCheck:
     """What the AI web check found for a job the rules left unclear (see ai_check.py)."""
 
-    verdict: str  # can_hire | cannot_hire | unknown
+    verdict: str  # can_hire | cannot_hire | sponsors_visa | unknown
     reason: str  # one sentence from the model
     quote: str = ""
     source_url: str = ""
@@ -97,6 +100,19 @@ class AiCheck:
     checked_at: str = ""
     searches: int = 0
     cost_usd: float | None = None
+
+
+@dataclass
+class DateCheck:
+    """When an undated job was posted, as found on a page (see posted_date.py)."""
+
+    posted_at: str | None  # ISO date code read from the quote; None when nothing was found
+    quote: str = ""
+    source_url: str = ""
+    # "page" (code read the page's schema.org datePosted) or the model that searched the web.
+    found_by: str = ""
+    reason: str = ""
+    checked_at: str = ""
 
 
 @dataclass

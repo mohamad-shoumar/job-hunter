@@ -139,6 +139,25 @@ def test_verified_can_hire_shortlists_as_likely(filters):
     assert cls.eligibility.code == "ai_can_hire"
 
 
+def test_verified_visa_sponsorship_in_any_country_shortlists(filters):
+    # The user's call (2026-10-22): a company that sponsors the move counts, wherever it is.
+    offer = AiCheck("sponsors_visa", "The careers FAQ says it sponsors H-1B visas for engineers.",
+                    "We sponsor H-1B visas for all engineering roles", "https://acme.com/faq", verified=True)
+    cls = classify(make_job(ai_check=offer), filters, NOW)
+    assert cls.status == SHORTLISTED and cls.eligibility.code == "ai_sponsors_visa"
+    assert cls.eligibility.reasons[0].startswith("AI check: The careers FAQ says it sponsors H-1B visas")
+
+
+def test_a_sponsorship_quote_the_visa_rules_do_not_read_as_an_offer_is_not_used(filters):
+    for quote in ("We are unable to sponsor visas for this role", "Sponsorship is available for the right person"):
+        check = AiCheck("sponsors_visa", "It sponsors.", quote, "https://acme.com/faq", verified=True)
+        cls = classify(make_job(ai_check=check), filters, NOW)
+        assert cls.status == NEEDS_REVIEW, quote
+        assert "does not offer one, so it is not used" in cls.eligibility.reasons[-1]
+    unverified = AiCheck("sponsors_visa", "It sponsors.", "We offer visa sponsorship", "https://acme.com/faq")
+    assert classify(make_job(ai_check=unverified), filters, NOW).status == NEEDS_REVIEW
+
+
 def test_rules_that_quote_evidence_still_win(filters):
     check = AiCheck(CANNOT_HIRE, "US only.", "Remote - United States", PAGE_URL, verified=True)
     assert classify(make_job(allowed_locations=["Worldwide"], ai_check=check), filters, NOW).eligibility.verdict == ELIGIBLE
