@@ -4,7 +4,7 @@
 // carries the token the server put into the page.
 
 const TOKEN = document.querySelector('meta[name="jh-token"]').content;
-const state = { tab: "today", view: "shortlisted", q: "", yoe: "", days: "0", jobs: [], jobId: null, detail: null, status: null };
+const state = { expanded: new Set(), tab: "today", view: "shortlisted", q: "", yoe: "", days: "0", jobs: [], jobId: null, detail: null, status: null };
 
 // --- helpers -------------------------------------------------------------------
 
@@ -70,8 +70,24 @@ function gradeChip(g) {
   return `<span class="chip ${tone}" title="${esc(g.reason)}">grade ${g.grade}/5</span>`;
 }
 // A job with no grade yet sorts in the middle (3), as on the server (fitgrade.UNGRADED).
-function byGrade(a, b) {
-  return (b.fit_grade?.grade || 3) - (a.fit_grade?.grade || 3);
+// One board fetch can bring a whole company at once (17 Palantir London roles on 2026-10-21):
+// show each company's best job (grade, then fit) and a button for the rest. Display only; statuses are unchanged.
+function onePerCompany(rows, grade) {
+  const groups = new Map();
+  [...rows].sort((a, b) => (grade(b) || 3) - (grade(a) || 3) || (b.fit ?? b.fit_score ?? 0) - (a.fit ?? a.fit_score ?? 0))
+    .forEach((r) => {
+      const key = (r.company || "").trim().toLowerCase() || `#${r.id}`;
+      groups.has(key) ? groups.get(key).push(r) : groups.set(key, [r]);
+    });
+  return [...groups].flatMap(([key, [best, ...others]]) => [
+    { ...best, _key: key, _more: others.length },
+    ...(state.expanded.has(key) ? others : []),
+  ]);
+}
+function moreButton(r) {
+  if (!r._more) return "";
+  const open = state.expanded.has(r._key);
+  return `<button class="btn small" data-more="${esc(r._key)}">${open ? "Hide" : `+${r._more}`} more at ${esc(r.company)}</button>`;
 }
 // Why you skip a job: one tap, plus an optional note. The fit grade learns from these.
 function skipPicker(id) {
@@ -706,10 +722,10 @@ async function renderToday() {
     <div class="cards">
       ${card("Replies to answer", t.replies.map((r) => item(r, `<div class="quote">${esc(r.reply_from || "")}: ${esc(r.reply_snippet || "")}</div>`)), "No new replies. Click Check inbox to look.")}
       ${card("Follow-ups due", t.follow_ups_due.map((r) => item(r, `<div class="small muted">to ${esc(r.email || "?")} · follow-up ${r.follow_ups + 1} · due ${esc(day(r.next_follow_up_at))}</div>`)), "Nothing due.")}
-      ${card("New shortlisted to triage", t.new_jobs.map((r) => item(r, ` ${r.fit_grade ? `<span class="chip">grade ${r.fit_grade}/5</span>` : ""} <span class="chip">fit ${r.fit_score}</span>
-        <span class="row" style="margin-top:4px"><button class="btn small" data-quick="saved" data-id="${r.id}">Save</button><button class="btn small danger" data-quick="skipped" data-id="${r.id}">Skip</button></span>`)), "All caught up.")}
-      ${card("New on the visa list (EU/UK)", (t.new_visa_jobs || []).map((r) => item(r, ` ${r.fit_grade ? `<span class="chip">grade ${r.fit_grade}/5</span>` : ""} <span class="chip">fit ${r.fit_score}</span>
-        <span class="row" style="margin-top:4px"><button class="btn small" data-quick="saved" data-id="${r.id}">Save</button><button class="btn small danger" data-quick="skipped" data-id="${r.id}">Skip</button></span>`)), "None this week.")}
+      ${card("New shortlisted to triage", onePerCompany(t.new_jobs, (r) => r.fit_grade).map((r) => item(r, ` ${r.fit_grade ? `<span class="chip">grade ${r.fit_grade}/5</span>` : ""} <span class="chip">fit ${r.fit_score}</span>
+        <span class="row" style="margin-top:4px"><button class="btn small" data-quick="saved" data-id="${r.id}">Save</button><button class="btn small danger" data-quick="skipped" data-id="${r.id}">Skip</button>${moreButton(r)}</span>`)), "All caught up.")}
+      ${card("New on the visa list (EU/UK)", onePerCompany(t.new_visa_jobs || [], (r) => r.fit_grade).map((r) => item(r, ` ${r.fit_grade ? `<span class="chip">grade ${r.fit_grade}/5</span>` : ""} <span class="chip">fit ${r.fit_score}</span>
+        <span class="row" style="margin-top:4px"><button class="btn small" data-quick="saved" data-id="${r.id}">Save</button><button class="btn small danger" data-quick="skipped" data-id="${r.id}">Skip</button>${moreButton(r)}</span>`)), "None this week.")}
       ${t.unsure_sends.length ? card("Sends to double-check", t.unsure_sends.map((r) => item(r, `<div class="small muted">Gmail didn't confirm ${esc(r.subject)}: Check inbox resolves it.</div>`)), "") : ""}
       ${card("Ghosted this week", t.ghosted.map((r) => item(r, `<div class="small muted">closed ${esc(day(r.at))}</div>`)), "None.")}
       <div class="card"><h2>Today</h2><div class="big">${t.sends_today.total}<span class="muted small"> / ${t.caps.total} emails sent</span></div>
@@ -737,7 +753,7 @@ async function renderPipeline() {
   const [open, visa, tracked, closed] = await Promise.all([
     api("/api/jobs?view=shortlisted"), api("/api/jobs?view=visa_list&days=2"), api("/api/jobs?view=tracked"), api("/api/jobs?view=closed"),
   ]);
-  const toApply = [...open.jobs, ...visa.jobs].filter((j) => !j.stage || j.stage === "new").sort(byGrade);
+  const toApply = onePerCompany([...open.jobs, ...visa.jobs].filter((j) => !j.stage || j.stage === "new"), (j) => j.fit_grade?.grade);
   const jobs = [...toApply, ...tracked.jobs, ...closed.jobs];
   const options = (current) => BOARD.map((c) => `<option value="${c.key}" ${c.key === current ? "selected" : ""}>${esc(c.label || stageLabel(c.stage))}</option>`).join("");
   $("#main").innerHTML = `<div class="board">${BOARD.map((col) => {
@@ -754,7 +770,7 @@ async function renderPipeline() {
           ${j.closed_reason && col.key === "closed" ? `<span class="chip">${esc(j.closed_reason)}${j.skip_reason ? esc(": " + ((state.status?.skip_reasons || {})[j.skip_reason] || j.skip_reason)) : ""}</span>` : ""}
         </div>
         <div class="row"><select data-move="${j.id}">${options(col.key)}</select>
-          ${col.key === "to_apply" ? `<button class="btn small danger" data-quick="skipped" data-id="${j.id}">Skip</button>` : ""}</div>
+          ${col.key === "to_apply" ? `<button class="btn small danger" data-quick="skipped" data-id="${j.id}">Skip</button>${moreButton(j)}` : ""}</div>
       </div>`).join("") || `<div class="small muted" style="margin-top:8px">Empty</div>`}</div>`;
   }).join("")}</div>`;
 }
@@ -793,6 +809,13 @@ document.addEventListener("click", async (e) => {
   const quick = e.target.closest("[data-quick]");
   const global = e.target.closest("[data-action-global]");
   try {
+    const more = e.target.closest("[data-more]");
+    if (more) {
+      e.stopPropagation();
+      const key = more.dataset.more;
+      state.expanded.has(key) ? state.expanded.delete(key) : state.expanded.add(key);
+      return render();
+    }
     const skipReason = e.target.closest("[data-skip-reason]");
     if (skipReason) {
       e.stopPropagation();

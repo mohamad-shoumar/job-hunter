@@ -126,6 +126,24 @@ def _sort_key(row: sqlite3.Row):
     return (-sort_grade(row), _ELIGIBILITY_ORDER.get(row["eligibility"], 2), -row["fit_score"], row["posted_at"] or "")
 
 
+def one_per_company(rows: list[sqlite3.Row]) -> list[tuple[sqlite3.Row, list[sqlite3.Row]]]:
+    """Each company's best job (rows come sorted best first), with its other jobs.
+
+    One board fetch can bring a whole company at once (17 Palantir London roles on
+    2026-10-21): the report and the To apply column show the best one and name the rest.
+    Display only; every job keeps its status.
+    """
+    groups: dict[str, list[sqlite3.Row]] = {}
+    for r in rows:
+        groups.setdefault(" ".join((r["company"] or "").lower().split()) or f"#{r['id']}", []).append(r)
+    return [(jobs[0], jobs[1:]) for jobs in groups.values()]
+
+
+def _also_line(company: str, others: list[sqlite3.Row]) -> str:
+    titles = "; ".join(f"{r['title']} (job #{r['id']})" for r in others)
+    return f"- **Also at {company} ({len(others)} more):** {titles}"
+
+
 def _rejected_section(rows: list[sqlite3.Row], max_age: int | None) -> list[str]:
     out = [f"## Rejected ({len(rows)})", ""]
     if not rows:
@@ -172,8 +190,12 @@ def render(day: str, rows: list[sqlite3.Row], sightings: dict[int, list[sqlite3.
     """apps: each job's applications row, for the links to its tailored CV and cover letter."""
     apps = apps or {}
 
-    def block(i: int, r: sqlite3.Row) -> str:
-        return _job_block(i, r, sightings.get(r["id"], []), _prepared_line(apps.get(r["id"]), reports_dir)) + "\n"
+    def block(i: int, r: sqlite3.Row, others: list[sqlite3.Row]) -> str:
+        text = _job_block(i, r, sightings.get(r["id"], []), _prepared_line(apps.get(r["id"]), reports_dir))
+        return text + (f"\n{_also_line(r['company'], others)}" if others else "") + "\n"
+
+    def blocks(section: list[sqlite3.Row]) -> list[str]:
+        return [block(i, r, others) for i, (r, others) in enumerate(one_per_company(section), 1)] or ["_None._", ""]
 
     shortlisted = sorted((r for r in rows if r["status"] == SHORTLISTED), key=_sort_key)
     review = sorted((r for r in rows if r["status"] == NEEDS_REVIEW), key=_sort_key)
@@ -190,16 +212,16 @@ def render(day: str, rows: list[sqlite3.Row], sightings: dict[int, list[sqlite3.
 
     out += [f"## Shortlisted ({len(shortlisted)})", ""]
     out += ["A target role, and the posting says (or strongly suggests) it can hire from Lebanon.", ""]
-    out += [block(i, r) for i, r in enumerate(shortlisted, 1)] or ["_None._", ""]
+    out += blocks(shortlisted)
 
     out += [f"## Needs review ({len(review)})", ""]
     out += ["A target role, but the posting does not say clearly whether Lebanon is allowed, or has no posting date. Check before applying.", ""]
-    out += [block(i, r) for i, r in enumerate(review, 1)] or ["_None._", ""]
+    out += blocks(review)
 
     out += [f"## Visa list ({len(visa)})", ""]
     out += ["Abroad (the EU or UK): a target role at an employer that offers a visa in the posting, or is on its "
             "country's government sponsor list. Kept apart from the remote jobs above.", ""]
-    out += [block(i, r) for i, r in enumerate(visa, 1)] or ["_None._", ""]
+    out += blocks(visa)
 
     out += _rejected_section(rejected, max_age)
 

@@ -78,7 +78,13 @@ _NEEDS_PERMIT = re.compile(
     r"netherlands|germany|ireland|spain|italy|finland)\b"
     r"|\bvalid\s+(?:work(?:ing)?\s+(?:permit|visa)|residence\s+permit)\b|\bexisting\s+right\s+to\s+work\b"
     r"|\b(?:eu|e\.u\.|eea)\s+(?:citizen(?:ship)?s?|passport|nationals?)\b|\b(?:pre-?)?settled\s+status\b"
-    r"|\bindefinite\s+leave\s+to\s+remain\b",
+    r"|\bindefinite\s+leave\s+to\s+remain\b"
+    # A nationality, which no visa gives: "Sole British National" (Palantir), "must be a UK national".
+    # Not "UK national security clearance" or "a British passport is a bonus".
+    r"|\bsole\s+(?:british|uk)\s+nationals?\b"
+    r"|\bmust\s+(?:be|hold)\s+(?:a\s+)?(?:british|uk|u\.k\.)\s+(?:nationals?|citizens?|citizenship|passport)\b"
+    r"|\bonly\s+consider\s+(?:\w+\s+){0,2}?from\s+(?:british|uk)\s+(?:nationals|citizens)\b"
+    r"|\b(?:hold|have)\s+a\s+(?:british|uk)\s+passport\b|\b(?:british|uk)\s+passport\s+or\s+ilr\b",
     re.I,
 )
 _HN_VISA = re.compile(r"(?<![A-Za-z])visa(?![A-Za-z])", re.I)

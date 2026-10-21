@@ -125,6 +125,25 @@ def test_reports_list_the_best_grade_first(store, filters, tmp_path):
     assert "- **Fit grade:** 5/5 — Python backend, 3+ years." in shortlisted
 
 
+def test_reports_show_one_job_per_company_and_name_the_rest(store, filters, tmp_path):
+    """17 Palantir London roles came in one fetch (2026-10-21): the best one is shown, the rest named."""
+    ids = [store_job(store, filters, source_job_id=f"p{i}", company="Palantir", title=f"Backend Engineer P{i}")
+           for i in range(3)]
+    other = store_job(store, filters, source_job_id="o", company="Monzo", title="Backend Engineer M")
+    store.set_report_date([*ids, other], pipeline.local_day(NOW).isoformat())
+    store.save_fit_grade(ids[1], {"grade": 5, "reason": "Python backend."})
+    store.commit()
+    text = write_report(store, tmp_path, pipeline.local_day(NOW).isoformat(), None, NOW, 14).read_text()
+    shortlisted = text.split("## Shortlisted")[1].split("## Needs review")[0]
+    assert "### 1. Backend Engineer P1 — Palantir" in shortlisted
+    assert "### 2. Backend Engineer M — Monzo" in shortlisted
+    assert "### " not in shortlisted.replace("### 1.", "").replace("### 2.", "")
+    assert (f"- **Also at Palantir (2 more):** Backend Engineer P0 (job #{ids[0]}); "
+            f"Backend Engineer P2 (job #{ids[2]})") in shortlisted
+    # Display only: each job keeps its status.
+    assert {store.get(i)["status"] for i in ids} == {"shortlisted"}
+
+
 def test_build_grader_is_off_without_config_or_key(tmp_path, monkeypatch):
     path = tmp_path / "fit_grade.json"
     assert build_grader(path) == (None, None)

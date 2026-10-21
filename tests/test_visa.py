@@ -110,6 +110,32 @@ def test_a_right_to_work_alone_rejects_and_next_to_an_offer_is_a_note(filters):
     assert read_posting(either).permits == []
 
 
+@pytest.mark.parametrize("sentence", [
+    "- Sole British National",
+    "- Eligibility: must be a UK national",
+    "We can only consider applications from UK nationals (including dual nationals who hold British citizenship).",
+    "We require applicants to hold a UK passport and 5 years of continuous UK residency.",
+    "- British Passport or ILR",
+])
+def test_a_british_nationality_rejects_even_at_a_listed_sponsor(listed, sentence):
+    """Palantir's UK Government roles (2026-10-21): on the register, but a visa cannot make you British."""
+    listed.visa.registers = Registers.from_rows("uk", [
+        Sponsor("uk", "Palantir Technologies UK Limited", "London", "Worker (A rating), Skilled Worker")])
+    result = _classify(listed, company="Palantir", allowed_locations=["London, United Kingdom"],
+                       description=f"Python.\n{sentence}")
+    assert result.reject_code == "no_sponsor"
+    assert result.reject_reason == f'Wants a right to work you would need a visa for: "{sentence}"'
+
+
+@pytest.mark.parametrize("sentence", [
+    "This role requires you to obtain and maintain the appropriate level of UK national security clearance.",
+    "A British passport is a bonus.",
+    "We support European and UK citizens with accommodation & travel arrangements.",
+])
+def test_british_in_other_senses_asks_for_nothing(sentence):
+    assert read_posting(sentence).permits == []
+
+
 def test_an_offer_and_a_refusal_together_list_the_job_with_the_refusal_to_ask_about(filters):
     text = ("Visa sponsorship: We do sponsor visas!\n"
             "However, we aren't able to successfully sponsor visas for every role and every candidate.")
