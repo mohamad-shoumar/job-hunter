@@ -150,7 +150,8 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
   - **Disability, medical needs, accommodations or adjustments:** No / none needed.
   - **Gender, sexual orientation, race and other voluntary (EEO) questions:** answer from the
     profile's "Voluntary self-identification (forms only)" section, word for word in meaning, and
-    never "Prefer not to say" for a question it covers (the user's call, 2026-10-21). Those answers
+    never "Prefer not to say" for a question it covers unless its line says so (the user's call,
+    2026-10-21). Those answers
     live only in the profile (not in git): never copy them into a tracked file. A voluntary
     question the section doesn't cover: leave it empty for the user (pick "Prefer not to say" only
     if the field is required) and list it in the report.
