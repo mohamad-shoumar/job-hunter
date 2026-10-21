@@ -8,7 +8,7 @@ from jobhunter.ai_check import AiCheckConfig
 from jobhunter.classify import classify
 from jobhunter.config import Paths
 from jobhunter.models import NEEDS_REVIEW, REJECTED, SHORTLISTED
-from jobhunter.posted_date import FOUND_ON_PAGE, DateFinder, build_finder, date_in, find_dates
+from jobhunter.posted_date import FOUND_ON_PAGE, DateFinder, build_finder, date_in, date_links, date_on_page, find_dates
 from jobhunter.store import JobStore, row_to_job
 from jobhunter.text import iso
 
@@ -52,6 +52,21 @@ def test_code_reads_the_date_a_quote_states():
     assert date_in("Just posted", NOW) == NOW and date_in("Posted yesterday", NOW) == NOW - timedelta(days=1)
     assert date_in("Posted on December 2, 2026", NOW) is None  # in the future
     assert date_in("Apply before the deadline", NOW) is None
+    assert date_in("See the remark 2, 2026 notes", NOW) is None  # "mar" inside a word is no month
+
+
+def test_real_page_forms_a_javascript_date_and_linkedins_age_line():
+    # Jobgether's JSON-LD (2026-10-22) and a logged-out LinkedIn job page.
+    js = '<script>{"datePosted":"Wed Sep 02 2026 09:30:32 GMT+0000 (Coordinated Universal Time)"}</script>'
+    assert date_on_page(js, NOW)[1].date().isoformat() == "2026-09-02"
+    linkedin = '<span class="posted-time-ago__text topcard__flavor--metadata">\n  3 weeks ago\n</span>'
+    assert date_on_page(linkedin, NOW) == ("3 weeks ago", NOW - timedelta(days=21))
+
+
+def test_a_regional_linkedin_link_is_read_in_english():
+    # ae.linkedin.com answered in Arabic ("٣ شهر"), which code cannot read.
+    job = undated(application_url="https://ae.linkedin.com/jobs/view/ai-engineer-at-acme-4440611818?trk=x")
+    assert date_links(job, 3) == ["https://example.com/jobs/1", "https://www.linkedin.com/jobs/view/ai-engineer-at-acme-4440611818"]
 
 
 def test_the_pages_own_date_posted_is_used_without_a_search():

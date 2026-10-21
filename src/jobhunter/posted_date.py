@@ -5,6 +5,8 @@ one), and Google Jobs through SerpApi often gives none. Two steps, like the AI c
 
 1. Code fetches the job's own links (ai_check.job_links) and reads the schema.org
    JobPosting `datePosted` the page gives search engines: where Google gets its date.
+   A LinkedIn job, through its English www page, gives "3 months ago" instead: one
+   request a job, so LinkedIn's pace is kept.
 2. Only when no page has one: `web_model` (the Claude Code CLI with WebSearch and
    WebFetch) looks for the date and quotes the words that state it. Code fetches
    that page, finds the quote word for word (find_quote) and reads the date out of
@@ -39,15 +41,20 @@ log = logging.getLogger(__name__)
 
 FOUND_ON_PAGE = "page"
 
-# The JSON-LD a job page gives search engines, or the same as microdata.
+# The JSON-LD a job page gives search engines, or the same as microdata. Some write a JavaScript
+# date: "Wed Sep 02 2026 09:30:32 GMT+0000 (Coordinated Universal Time)".
 _DATE_POSTED = re.compile(
-    r""""datePosted"\s*:\s*"(?P<date>[^"]{8,40})"|itemprop=["']datePosted["'][^>]*?content=["'](?P<meta>[^"']{8,40})""",
+    r""""datePosted"\s*:\s*"(?P<date>[^"]{8,90})"|itemprop=["']datePosted["'][^>]*?content=["'](?P<meta>[^"']{8,90})""",
     re.I,
 )
+# A logged-out LinkedIn job page: <span class="posted-time-ago__text ...">3 months ago</span>.
+_LINKEDIN_AGE = re.compile(r"posted-time-ago__text[^>]*>\s*(?P<age>[^<]{3,40}?)\s*<", re.I)
+# ae.linkedin.com answers in Arabic ("٣ شهر"): the www page is in English.
+_LINKEDIN_VIEW = re.compile(r"^https?://(?:[a-z]{2,3}\.)?linkedin\.com(/jobs/view/[^?#]+)", re.I)
 _ISO_DATE = re.compile(r"\b(20\d\d)-(\d\d)-(\d\d)\b")
 _MONTHS = {m: i for i, m in enumerate(
     ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"), start=1)}
-_MONTH = r"(?P<month>jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?"
+_MONTH = r"\b(?P<month>jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?"
 _MONTH_FIRST = re.compile(_MONTH + r"\s+(?P<day>\d{1,2})(?:st|nd|rd|th)?,?\s+(?P<year>20\d\d)\b", re.I)
 _DAY_FIRST = re.compile(r"\b(?P<day>\d{1,2})(?:st|nd|rd|th)?\s+" + _MONTH + r",?\s+(?P<year>20\d\d)\b", re.I)
 _TODAY = re.compile(r"\b(?:just\s+posted|posted\s+today|today)\b", re.I)
@@ -60,7 +67,8 @@ Search the web for this exact role at this company: the company's careers page \
 or its Greenhouse, Lever, Ashby or Workable board, LinkedIn, or a job board that \
 shows when it was posted ("Posted 5 days ago", "Date posted: October 2, 2026"). \
 Make sure it is the same role: same company and same title. When pages disagree, \
-use the earliest date.
+use the earliest date. For LinkedIn, open the www.linkedin.com address, which is \
+in English, and quote its English words.
 
 Open the page with WebFetch. Code fetches that URL again and looks for your \
 quote there, then reads the date from the quote, so:
@@ -116,21 +124,23 @@ def _day(year: int, month: int, day: int) -> datetime | None:
         return None
 
 
-def date_on_page(raw: str) -> tuple[str, str] | None:
-    """(the datePosted text as written, its value) from a page's schema.org data, or None."""
+def date_on_page(raw: str, now: datetime) -> tuple[str, datetime] | None:
+    """(the words as written, the date) from a page's schema.org datePosted or LinkedIn's age line, or None."""
     for m in _DATE_POSTED.finditer(raw):
         value = m.group("date") or m.group("meta")
-        if parse_datetime(value) or _ISO_DATE.search(value):
-            return " ".join(m.group(0).split()), value
+        posted = parse_datetime(value) or date_in(value, now)
+        if posted and posted <= now + timedelta(days=1):
+            return " ".join(m.group(0).split()), posted
+    if (m := _LINKEDIN_AGE.search(raw)) and (posted := parse_relative_age(m.group("age"), now)):
+        return " ".join(m.group("age").split()), posted
     return None
 
 
-def _from_value(value: str) -> datetime | None:
-    parsed = parse_datetime(value)
-    if parsed:
-        return parsed.astimezone(timezone.utc).replace(microsecond=0)
-    m = _ISO_DATE.search(value)
-    return _day(int(m.group(1)), int(m.group(2)), int(m.group(3))) if m else None
+def date_links(job: Job, limit: int) -> list[str]:
+    """The job's pages worth reading for a date: its own links, and a LinkedIn job page in English."""
+    linkedin = [f"https://www.linkedin.com{m.group(1)}" for u in (job.application_url, job.source_url)
+                if u and (m := _LINKEDIN_VIEW.match(u))]
+    return list(dict.fromkeys(job_links(job, limit) + linkedin[:1]))
 
 
 @dataclass
@@ -144,13 +154,12 @@ class DateFinder:
 
     def find(self, job: Job, now: datetime) -> DateCheck:
         """One job. Raises on a model error, so it is tried again next run."""
-        for url in job_links(job, self.config.max_fetches_per_job):
+        for url in date_links(job, self.config.max_fetches_per_job):
             page = fetch_page(url, self.http)
-            found = date_on_page(page[1]) if page else None
-            posted = _from_value(found[1]) if found else None
-            if posted and posted <= now + timedelta(days=1):
-                return DateCheck(iso(posted), found[0], url, FOUND_ON_PAGE,
-                                 "The page's schema.org data gives the date it was posted.", iso(now))
+            found = date_on_page(page[1], now) if page else None
+            if found:
+                return DateCheck(iso(found[1]), found[0], url, FOUND_ON_PAGE,
+                                 "The job's page states when it was posted.", iso(now))
         if self.model is None:
             return DateCheck(None, found_by=FOUND_ON_PAGE, reason="No page of the job gives a date.",
                              checked_at=iso(now))
@@ -174,6 +183,8 @@ class DateFinder:
         base = DateCheck(None, quote, stated_url, self.label, reason, iso(now))
         if not answer.get("found") or not quote:
             return base
+        if m := _LINKEDIN_VIEW.match(stated_url):
+            stated_url = f"https://www.linkedin.com{m.group(1)}"
         pages = [(JOB_DESCRIPTION, job.description or "")]
         if stated_url.startswith("http") and (page := fetch_page(stated_url, self.http)):
             pages += _for_quotes(stated_url, page)
