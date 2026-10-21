@@ -56,7 +56,8 @@
     { "company": "Kraken", "board_token": "kraken.com", "_note": "Moved from lever 'kraken123' (empty board). Kraken's jobs are on Ashby now." },
     { "company": "Ziina", "board_token": "ziina" },
     { "company": "Qlub", "board_token": "qlub" },
-    { "company": "Lean Technologies", "board_token": "LeanTech" }
+    { "company": "Lean Technologies", "board_token": "LeanTech" },
+    { "company": "Brain Co.", "board_token": "brainco", "_note": "Abu Dhabi 'Deployed' AI roles next to its San Francisco ones (2026-10-21 research)." }
   ],
   "custom_pages": [
     {
@@ -145,10 +146,53 @@
     ],
     "pages_per_query": 1
   },
-  "remote_api": {
-    "_note": "Remotive. Its API ignores search terms and returns its latest jobs; local filters decide.",
-    "provider": "remotive",
-    "limit": 100
+  "_remote_api": "Remotive was removed 2026-10-21: its free API returns only 10 jobs in total, whatever the parameters.",
+  "jobicy": {
+    "_note": "Jobicy API: remote jobs with the region each company hires in ('Anywhere', 'EMEA', 'USA'). No key; credit Jobicy and send applications to its job URL (both links are the Jobicy page). Newest first, read until jobs older than lookback_hours. Only titles with one of `queries` are kept. Checked 2026-10-21 (docs/research/2026-10-21-market-size.md).",
+    "enabled": true,
+    "industry": "dev",
+    "lookback_hours": 36,
+    "max_pages": 3,
+    "queries": ["python", "backend", "back end", "software", "fullstack", "full stack", "ai engineer", "api",
+                "web developer", "platform engineer", "django", "fastapi", "forward deployed", "solutions engineer",
+                "solution engineer", "product engineer", "integration engineer", "integrations engineer",
+                "automation engineer", "ai automation", "applied ai", "founding engineer", "llm"]
+  },
+  "euremotejobs": {
+    "_note": "EU Remote Jobs: remote jobs open in Europe, EMEA or worldwide. The whole list is read newest first (robots.txt blocks its category search) and only titles with one of `queries` get their job page read (full text, allowed countries, the company's apply link). ~100 jobs a day of all kinds. Checked 2026-10-21.",
+    "enabled": true,
+    "lookback_hours": 36,
+    "max_pages": 3,
+    "queries": ["python", "backend", "back end", "software", "fullstack", "full stack", "ai engineer", "api",
+                "web developer", "platform engineer", "django", "fastapi", "forward deployed", "solutions engineer",
+                "solution engineer", "product engineer", "integration engineer", "integrations engineer",
+                "automation engineer", "ai automation", "applied ai", "founding engineer", "llm"]
+  },
+  "linkedin": {
+    "_note": "LinkedIn's logged-out job search (src/jobhunter/sources/linkedin.py). Logged out, only keywords, location and the posted-within window work (no remote or level filter), so searches are by place: the UAE and Qatar (relocation), Lebanon, and UK/NL jobs that mention visa sponsorship (visa list). Each request waits `pause` seconds (about 1/s gets HTTP 429); only titles with one of `queries` get their page read. LinkedIn's terms forbid automated access: used anyway at this low volume, the user's call (2026-10-21). The 2026-10-21 research found UAE fits missing from the DB (Core42/G42, Open Innovation AI, ADG, Al-Futtaim).",
+    "enabled": true,
+    "hours": 24,
+    "max_pages": 4,
+    "pause": 2.5,
+    "queries": ["python", "backend", "back end", "software", "fullstack", "full stack", "ai engineer", "api",
+                "web developer", "platform engineer", "django", "fastapi", "forward deployed", "solutions engineer",
+                "solution engineer", "product engineer", "integration engineer", "integrations engineer",
+                "automation engineer", "ai automation", "applied ai", "founding engineer", "llm"],
+    "searches": [
+      { "keywords": "software engineer", "location": "United Arab Emirates" },
+      { "keywords": "backend engineer", "location": "United Arab Emirates" },
+      { "keywords": "python developer", "location": "United Arab Emirates" },
+      { "keywords": "full stack developer", "location": "United Arab Emirates", "max_pages": 2 },
+      { "keywords": "ai engineer", "location": "United Arab Emirates", "max_pages": 2 },
+      { "keywords": "solutions engineer", "location": "United Arab Emirates", "max_pages": 2 },
+      { "keywords": "software engineer", "location": "Qatar", "max_pages": 2 },
+      { "keywords": "backend developer", "location": "Qatar", "max_pages": 1 },
+      { "keywords": "software engineer", "location": "Lebanon", "max_pages": 2 },
+      { "keywords": "backend developer", "location": "Lebanon", "max_pages": 1 },
+      { "keywords": "software engineer visa sponsorship", "location": "United Kingdom", "max_pages": 3 },
+      { "keywords": "backend engineer visa sponsorship", "location": "United Kingdom", "max_pages": 2 },
+      { "keywords": "software engineer visa sponsorship", "location": "Netherlands", "max_pages": 2 }
+    ]
   },
   "himalayas": {
     "_note": "country=LB makes Himalayas return jobs that list Lebanon or list no countries. No countries is treated as unknown, not worldwide. 2026-10-19: the best source (most applied-to jobs) searched only Python/backend words; added the profile's other target roles.",

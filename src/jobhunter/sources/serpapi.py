@@ -33,6 +33,7 @@ API = "https://serpapi.com/search.json"
 
 class SerpApiSource(Source):
     name = "serpapi"
+    refetch = False  # one credit per query
 
     def __init__(self, queries: list, pages_per_query: int = 1, engine: str = "google_jobs", params: dict | None = None):
         self.queries = queries

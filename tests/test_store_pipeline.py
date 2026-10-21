@@ -1,13 +1,15 @@
 """Dedup across sources, 'only new jobs', rejected jobs staying rejected, reports."""
 
+import contextlib
 import json
 from datetime import timedelta
 
+from jobhunter import http as http_module
 from jobhunter import pipeline
 from jobhunter.config import Filters, Paths
 from jobhunter.models import NEEDS_REVIEW, REJECTED, SHORTLISTED
 from jobhunter.report import write_report
-from jobhunter.sources import SourceResult
+from jobhunter.sources import Source, SourceResult
 from jobhunter.sources import greenhouse, himalayas
 from jobhunter.store import SCHEMA, JobStore
 
@@ -427,3 +429,46 @@ def test_skip_leaves_a_source_out_of_the_run(tmp_path, filters):
                               ai=False, outreach=False)
     assert set(summary.sources) == {"greenhouse"} and summary.new == 2
     assert "--skip: no enabled source named serpapi" in summary.config_notes
+
+
+class _Flaky(Source):
+    """Fails to connect on its first fetch (the Mac just woke up), works on the second."""
+
+    def __init__(self, name, refetch=True):
+        self.name, self.refetch, self.tries = name, refetch, 0
+
+    def fetch(self, http):
+        self.tries += 1
+        if self.tries == 1:
+            return SourceResult(self.name, [make_job(source=self.name, source_job_id="a")],
+                                errors=["Careem (careem): ConnectError for https://boards-api.greenhouse.io/x"])
+        return SourceResult(self.name, [make_job(source=self.name, source_job_id="b")])
+
+
+def test_a_source_that_could_not_connect_is_fetched_again(monkeypatch):
+    monkeypatch.setattr(pipeline.clock, "sleep", lambda seconds: None)
+    flaky, paid = _Flaky("greenhouse"), _Flaky("serpapi", refetch=False)
+    fine = _Flaky("himalayas")
+    fine.tries = 1  # already past its failing try
+    results = pipeline.fetch_all([flaky, paid, fine], http=None)
+    assert (flaky.tries, paid.tries, fine.tries) == (2, 1, 2)
+    assert [j.source_job_id for j in results[0].jobs] == ["a", "b"] and results[0].errors == []
+    assert results[0].notes == ["fetched again after 1 error(s) the first time"]
+    assert results[1].errors and [j.source_job_id for j in results[1].jobs] == ["a"]  # credits are not spent twice
+
+
+def test_waiting_for_the_network(monkeypatch):
+    attempts = []
+
+    def connect(address, timeout):
+        attempts.append(address)
+        if len(attempts) < 3:
+            raise OSError("nodename nor servname provided, or not known")
+        return contextlib.nullcontext()
+
+    monkeypatch.setattr(http_module.socket, "create_connection", connect)
+    monkeypatch.setattr(http_module.time, "sleep", lambda seconds: None)
+    assert http_module.wait_for_network(timeout=60) is not None and len(attempts) == 3
+    attempts.clear()
+    monkeypatch.setattr(http_module.socket, "create_connection", lambda *a, **k: (_ for _ in ()).throw(OSError()))
+    assert http_module.wait_for_network(timeout=0) is None

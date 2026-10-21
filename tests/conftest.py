@@ -58,6 +58,9 @@ class FakeHttp:
         """A route value that is callable gets the JSON body (a search request)."""
         return self._get(url, body)
 
+    def post_form(self, url, data):
+        return self._get(url, data)
+
 
 @pytest.fixture(autouse=True)
 def no_real_keys(monkeypatch):

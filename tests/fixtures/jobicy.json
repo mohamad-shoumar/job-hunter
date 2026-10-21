@@ -1,0 +1,78 @@
+{
+ "apiVersion": "2.2.19",
+ "documentationUrl": "https://jobi.cy/apidocs",
+ "friendlyNotice": "Thanks for using Jobicy API! Please ensure Jobicy is clearly credited with a direct link to the source, and all application buttons redirect to the original job URL provided in this feed. That’s all! You might be building something amazing, we wish you the best of luck!",
+ "jobCount": 3,
+ "lastUpdate": "2026-10-21T04:41:14+00:00",
+ "nextCursor": "AgAAAABq2H8_AAAAAGrW3xgAAAAAAAJYMU0zVhQkI8JYfGeOL2bNeSwvpjGOV7-iA1vhuPyR3yEvc2Crbkx6gPrWQjcHsvVXMBZBd7UfNg4wyGTV4A3ga4o",
+ "hasMore": false,
+ "appliedFilters": {
+  "count": 50,
+  "industry": "engineering"
+ },
+ "jobs": [
+  {
+   "id": 146760,
+   "url": "https://jobicy.com/jobs/146760-norwegian-tech-linguistic-tester",
+   "jobSlug": "146760-norwegian-tech-linguistic-tester",
+   "jobTitle": "Norwegian Tech Linguistic Tester",
+   "companyName": "Welo Global",
+   "companyLogo": "https://jobicy.com/data/server-nyc0409/galaxy/mercury/2026/06/83c40f94-221.webp",
+   "jobIndustry": [
+    "QA & Testing"
+   ],
+   "jobType": [
+    "Full-Time"
+   ],
+   "jobGeo": "Anywhere",
+   "jobLevel": "Entry-Level, Junior",
+   "jobExcerpt": "As a trusted global transformation partner, Welocalize accelerates the global business journey by enabling brands and companies to reach, engage, and grow international audiences. Welocalize delivers ",
+   "jobDescription": "<div>As a trusted global transformation partner, Welocalize accelerates the global business journey by enabling brands and companies to reach, engage, and grow international audiences. Welocalize delivers multilingual content transformation services in translation, localization, and adaptation for over 250 languages with a growing network of over 400,000 in-country linguistic resources. Driving innovation in language services, Welocalize delivers high-quality training data transformation solutions for NLP-enabled machine learning by blending technology and human intelligence to collect, annota",
+   "pubDate": "2026-10-21T03:05:30+00:00"
+  },
+  {
+   "id": 153697,
+   "url": "https://jobicy.com/jobs/153697-staff-software-engineer-6",
+   "jobSlug": "153697-staff-software-engineer-6",
+   "jobTitle": "Staff Software Engineer",
+   "companyName": "saas.group",
+   "companyLogo": "https://jobicy.com/data/server-nyc0409/galaxy/mercury/2025/06/f6d362c3-221-1.png",
+   "jobIndustry": [
+    "Software Engineering"
+   ],
+   "jobType": [
+    "Full-Time"
+   ],
+   "jobGeo": "EMEA",
+   "jobLevel": "Senior",
+   "jobExcerpt": "This role is part of our Prerender team, one of our growing brands at saas.group. For nearly a decade, Prerender has empowered marketers to create dynamic, complex sites at scale, making their JavaScr",
+   "jobDescription": "<p>This role is part of our <a href=\"https://prerender.io/\" rel=\"nofollow ugc noopener\" target=\"_blank\">Prerender</a><em> </em>team, one of our growing brands at <a href=\"https://jobicy.com/company/saas-group\" target=\"_blank\" rel=\"noopener\">saas.group</a>.</p>\n<p>For nearly a decade, Prerender has empowered marketers to create dynamic, complex sites at scale, making their JavaScript websites easily indexable by search engines. We eliminate indexing and crawling limitations, allowing our customers to gain the upper-hand on HTML sites and rank higher on SERPs. More than <strong>100,000 websites<",
+   "pubDate": "2026-10-21T03:15:12+00:00"
+  },
+  {
+   "id": 156097,
+   "url": "https://jobicy.com/jobs/156097-manager-machine-learning-engineering",
+   "jobSlug": "156097-manager-machine-learning-engineering",
+   "jobTitle": "Manager, Machine Learning Engineering",
+   "companyName": "Tala",
+   "companyLogo": "https://jobicy.com/data/server-nyc0409/galaxy/mercury/2022/02/a788b3a65c0fc717303f0b5b049cc7e6.jpeg",
+   "jobIndustry": [
+    "Software Engineering"
+   ],
+   "jobType": [
+    "Full-Time"
+   ],
+   "jobGeo": "USA",
+   "jobLevel": "Senior",
+   "jobExcerpt": "About Tala Tala is the AI-native credit infrastructure that connects global capital to the global majority. We combine proprietary risk intelligence with an expanding network of capital and distributi",
+   "jobDescription": "<p><strong>About <a href=\"https://jobicy.com/company/tala\" target=\"_blank\" rel=\"noopener\">Tala</a></strong></p>\n<p>Tala is the AI-native credit infrastructure that connects global capital to the global majority. We combine proprietary risk intelligence with an expanding network of capital and distribution partners to power credit access at scale. To date, Tala has distributed more than $9 billion in capital to more than 14 million customers across Africa, Latin America, and Asia, building the definitive contextual dataset on thin-file borrowers in emerging markets. Tala is now converting that ",
+   "pubDate": "2026-10-21T04:41:14+00:00",
+   "salaryMin": 170000,
+   "salaryMax": 210000,
+   "salaryCurrency": "USD",
+   "salaryPeriod": "yearly"
+  }
+ ],
+ "statusCode": 200,
+ "success": true
+}

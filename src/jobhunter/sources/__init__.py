@@ -11,15 +11,17 @@ from . import (
     ashby,
     bamboohr,
     custom_page,
+    euremotejobs,
     getro,
     greenhouse,
     hackernews,
     himalayas,
+    jobicy,
     lever,
+    linkedin,
     nodesk,
     pinpoint,
     remoteok,
-    remotive,
     serpapi,
     smartrecruiters,
     teamtailor,
@@ -34,7 +36,6 @@ BUILDERS = {
     "ashby_boards": ashby.from_config,
     "custom_pages": custom_page.from_config,
     "serpapi": serpapi.from_config,
-    "remote_api": remotive.from_config,
     "himalayas": himalayas.from_config,
     "remoteok": remoteok.from_config,
     "weworkremotely": weworkremotely.from_config,
@@ -47,6 +48,9 @@ BUILDERS = {
     "pinpoint_boards": pinpoint.from_config,
     "arbeitnow": arbeitnow.from_config,
     "workable": workable.from_config,
+    "jobicy": jobicy.from_config,
+    "euremotejobs": euremotejobs.from_config,
+    "linkedin": linkedin.from_config,
 }
 
 # Sections that configure something other than one source (boards.py reads "watch_boards").
@@ -57,7 +61,8 @@ SETTINGS = {"watch_boards"}
 NOT_IMPLEMENTED = {
     "hiringcafe": "hiring.cafe answers automated requests with HTTP 403 (Cloudflare) and has no public API",
     "remote100k": "no API or feed, HTML pages only; its listings are mostly US/EU-restricted ATS jobs",
-    "linkedin": "blocks automated access and forbids scraping; use the serpapi (Google Jobs) source instead",
+    "remote_api": "Remotive's free API returns only 10 jobs in total, whatever the parameters (checked 2026-10-21)",
+    "remoterocketship": "its terms forbid scraping; the paid API does not document location fields (checked 2026-10-21)",
     "wellfound": "bot protection on every page, no public API",
     "workatastartup": "requires a logged-in account (HTTP 406 without one)",
 }

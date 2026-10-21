@@ -14,6 +14,7 @@ Two ways to run:
 from __future__ import annotations
 
 import logging
+import time as clock
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
@@ -26,7 +27,7 @@ from .classify import classify
 from .config import Filters, OutreachConfig
 from .extract import enrich
 from .fitgrade import FitGrader, build_grader, grade_jobs, to_grade
-from .http import Http
+from .http import Http, wait_for_network
 from .models import NEEDS_REVIEW, UNCLEAR, Job
 from .outreach import run_outreach
 from .report import write_report
@@ -85,8 +86,20 @@ class RunSummary:
         }
 
 
-def fetch_all(sources: list[Source], http: Http, workers: int = 6) -> list[SourceResult]:
-    """Fetch sources in parallel. A crashing adapter becomes an error line, not a failed run."""
+# Error lines that mean the request never reached the site (describe_error names the httpx class).
+_CONNECTION_ERRORS = ("ConnectError", "ConnectTimeout")
+
+
+def _lost_connection(result: SourceResult) -> bool:
+    return any(kind in error for error in result.errors for kind in _CONNECTION_ERRORS)
+
+
+def fetch_all(sources: list[Source], http: Http, workers: int = 6, retry_after: float = 60.0) -> list[SourceResult]:
+    """Fetch sources in parallel. A crashing adapter becomes an error line, not a failed run.
+
+    A source with a connection error is fetched once more after `retry_after` seconds (unless it
+    pays per request, `refetch=False`); its jobs from both tries are kept, its errors from the second.
+    """
 
     def safe_fetch(source: Source) -> SourceResult:
         try:
@@ -96,7 +109,19 @@ def fetch_all(sources: list[Source], http: Http, workers: int = 6) -> list[Sourc
             return SourceResult(source.name, errors=[f"adapter crashed: {describe_error(exc)}"])
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        return list(pool.map(safe_fetch, sources))
+        results = list(pool.map(safe_fetch, sources))
+        again = [i for i, (source, result) in enumerate(zip(sources, results))
+                 if source.refetch and _lost_connection(result)]
+        if not again:
+            return results
+        log.info("connection errors in %s: trying again in %.0fs",
+                 ", ".join(sources[i].name for i in again), retry_after)
+        clock.sleep(retry_after)
+        for i, second in zip(again, pool.map(safe_fetch, [sources[i] for i in again])):
+            first = results[i]
+            note = f"fetched again after {len(first.errors)} error(s) the first time"
+            results[i] = SourceResult(first.source, first.jobs + second.jobs, second.errors, second.notes + [note])
+    return results
 
 
 def _unique(jobs: list[Job]) -> list[Job]:
@@ -261,6 +286,12 @@ def run(root_paths, sources_config: dict, filters: Filters, only: set[str] | Non
                 source.since = since
         run_id = store.start_run(now)
         summary = RunSummary(run_id=run_id, started_at=iso(now), config_notes=config_notes)
+        if own_http:
+            waited = wait_for_network()
+            if waited is None:
+                config_notes.append("no network after 5 minutes of waiting; fetching anyway")
+            elif waited >= 1:
+                config_notes.append(f"waited {waited:.0f}s for the network before fetching")
         if filters.visa and only is None:
             refresh_sponsors(root_paths, filters, http, now, summary)
         log.info("fetching %d sources: %s", len(sources), ", ".join(s.name for s in sources))

@@ -29,6 +29,9 @@ class Source:
     # newest-first (Himalayas) or split by month (HN) use it to reach back far
     # enough; the rest return everything they have anyway.
     since: datetime | None = None
+    # Fetched again after a connection error (pipeline.fetch_all). False for a source that pays
+    # per request, where a second try would spend its credits again.
+    refetch: bool = True
 
     def fetch(self, http) -> SourceResult:  # pragma: no cover - interface
         raise NotImplementedError

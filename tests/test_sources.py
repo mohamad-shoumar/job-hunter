@@ -1,6 +1,7 @@
 """Adapters against trimmed real responses (tests/fixtures), through a fake HTTP client."""
 
 import json
+from datetime import datetime, timezone
 
 import httpx
 
@@ -10,13 +11,15 @@ from jobhunter.sources import build_sources
 from jobhunter.sources import (
     ashby,
     custom_page,
+    euremotejobs,
     greenhouse,
     hackernews,
     himalayas,
+    jobicy,
     lever,
+    linkedin,
     nodesk,
     remoteok,
-    remotive,
     serpapi,
     weworkremotely,
 )
@@ -151,12 +154,6 @@ def test_himalayas_asks_for_lebanon_and_pages():
     # Empty restrictions mean Himalayas does not know, not "any country".
     assert job.allowed_locations == [] and job.location_raw is None
     assert job.company == "Miris" and job.salary_currency == "USD" and job.salary_period == "year"
-
-
-def test_remotive_splits_candidate_locations():
-    result = remotive.RemotiveSource().fetch(FakeHttp({remotive.API: fixture_json("remotive.json")}))
-    assert result.jobs[1].allowed_locations == ["USA", "Canada", "Argentina", "Mexico", "Peru"]
-    assert result.jobs[1].salary_raw == "$90k - $105k"
 
 
 def test_remoteok_skips_legal_notice_and_filters_locally():
@@ -466,3 +463,52 @@ def test_workable_searches_each_country_and_reads_the_three_text_parts():
     assert jobs["OrganOx"].location_raw.startswith("Oxford") and jobs["OrganOx"].remote_status == "onsite"
     assert jobs["Informed Solutions"].remote_status == HYBRID
     assert "<p>" not in jobs["OrganOx"].description and jobs["OrganOx"].posted_at is not None
+
+
+def test_jobicy_keeps_target_titles_and_its_hiring_region():
+    data = fixture_json("jobicy.json")
+    result = jobicy.JobicySource(["software engineer"]).fetch(FakeHttp({jobicy.API: data}))
+    assert [(j.title, j.company, j.allowed_locations) for j in result.jobs] == [
+        ("Staff Software Engineer", "saas.group", ["EMEA"])]
+    job = result.jobs[0]
+    assert job.application_url == job.source_url and job.source_url.startswith("https://jobicy.com/jobs/")
+    assert job.posted_at.isoformat() == "2026-10-21T03:15:12+00:00"
+    everything = jobicy.JobicySource([]).fetch(FakeHttp({jobicy.API: data}))
+    assert everything.jobs[2].allowed_locations == ["USA"] and everything.jobs[2].salary_min == 170000
+
+
+def test_euremotejobs_reads_the_job_page_of_target_titles_only(monkeypatch):
+    monkeypatch.setattr(euremotejobs, "utcnow", lambda: datetime(2026, 10, 21, 12, tzinfo=timezone.utc))
+    listing = fixture_json("euremotejobs_listings.json")
+    page = fixture_text("euremotejobs_job.html")
+    http = FakeHttp({euremotejobs.LISTINGS: listing,
+                     "https://euremotejobs.com/job/security-architect-2/": page,
+                     "https://euremotejobs.com/job/platform-engineer-compute/": http_error("x", 500)})
+    result = euremotejobs.EuRemoteJobsSource(["architect", "platform engineer"]).fetch(http)
+    by_title = {j.title: j for j in result.jobs}
+    assert set(by_title) == {"Security Architect", "Platform Engineer – Compute"}  # not the finance manager
+    netbox = by_title["Security Architect"]
+    assert netbox.company == "NetBox Labs" and netbox.allowed_locations == ["UK", "US"]
+    assert netbox.application_url.startswith("https://jobs.ashbyhq.com/netboxlabs/")
+    assert "NetBox Labs builds NetBox" in netbox.description
+    supabase = by_title["Platform Engineer – Compute"]  # its page failed: the listing row is kept
+    assert supabase.company == "Supabase" and supabase.allowed_locations == ["Worldwide"]
+    assert supabase.description == "" and len(result.errors) == 1
+
+
+def test_linkedin_fetches_pages_of_target_titles_only(monkeypatch):
+    monkeypatch.setattr(linkedin, "utcnow", lambda: datetime(2026, 10, 21, 12, tzinfo=timezone.utc))
+    posting = linkedin.POSTING.format(id="4478986376")
+    http = FakeHttp({linkedin.SEARCH: fixture_text("linkedin_search.html"), posting: fixture_text("linkedin_job.html")})
+    source = linkedin.LinkedInSource([{"keywords": "backend engineer", "location": "United Arab Emirates"}],
+                                     ["back end developer", "backend"], pause=0)
+    result = source.fetch(http)
+    assert http.calls[0][1] == {"keywords": "backend engineer", "location": "United Arab Emirates",
+                                "f_TPR": "r86400", "start": 0}
+    assert len(http.calls) == 2  # 2 cards (< 10): one search page; the lead role's page is never read
+    [job] = result.jobs
+    assert (job.title, job.company, job.location_raw) == ("Back End Developer", "Confidential",
+                                                          "Dubai, United Arab Emirates")
+    assert job.source_url == job.application_url == "https://www.linkedin.com/jobs/view/4478986376"
+    assert "Mid-Level .NET Backend Developer" in job.description
+    assert job.tags == ["Associate"] and job.posted_at.date().isoformat() == "2026-10-21"

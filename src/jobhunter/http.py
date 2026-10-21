@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import socket
 import time
 
 import httpx
@@ -13,6 +14,24 @@ _RETRY_STATUSES = {429, 500, 502, 503, 504}
 def _retry_after(response: httpx.Response) -> float | None:
     value = response.headers.get("Retry-After", "")
     return min(float(value), 30.0) if value.isdigit() else None
+
+
+def wait_for_network(host: str = "api.github.com", timeout: float = 300.0, step: float = 5.0) -> float | None:
+    """Seconds it took until `host` answered on port 443, or None if it never did within `timeout`.
+
+    The scheduled runs start right after the Mac wakes, often before Wi-Fi is back: the first requests
+    of each source failed with ConnectError in 4 of 5 runs (2026-10-17 to 10-21), losing the boards
+    listed first (Careem, Tamara, Tabby...).
+    """
+    start = time.monotonic()
+    while True:
+        try:
+            with socket.create_connection((host, 443), timeout=step):
+                return time.monotonic() - start
+        except OSError:
+            if time.monotonic() - start >= timeout:
+                return None
+            time.sleep(step)
 
 
 class Http:
@@ -33,6 +52,10 @@ class Http:
     def post_json(self, url: str, body: dict, headers: dict | None = None):
         """POST a JSON body, return the JSON answer. For search APIs that only take POST (Getro)."""
         return self._send("POST", url, json=body, headers=headers).json()
+
+    def post_form(self, url: str, data: dict):
+        """POST a form, return the JSON answer. For WordPress job lists (EU Remote Jobs)."""
+        return self._send("POST", url, data=data).json()
 
     def _send(self, method: str, url: str, **kwargs) -> httpx.Response:
         for attempt in range(self.retries + 1):

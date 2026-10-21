@@ -122,3 +122,19 @@ handled: since Oct 14 they went to needs_review 21, agency 44, other stack 19, s
 
 Not worth it: Bayt/GulfTalent/Naukrigulf (blocked, little new), Indeed (blocked), Welcome to
 the Jungle (terms forbid scraping), Working Nomads, 4dayweek, Wellfound.
+
+## Follow-up (same day)
+
+- "Open to the user" above already counts worldwide and EMEA postings: no posting has to name
+  Lebanon. The rules work the same way (`eligibility.py`: "worldwide"/"anywhere" is eligible,
+  EMEA/MENA likely, a silent remote posting goes to needs review).
+- Built: the network wait and retry, LinkedIn's logged-out search, Jobicy, EU Remote Jobs, Brain
+  Co.'s Ashby board; Remotive removed.
+- A one-day LinkedIn trial (13 searches, 24 hours, ~5.5 minutes) against a copy of the DB: 82
+  jobs, 75 not in the DB; 13 shortlisted (UAE and Qatar), 10 visa list (UK, NL), 1 needs review.
+  Jobicy (54 jobs, 40 new) and EU Remote Jobs (53, 26 new) gave nothing past the rules that day,
+  as the counts above predicted.
+- Remote Rocketship: not built. Its terms (§5) say "Scraping the Platform, running automated
+  browser sessions, or performing request bursts that mimic scraping is prohibited." The paid API
+  ($29/month) allows caching for 24 hours only and documents no location fields. Logged out, the
+  site shows only the newest 20 jobs per filter, and of 6 "Worldwide" jobs checked only 2 were.

@@ -72,7 +72,7 @@ was posted, so you get one file per day. It does not fetch once per day: job
 sites only show what is open *now*, so eight fetches would return the same
 listings eight times (and use eight times the SerpApi credits). Two consequences:
 jobs that already closed cannot be recovered, and sources that only keep their
-latest jobs (Remote OK ~100, Remotive ~20) are thin for older days. Himalayas
+latest jobs (Remote OK ~100, Jobicy ~7 days) are thin for older days. Himalayas
 keeps paging back until it reaches the start of the range, and Hacker News reads
 every monthly thread the range touches. Jobs inside the range are kept even if
 they are older than the usual 30-day limit.
@@ -403,14 +403,21 @@ sites a job was seen on.
 
 ## Sources
 
-Checked on 2026-09-25, SerpApi on 2026-09-27, the investor and Gulf boards on 2026-10-10
-(research notes: `docs/research/2026-10-10-job-sources.md`).
+Checked on 2026-09-25, SerpApi on 2026-09-27, the investor and Gulf boards on 2026-10-10, LinkedIn, Jobicy and
+EU Remote Jobs on 2026-10-21 (research notes: `docs/research/2026-10-10-job-sources.md`,
+`docs/research/2026-10-21-market-size.md`).
+
+Every run first waits (up to 5 minutes) until the network answers, since the scheduled runs start
+right after the Mac wakes; a source whose requests still could not connect is fetched once more a
+minute later (never SerpApi, which pays per query).
 
 | source | how | notes |
 | --- | --- | --- |
 | Lever, Ashby | public ATS APIs | one entry per company board in `config/sources.json` |
 | Himalayas | public API | queried with `country=LB`: returns jobs that list Lebanon or list no countries at all. "No countries" often means Himalayas does not know (it shows "Worldwide" for US-only roles), so those count as no location |
-| Remotive | public API | returns its latest ~20 jobs; ignores search terms |
+| Jobicy | public API | remote jobs with the region each company hires in ("Anywhere", "EMEA", "USA"); `queries` filter titles locally |
+| EU Remote Jobs | the site's own job list (JSON) | ~100 remote jobs a day of all kinds; target titles get their page read (schema.org JobPosting: full text, allowed countries, the company's apply link) |
+| LinkedIn | logged-out job search | searches by place (UAE, Qatar, Lebanon, UK/NL with "visa sponsorship"); only keywords, location and posted-within work logged out. ~2.5 s between requests (faster gets HTTP 429), so a run spends a few minutes on it. LinkedIn's terms forbid automated access: you chose to use it anyway at this volume (2026-10-21). A one-day trial found 75 jobs not in the DB: 13 shortlisted, 10 visa list |
 | Remote OK | public API | latest ~100 jobs; `queries` filter them locally |
 | We Work Remotely | RSS | back-end and full-stack feeds |
 | Hacker News | Algolia API | latest "Who is hiring?" thread, one job per role |
@@ -421,7 +428,9 @@ Checked on 2026-09-25, SerpApi on 2026-09-27, the investor and Gulf boards on 20
 | Greenhouse, Teamtailor, BambooHR, SmartRecruiters, Pinpoint | public ATS APIs / RSS | companies in the UAE, Qatar and Lebanon (Careem, talabat, Property Finder, Calo, Qashio, Toters, Tabby, ...). Mostly on-site: the `relocation` rules decide. Pinpoint gives no dates, so Tabby's jobs go to "needs review" |
 | HiringCafe | not built | blocks automated requests (HTTP 403) |
 | Remote100k | not built | HTML only, no feed |
-| LinkedIn, Wellfound, Work at a Startup | not built | bot walls, login, or terms forbid scraping (LinkedIn's guest search works, but you chose not to risk it, 2026-10-10) |
+| Remotive | removed 2026-10-21 | its free API returns only 10 jobs in total |
+| Remote Rocketship | not built | its terms forbid scraping; the paid API ($29/month) does not document location fields (checked 2026-10-21) |
+| Wellfound, Work at a Startup | not built | bot walls or login |
 | Bayt, GulfTalent, NaukriGulf | not built | block scripts or forbid them in robots.txt, and mostly recruiters |
 | Arbeitnow | public API | jobs in Germany, the Netherlands and the UK, for the visa list. Its visa flag is per company (flagged postings say "we do not provide visa sponsorship" too), so it only trims the NL and UK feeds; the posting's words decide. Only titles with one of `queries` are kept |
 | Workable | public job search API | every company on Workable, searched by country and `day_range`, for the visa list. Full text |
