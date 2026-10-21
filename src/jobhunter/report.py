@@ -233,7 +233,8 @@ def render(day: str, rows: list[sqlite3.Row], sightings: dict[int, list[sqlite3.
         dates = summary.get("date_check")
         if dates:
             found = ", ".join(f"{n} {v}" for v, n in sorted(dates["found"].items())) or "none"
-            out += [f"**Posting dates** (job pages, then {dates['model']}): {dates['checked']} undated jobs "
+            how = "job pages" + ("" if dates["model"] == "page" else f", then {dates['model']}")
+            out += [f"**Posting dates** ({how}): {dates['checked']} undated jobs "
                     f"looked up ({found})", ""]
             out += [f"- {_cell(line)}" for line in dates["notes"] + dates["errors"]]
             out += [""] if dates["notes"] or dates["errors"] else []

@@ -140,7 +140,9 @@ def date_links(job: Job, limit: int) -> list[str]:
     """The job's pages worth reading for a date: its own links, and a LinkedIn job page in English."""
     linkedin = [f"https://www.linkedin.com{m.group(1)}" for u in (job.application_url, job.source_url)
                 if u and (m := _LINKEDIN_VIEW.match(u))]
-    return list(dict.fromkeys(job_links(job, limit) + linkedin[:1]))
+    # A Google Jobs share link is a search page that can carry other listings' dates.
+    own = [u for u in job_links(job, limit + 1) if "google." not in u.split("/")[2]][:limit]
+    return list(dict.fromkeys(own + linkedin[:1]))
 
 
 @dataclass

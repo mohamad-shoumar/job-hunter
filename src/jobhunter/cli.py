@@ -324,7 +324,8 @@ def cmd_dates(args) -> int:
         if not rows:
             print("nothing to look up")
             return 0
-        print(f"looking up {len(rows)} of {waiting} undated jobs (job pages, then {finder.label})\n")
+        how = "job pages" + ("" if finder.model is None else f", then {finder.label}")
+        print(f"looking up {len(rows)} of {waiting} undated jobs ({how})\n")
 
         def show(row, check, cls):
             print(f"#{row['id']:<5} {row['company']} — {row['title']}")

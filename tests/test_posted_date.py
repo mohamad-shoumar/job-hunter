@@ -67,6 +67,8 @@ def test_a_regional_linkedin_link_is_read_in_english():
     # ae.linkedin.com answered in Arabic ("٣ شهر"), which code cannot read.
     job = undated(application_url="https://ae.linkedin.com/jobs/view/ai-engineer-at-acme-4440611818?trk=x")
     assert date_links(job, 3) == ["https://example.com/jobs/1", "https://www.linkedin.com/jobs/view/ai-engineer-at-acme-4440611818"]
+    google = undated(source_url="https://www.google.com/search?ibp=htl%3Bjobs&q=python")
+    assert date_links(google, 3) == [PAGE]
 
 
 def test_the_pages_own_date_posted_is_used_without_a_search():
