@@ -13,7 +13,7 @@ from jobhunter import tracking
 from jobhunter.config import OutreachConfig, Paths
 from jobhunter.cv import (
     MAX_BULLET_WORDS, TAG_RULES, CvWriter, TailorError, check_bullet, check_headline, check_version, cv_headline, job_tags,
-    load_facts, plan_from, printed_title, render, role_label, save_version, scan, select, split_items,
+    load_facts, plan_from, printed_title, render, restore_bold, role_label, save_version, scan, select, split_items,
     tailor_for_job, tailored_of, version_of,
 )
 from jobhunter.llm import JsonModel
@@ -34,17 +34,21 @@ GOOD = {
     "headline": "Backend Engineer - Python & AWS",
     "roles": [
         {"role": "R1", "bullets": [
-            {"sources": ["R1.1"], "text": "Architected a serverless platform on AWS Lambda that runs 800+ concurrent "
-                                          "Python jobs with zero production failures."},
+            {"sources": ["R1.1"], "text": "Architected a serverless, event-driven backtesting platform on AWS Lambda "
+                                          "and SQS running 800+ concurrent Python jobs over historical market "
+                                          "datasets, with zero production failures."},
             {"sources": ["R1.2"], "text": "Designed failure handling so no job is silently lost: SQS dead-letter "
-                                          "queue, idempotent PostgreSQL writes and credit refunds."},
+                                          "queue with redrive, idempotent PostgreSQL result writes with retry and "
+                                          "backoff, and idempotent credit refunds for failed or timed-out jobs."},
             {"sources": ["R1.4"], "text": "Designed a slippage model that improves backtest realism and trading "
                                           "cost accuracy."},
         ]},
-        {"role": "R2", "bullets": [{"sources": ["R2.1"], "text": "Led the microservices packaging migration from "
-                                                                 "Bazel to Poetry across internal Python services."}]},
-        {"role": "R3", "bullets": [{"sources": ["R3.1"], "text": "Designed REST APIs in Python for the backtesting "
-                                                                 "platform, delivering market and simulation data."}]},
+        {"role": "R2", "bullets": [{"sources": ["R2.1"], "text": "Led the Python packaging migration from Bazel to "
+                                                                 "Poetry across internal microservices, simplifying "
+                                                                 "dependency management and reproducible builds."}]},
+        {"role": "R3", "bullets": [{"sources": ["R3.1"], "text": "Designed and implemented REST APIs in Python for the "
+                                                                 "backtesting platform, delivering market and "
+                                                                 "simulation data to the product frontend."}]},
     ],
     "skills": [{"label": "Languages", "items": ["Python", "SQL", "Rust"]},
                {"label": "Tools & Platforms", "items": ["AWS (Lambda, SQS)", "Docker"]}],
@@ -140,7 +144,7 @@ def test_the_file_keeps_the_layout_and_prints_only_checked_lines():
     text = render(lines, matched, rows, plan, "TAILORED for Acme", compact=True)
     assert text.startswith("// TAILORED for Acme\n# Mohamad Shoumar\ntitle: Backend Engineer\n")  # no tech after it
     assert "location: Beirut, Lebanon\ncompact: yes\n\n## Professional Experience" in text
-    assert "Present\nAlgorithmic Trader\n- Architected a serverless platform" in text  # the printed title
+    assert "Present\nAlgorithmic Trader\n- Architected a serverless, event-driven" in text  # the printed title
     assert f"- {R1[3]}\n- {R1[5]}\n// [lead] - {R1[6]}" in text  # core bullets always print; lead ones not here
     assert f"// [automation] - {R1[9]}" in text and "[core]" not in text
     assert "spare bullet" not in text and "Summary" not in text
@@ -157,15 +161,29 @@ def test_the_file_keeps_the_layout_and_prints_only_checked_lines():
     ("Architected a serverless platform on AWS Lambda for Goldman Sachs.", 'names "Goldman"'),
     ("Architected a robust, scalable, secure, resilient, observable serverless platform on AWS Lambda.",
      "adds 5 words"),
+    ("Architected a serverless platform on AWS Lambda that runs 800+ concurrent Python jobs.",  # shortened
+     "drops 9 of its words (event, driven, backtesting, historical, market, datasets, zero"),
 ])
 def test_a_rewrite_may_not_add_facts(text, problem):
     assert any(problem in p for p in check_bullet(text, [R1[1]]))
 
 
 def test_a_faithful_rewrite_passes():
-    assert check_bullet("Architected a serverless platform on AWS Lambda that runs 800+ concurrent Python jobs "
-                        "with zero production failures.", [R1[1]]) == []
-    assert check_bullet("Built REST APIs in Python for the backtesting platform.", [ROLES[2].bullets[0]]) == []
+    assert check_bullet("Architected a serverless, event-driven backtesting platform on AWS Lambda and SQS running "
+                        "800+ concurrent Python jobs over historical market datasets, with zero production failures.",
+                        [R1[1]]) == []
+    assert check_bullet("Designed and built REST APIs in Python for the backtesting platform, delivering market and "
+                        "simulation data to the product frontend.", [ROLES[2].bullets[0]]) == []  # one word swapped
+
+
+def test_a_rewrite_gets_the_profile_bold_back():
+    cited = ["Led the migration across 4 services, reducing update effort by **~70%**, and uncovering "
+             "**40 bugs and edge cases**."]
+    assert restore_bold("Uncovered 40 bugs and edge cases and cut update effort by ~70% across 4 services.", cited) \
+        == "Uncovered **40 bugs and edge cases** and cut update effort by **~70%** across 4 services."
+    assert restore_bold("Found 40 bugs early.", cited) == "Found **40** bugs early."  # the bold words changed
+    assert restore_bold("Scans **10,000+** postings for the top 10-20.", ["scans **10,000+** postings, top **10-20**"]) \
+        == "Scans **10,000+** postings for the top **10-20**."
 
 
 def test_the_headline_is_a_target_role_and_nothing_else():

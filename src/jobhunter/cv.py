@@ -10,8 +10,10 @@ you (see CLAUDE.md):
   - a role's bullets come from that role's bullets in the profile. Each
     bullet the model writes names the profile bullet(s) it rewords, from the
     same role, and is kept only when its numbers, tools, seniority words and
-    names are in those bullets and it adds at most MAX_NEW_WORDS other words.
-    Otherwise the profile's own wording is printed;
+    names are in those bullets, it adds at most MAX_NEW_WORDS other words and
+    drops at most MAX_DROPPED_WORDS of theirs (a rewrite never shortens a
+    bullet). Otherwise the profile's own wording is printed. Code puts back the
+    profile's bold ("**800+**"), which the model's text does not carry;
   - which bullets print is decided by code, from the profile's tags: "[core]"
     bullets always, an optional one ("[lead]", "[fullstack]", "[automation]"...)
     only when the job matches that tag (TAG_RULES, overridable as cv_tags in
@@ -61,7 +63,9 @@ from .store import JobStore
 from .text import iso
 
 MAX_NEW_WORDS = 4
-MAX_BULLET_WORDS = 40
+# A rewrite keeps the bullet's details: it may swap a word for the posting's term, never cut a clause.
+MAX_DROPPED_WORDS = 1
+MAX_BULLET_WORDS = 40  # or the cited bullets' length, when longer
 MAX_POSTING_CHARS = 6000
 # When a job gets a profile tag's optional bullets: a phrase in its title, or in the posting.
 # Matched as whole words, ignoring case, except that a phrase with a capital letter must match
@@ -291,6 +295,11 @@ def _knows(token: str, words: set[str]) -> bool:
                for p in re.findall(r"[a-z0-9#+]+", token.lower()))
 
 
+def _kept(word: str, roots: set[str], words: set[str]) -> bool:
+    """The rewrite still says this word: same root, or a shorter form of it ("REST" for "RESTful")."""
+    return _root(word) in roots or any(len(w) >= 4 and word.startswith(w) for w in words)
+
+
 def check_bullet(text: str, sources: list[str]) -> list[str]:
     """Why this rewrite of `sources` cannot be printed (empty: it can)."""
     if not text:
@@ -314,10 +323,33 @@ def check_bullet(text: str, sources: list[str]) -> list[str]:
     added = list(dict.fromkeys(w for w in _content_words(text) if _root(w) not in roots))
     if len(added) > MAX_NEW_WORDS:
         problems.append(f"adds {len(added)} words that are not in it ({', '.join(added)}); at most {MAX_NEW_WORDS}")
-    words = len(text.split())
-    if words > MAX_BULLET_WORDS:
-        problems.append(f"is {words} words; at most {MAX_BULLET_WORDS}")
+    mine = set(re.findall(r"[a-z0-9]+", text.lower()))
+    dropped = [w for w in dict.fromkeys(_content_words(cited)) if not _kept(w, {_root(x) for x in mine}, mine)]
+    if len(dropped) > MAX_DROPPED_WORDS:
+        problems.append(f"drops {len(dropped)} of its words ({', '.join(dropped)}); keep every detail, "
+                        f"at most {MAX_DROPPED_WORDS} left out")
+    words, limit = len(text.split()), max(MAX_BULLET_WORDS, len(cited.split()) + MAX_NEW_WORDS)
+    if words > limit:
+        problems.append(f"is {words} words; at most {limit}")
     return problems
+
+
+_BOLD_NUMBER = re.compile(r"[~$]?\d[\d,.]*(?:[-–]\d[\d,.]*)?[+%kKmMx]*")
+
+
+def restore_bold(text: str, sources: list[str]) -> str:
+    """The rewrite with the cited bullets' bold put back: the same bold words, else the number in them."""
+    text = text.replace("**", "")
+    spans: list[tuple[int, int]] = []
+    for bold in re.findall(r"\*\*(.+?)\*\*", " ".join(sources)):
+        for target in [bold] + _BOLD_NUMBER.findall(bold):
+            m = re.search(rf"(?<![\w~$]){re.escape(target)}(?![\w+%])", text, re.I)
+            if m and not any(a < m.end() and m.start() < b for a, b in spans):
+                spans.append(m.span())
+                break
+    for a, b in sorted(spans, reverse=True):
+        text = f"{text[:a]}**{text[a:b]}**{text[b:]}"
+    return text
 
 
 def check_headline(text: str, headlines: list[str]) -> tuple[str, str | None]:
@@ -429,14 +461,14 @@ def plan_from(answer: dict, roles: list[Role], skills: dict[str, list[str]], hea
                 notes.append(f"{role.title}: left out a bullet that cites none of this role's bullets")
                 continue
             used.update(sources)
-            text = " ".join(str(item.get("text") or "").split()).lstrip("-• ").strip()
+            text = " ".join(str(item.get("text") or "").replace("**", "").split()).lstrip("-• ").strip()
             why = check_bullet(text, [ids[s] for s in sources])
             if why:
                 problems.append(f'{"+".join(sources)} "{text[:70]}{"…" if len(text) > 70 else ""}": {"; ".join(why)}')
                 chosen += [ids[s] for s in sources]  # the profile's own wording
                 flags += [extra[s] for s in sources]
             else:
-                chosen.append(text)
+                chosen.append(restore_bold(text, [ids[s] for s in sources]))
                 flags.append(all(extra[s] for s in sources))
         # Every bullet given to the model prints (the tags already chose them): one it left out
         # goes at the end, in the profile's words.
@@ -502,15 +534,18 @@ for this job.
 
 Rewording rules. Code checks each bullet; one that breaks a rule is printed in \
 its original words instead:
-- Same work, same scope, same results as the bullets it cites. Keep their \
-numbers exactly, next to the same words ("800+ concurrent Python jobs").
+- Same work, same scope, same results and the same length as the bullets it \
+cites. Keep every detail: each tool, number, result and clause. Never shorten \
+or summarize a bullet; if nothing in it should change, return it word for word. \
+Keep their numbers exactly, next to the same words ("800+ concurrent Python jobs").
 - Never add a tool, language, number, team size, employer, title, result or \
 responsibility that is not in the cited bullets. The posting's words describe \
 the job, not the engineer.
-- You may cut words, reorder, and use the posting's term for something the \
-bullet already says ("REST APIs" for "RESTful APIs"). At most {MAX_NEW_WORDS} words \
-that are not in the cited bullets.
-- At most {MAX_BULLET_WORDS} words per bullet. Plain words, no buzzwords.
+- You may use the posting's term for something the bullet already says \
+("REST APIs" for "RESTful APIs") and move a clause to the front. At most \
+{MAX_NEW_WORDS} words that are not in the cited bullets, and at most \
+{MAX_DROPPED_WORDS} of their words left out.
+- Bold (**) is put back by code; leave it out. Plain words, no buzzwords.
 """
 
 SCHEMA = {
