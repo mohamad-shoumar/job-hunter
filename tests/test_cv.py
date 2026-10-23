@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 from jobhunter import tracking
 from jobhunter.config import OutreachConfig, Paths
 from jobhunter.cv import (
-    MAX_BULLET_WORDS, TAG_RULES, CvWriter, TailorError, check_bullet, check_headline, check_version, job_tags,
+    MAX_BULLET_WORDS, TAG_RULES, CvWriter, TailorError, check_bullet, check_headline, check_version, cv_headline, job_tags,
     load_facts, plan_from, printed_title, render, role_label, save_version, scan, select, split_items,
     tailor_for_job, tailored_of, version_of,
 )
@@ -228,6 +228,40 @@ def test_deepseek_answers_through_the_same_check(filters):
     assert seen[0]["response_format"] == {"type": "json_object"} and '"headline"' in seen[0]["messages"][0]["content"]
 
 
+@pytest.mark.parametrize("title, headline", [
+    ("Senior Software Engineer", "Senior Software Engineer"),
+    ("Backend Developer", "Backend Developer"),
+    ("Senior Backend & Platform Engineer", "Senior Backend Engineer"),
+    ("Senior Backend and Platform Engineer", "Senior Backend Engineer"),
+    ("Senior Software Engineer, Payments Platform", "Senior Software Engineer"),
+    ("Senior+ Full-Stack Engineer", "Senior Full-Stack Engineer"),
+    ("Product Engineer (TradeNet)", "Product Engineer"),
+    ("Software Engineer, AI Data", "Software Engineer"),
+    ("Software Engineer, Senior", "Senior Software Engineer"),
+    ("Senior/Lead Software Engineer", "Senior Software Engineer"),
+    ("Backend Engineer / Procedural 3D Developer", "Backend Engineer"),
+    ("Backend / Full Stack Developer (Mid to Senior)", "Backend Developer"),
+    ("Senior Backend & Data Engineer for Fintech Pipelines", "Senior Backend Engineer"),
+    ("Full Stack Engineer with AI Experience- Qatar", "Full Stack Engineer"),
+    ("Lead Backend Engineer — Remote & AI-Driven Systems", "Lead Backend Engineer"),
+    ("Backend Developer: Python & FastAPI | APIs & Systems", "Backend Developer"),
+    ("[UAE] Forward Deployed Engineer", "Forward Deployed Engineer"),
+    ("Graduate Programme 2027: Applied AI Engineer", "Applied AI Engineer"),
+    ("Senior Software Developer II - Wise for Banks", "Senior Software Developer"),
+    ("Sr. Python Developer", "Senior Python Developer"),
+    ("Freelance Back End / Typescript Developer", "Back End Developer"),
+    ("Software engineer - Real-Time Pricing", "Software Engineer"),
+    ("Software Engineers", "Software Engineer"),
+    # Not one engineering role: the target-role headline instead.
+    ("Forward-Deployed Banker", None),
+    ("Exceptional Engineers (Python -> AI coding) - AI Native scale up", None),
+    ("Applied AI, Forward Deployed Machine Learning Engineer - London", None),
+    ("Engineer", None),
+])
+def test_the_headline_is_the_postings_title_cleaned(title, headline):
+    assert cv_headline(title) == headline
+
+
 # --- the whole step, with build.py faked ----------------------------------------------------
 
 
@@ -271,7 +305,8 @@ def test_tailoring_writes_the_version_builds_it_and_attaches_it(resume, filters)
     meta = tailor_for_job(store, job_id, writer(GOOD), PROFILE_FILE, config_for(resume), NOW, builder=build)
     assert meta["file"] == "Shoumar_Backend_Acme_Sep2026.pdf" and meta["source"] == "versions/Backend_Acme_Sep2026.md"
     assert meta["pages"] == 1 and "compact: yes" in build.sources[1] and "compact: yes" not in build.sources[0]
-    assert meta["gaps"] == ["kafka"] and meta["headline"] == "Backend Engineer"
+    assert meta["gaps"] == ["kafka"] and meta["headline"] == "Senior Backend Engineer"  # the posting's title, cleaned
+    assert "title: Senior Backend Engineer\n" in build.sources[1]
     assert meta["tags"] == {} and meta["titles"] == {"R1": "Algorithmic Trader"}
     assert meta["changes"][0].startswith("Core bullets only") and meta["changes"][1:] == GOOD["changes"]
     assert "Present\nAlgorithmic Trader\n- " in build.sources[1] and f"// [lead] - {R1[6]}" in build.sources[1]
@@ -284,6 +319,14 @@ def test_tailoring_writes_the_version_builds_it_and_attaches_it(resume, filters)
     again = tailor_for_job(store, job_id, writer(GOOD), PROFILE_FILE, config_for(resume), NOW, builder=FakeBuild())
     assert again["file"] == meta["file"] and len(list(csv.reader((resume / "applications.csv").open()))) == 2
     assert [e["detail"] for e in tracking.events_for(store, job_id)][-1].endswith("(again)")
+
+
+def test_a_title_that_is_not_one_role_keeps_the_target_role_headline(resume, filters):
+    store = JobStore(":memory:")
+    job_id = store_job(store, filters, title="Forward-Deployed Banker")
+    meta = tailor_for_job(store, job_id, writer(GOOD), PROFILE_FILE, config_for(resume), NOW, builder=FakeBuild())
+    assert meta["headline"] == "Backend Engineer"
+    assert any('the posting\'s title "Forward-Deployed Banker"' in n for n in meta["notes"])
 
 
 def test_a_cv_that_spills_loses_optional_bullets_never_core_ones(resume, filters):

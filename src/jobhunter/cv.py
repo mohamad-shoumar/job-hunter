@@ -21,9 +21,12 @@ you (see CLAUDE.md):
     pages long in the compact layout loses optional bullets, oldest role first,
     until it fits;
   - a skills row only holds skills from the profile row with the same label;
-  - the headline is one of your target roles (or the profile's headline),
-    word for word, with nothing next to it ("Backend Engineer", never
-    "Backend Engineer - Python & AWS");
+  - the headline is the posting's own title, cleaned by code (cv_headline:
+    "Senior Software Engineer, Payments Platform" -> "Senior Software
+    Engineer", "Senior Backend & Platform Engineer" -> "Senior Backend
+    Engineer"); a title that does not read as one engineering role gets one of
+    your target roles instead, with nothing next to it ("Backend Engineer",
+    never "Backend Engineer - Python & AWS");
   - the model never writes a summary (resume.md's own Summary paragraph is
     copied as it is).
 
@@ -326,6 +329,56 @@ def check_headline(text: str, headlines: list[str]) -> tuple[str, str | None]:
     if role.lower() not in allowed:
         return headlines[0], f'the headline "{text}" is not one of your target roles'
     return allowed[role.lower()], None
+
+
+# The job word a CV headline ends in, the level words before it, and words that never print.
+_ROLE_NOUN = {"engineer", "developer", "programmer", "architect", "lead"}
+_LEVEL = {"senior", "staff", "principal", "lead", "junior"}
+_DROP = {"freelance", "remote", "remote-first", "contract", "junior", "medior", "mid", "mid-level", "mid-senior",
+         "entry", "level", "entry-level", "graduate", "exceptional", "talented"}
+# Where the title's own words end: "Senior Software Engineer, Payments Platform", "Product Engineer (TradeNet)",
+# "Backend Engineer - Python", "Backend Developer: Python & FastAPI", "Full Stack Engineer with AI Experience".
+_TITLE_END = re.compile(r"\s+[-–—]\s+|\s*[|:;,(\[_*]|\s+(?:with|for|at|in|focused|needed)\s+", re.I)
+
+
+def _is_noun(word: str) -> bool:
+    return word.lower().removesuffix("s") in _ROLE_NOUN
+
+
+def cv_headline(title: str) -> str | None:
+    """The posting's title as a CV headline, or None when it does not read as one engineering role.
+    'Senior Software Engineer, Payments Platform' -> 'Senior Software Engineer', 'Senior Backend & Platform
+    Engineer' -> 'Senior Backend Engineer', 'Senior/Lead Software Engineer' -> 'Senior Software Engineer',
+    'Senior+ Full-Stack Engineer' -> 'Senior Full-Stack Engineer', 'Software Engineer II' -> 'Software Engineer'."""
+    text = re.sub(r"^\s*[\[(][^\])]*[\])]\s*", "", " ".join((title or "").split()))  # "[UAE] Forward Deployed..."
+    text = re.sub(r"^(.+?),\s*(senior|staff|principal|lead)$", r"\2 \1", text, flags=re.I)  # "Software Engineer, Senior"
+    head, colon, tail = text.partition(":")  # "Graduate Programme 2027: Applied AI Engineer"
+    if colon and not any(_is_noun(w) for w in head.split()):
+        text = tail.strip()
+    text = _TITLE_END.split(text, maxsplit=1)[0]
+    text = re.sub(r"\bSr\b\.?", "Senior", text, flags=re.I)
+    text = re.sub(r"\b(senior|staff|principal|lead)\+", r"\1", text, flags=re.I)
+    # Two roles in one: keep the first. "Backend & Platform Engineer" -> "Backend Engineer",
+    # "Senior/Lead Software Engineer" -> "Senior Software Engineer", "Backend Engineer / 3D Developer" -> the first.
+    first, *rest = re.split(r"\s*/\s*|\s+(?:&|and)\s+", text, maxsplit=1)
+    words = first.split()
+    if rest and (not words or all(w.lower() in _LEVEL for w in words) or not _is_noun(words[-1])):
+        other = rest[0].split()
+        if words and all(w.lower() in _LEVEL for w in words):
+            while other and other[0].lower() in _LEVEL:
+                other.pop(0)
+            words += other
+        elif other and _is_noun(other[-1]):
+            words.append(other[-1])
+    words = [w[:1].upper() + w[1:] for w in words if w.lower() not in _DROP and not w.startswith("#")]
+    nouns = [i for i, w in enumerate(words) if _is_noun(w)]
+    if nouns:  # "Software Engineer II", "Backend Engineer Python", "Software Developer AI Coding"
+        words = words[:nouns[-1] + 1]
+    if len(words) < 2 or len(words) > 5 or not _is_noun(words[-1]):
+        return None
+    if words[-1].lower().endswith("s"):  # "Software Engineers"
+        words[-1] = words[-1][:-1]
+    return " ".join(words)
 
 
 # --- what the model asked for, after the checks ---------------------------------------
@@ -685,6 +738,11 @@ def tailor_for_job(store: JobStore, job_id: int, writer: CvWriter, profile_path:
     roles, skipped = select(roles, tags)
     plan, usage, attempts = writer.plan(job, company, roles, skills, headlines, profile)
     plan.skipped = skipped
+    if headline := cv_headline(job["title"]):
+        plan.headline = headline
+    else:
+        plan.notes.append(f'Headline "{plan.headline}", one of your target roles: the posting\'s title '
+                          f'"{job["title"]}" does not read as one engineering role')
     plan.titles = {r.key: t for r in roles if (t := printed_title(r, tags))}
     picked = "; ".join(f"{tag} ({why})" for tag, why in tags.items())
     plan.changes.insert(0, f"Optional bullets for: {picked}" if tags else
