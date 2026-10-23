@@ -204,6 +204,7 @@ class OutreachConfig:
     auto_draft: bool = True
     follow_up_business_days: list[int] = field(default_factory=lambda: [4, 7])
     ghost_after_business_days: int = 7
+    reach_out_days: int = 7
     daily_send_cap: int = 15
     daily_guessed_cap: int = 3
     # CVs to attach: PDFs in this folder. A file whose name contains the company (e.g.

@@ -244,7 +244,8 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
             f"""
             SELECT j.*, a.stage, a.closed_reason, a.skip_reason, a.body IS NOT NULL AS has_draft, a.draft_blocked,
                    a.next_follow_up_at, a.emailed_at, a.applied_at, a.replied_at,
-                   a.cv_tailored_json IS NOT NULL AS has_cv, a.cover_letter_json IS NOT NULL AS has_cover
+                   a.cv_tailored_json IS NOT NULL AS has_cv, a.cover_letter_json IS NOT NULL AS has_cover,
+                   {tracking.OUTREACH_COLUMNS}
             FROM jobs j LEFT JOIN applications a ON a.job_id = j.id
             WHERE {where}
             ORDER BY COALESCE(j.report_date, substr(j.first_seen, 1, 10)) DESC,
@@ -254,7 +255,7 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
             """,
             params,
         ).fetchall()
-        return {"jobs": [_job_summary(store, row, config) for row in rows]}
+        return {"jobs": [_job_summary(store, row, config, now()) for row in rows]}
 
     @app.get("/api/jobs/{job_id}")
     def job(job_id: int, store: JobStore = Depends(db)):
@@ -500,7 +501,7 @@ def _contact_json(contact: sqlite3.Row | None, targets: list[str] | None = None)
     return data
 
 
-def _job_summary(store: JobStore, row: sqlite3.Row, config: OutreachConfig) -> dict:
+def _job_summary(store: JobStore, row: sqlite3.Row, config: OutreachConfig, now: datetime) -> dict:
     contact = chosen_contact(store, row, config)
     reasons = _reasons(row, "eligibility_reasons_json")
     company, _ = clean_company_name(row["company"])
@@ -515,6 +516,8 @@ def _job_summary(store: JobStore, row: sqlite3.Row, config: OutreachConfig) -> d
         "draft_blocked": bool(row["draft_blocked"]), "emailed_at": row["emailed_at"], "applied_at": row["applied_at"],
         "has_cv": bool(row["has_cv"]), "has_cover": bool(row["has_cover"]),
         "replied_at": row["replied_at"], "next_follow_up_at": row["next_follow_up_at"],
+        "reached_out_at": tracking.reached_out_at(row) if row["stage"] not in (None, tracking.NEW, tracking.SAVED) else None,
+        "to_email": tracking.needs_email(row, now, config),
         "job_board": skip_list_match(row["company"], config),
         "contact": {"name": contact["full_name"], "role": ROLE_LABELS.get(contact["role"], contact["role"]),
                     "email_status": contact["email_status"] if contact["email"] else None} if contact else None,

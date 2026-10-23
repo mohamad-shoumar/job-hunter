@@ -72,14 +72,17 @@ function gradeChip(g) {
 // A job with no grade yet sorts in the middle (3), as on the server (fitgrade.UNGRADED).
 // One board fetch can bring a whole company at once (17 Palantir London roles on 2026-10-21):
 // show each company's best job (grade, then fit) and a button for the rest. Display only; statuses are unchanged.
-function onePerCompany(rows, grade) {
+// `order` sorts the companies by their shown job; without it they keep the grade order.
+function onePerCompany(rows, grade, order) {
   const groups = new Map();
   [...rows].sort((a, b) => (grade(b) || 3) - (grade(a) || 3) || (b.fit ?? b.fit_score ?? 0) - (a.fit ?? a.fit_score ?? 0))
     .forEach((r) => {
       const key = (r.company || "").trim().toLowerCase() || `#${r.id}`;
       groups.has(key) ? groups.get(key).push(r) : groups.set(key, [r]);
     });
-  return [...groups].flatMap(([key, [best, ...others]]) => [
+  const list = [...groups];
+  if (order) list.sort(([, [a]], [, [b]]) => order(a, b));
+  return list.flatMap(([key, [best, ...others]]) => [
     { ...best, _key: key, _more: others.length },
     ...(state.expanded.has(key) ? others : []),
   ]);
@@ -736,26 +739,41 @@ async function renderToday() {
 // --- pipeline ----------------------------------------------------------------------
 
 // Board columns. "To apply" is shortlisted jobs you haven't acted on (stage new), plus visa-list jobs posted
-// today or yesterday; rejected gets its own column, and Closed holds the other reasons (ghosted, skipped).
+// today or yesterday, newest posting first. "Email someone" is Reached out jobs nobody at the company was
+// emailed about, for a week after you applied (to_email, reach_out_days); then they join Reached out. Both
+// are newest reached out first. Rejected gets its own column, and Closed holds the other reasons (ghosted, skipped).
 const BOARD = [
   { key: "to_apply", label: "To apply", stage: "new" },
-  ...["saved", "reached_out", "replied", "interviewing", "offer"].map((s) => ({ key: s, stage: s })),
+  { key: "saved", stage: "saved" },
+  { key: "to_email", label: "Email someone", stage: "reached_out" },
+  ...["reached_out", "replied", "interviewing", "offer"].map((s) => ({ key: s, stage: s })),
   { key: "rejected", label: "Rejected", stage: "closed", reason: "rejected" },
   { key: "closed", label: "Closed", stage: "closed" },
 ];
 function boardKey(j) {
   if (!j.stage || j.stage === "new") return "to_apply";
   if (j.stage === "closed") return j.closed_reason === "rejected" ? "rejected" : "closed";
-  return j.stage;
+  return j.to_email ? "to_email" : j.stage;
 }
+// Newest first, by the local day the card shows; the same day keeps the grade order.
+const localDay = (iso) => { const d = new Date(iso); return isNaN(d) ? String(iso || "").slice(0, 10) : d.toLocaleDateString("sv"); };
+const newestDay = (when) => (a, b) => localDay(when(b)).localeCompare(localDay(when(a)));
+const postedAt = (j) => j.posted_at || j.first_seen;
+const newestReachedOut = (a, b) => (Date.parse(b.reached_out_at) || 0) - (Date.parse(a.reached_out_at) || 0);
+
 
 async function renderPipeline() {
   const [open, visa, tracked, closed] = await Promise.all([
     api("/api/jobs?view=shortlisted"), api("/api/jobs?view=visa_list&days=2"), api("/api/jobs?view=tracked"), api("/api/jobs?view=closed"),
   ]);
-  const toApply = onePerCompany([...open.jobs, ...visa.jobs].filter((j) => !j.stage || j.stage === "new"), (j) => j.fit_grade?.grade);
-  const jobs = [...toApply, ...tracked.jobs, ...closed.jobs];
-  const options = (current) => BOARD.map((c) => `<option value="${c.key}" ${c.key === current ? "selected" : ""}>${esc(c.label || stageLabel(c.stage))}</option>`).join("");
+  const grade = (j) => j.fit_grade?.grade;
+  const toApply = onePerCompany([...open.jobs, ...visa.jobs].filter((j) => !j.stage || j.stage === "new"), grade, newestDay(postedAt));
+  const toEmail = onePerCompany(tracked.jobs.filter((j) => j.to_email), grade, newestReachedOut);
+  const reachedOut = tracked.jobs.filter((j) => !j.to_email && j.stage === "reached_out").sort(newestReachedOut);
+  const jobs = [...toApply, ...toEmail, ...reachedOut, ...tracked.jobs.filter((j) => j.stage !== "reached_out"), ...closed.jobs];
+  // A reached-out card offers only its own one of the two Reached out columns: the other is the same stage.
+  const options = (current) => BOARD.filter((c) => c.key === current || c.stage !== "reached_out" || !["to_email", "reached_out"].includes(current))
+    .map((c) => `<option value="${c.key}" ${c.key === current ? "selected" : ""}>${esc(c.label || stageLabel(c.stage))}</option>`).join("");
   $("#main").innerHTML = `<div class="board">${BOARD.map((col) => {
     const cards = jobs.filter((j) => boardKey(j) === col.key);
     return `<div class="column"><h3>${esc(col.label || stageLabel(col.stage))} <span>${cards.length}</span></h3>${cards.map((j) => `
@@ -764,13 +782,15 @@ async function renderPipeline() {
         <div class="small muted">${esc(j.company)}</div>
         <div class="job-meta small" style="margin-top:4px">
           ${j.status === "visa_list" ? `<span class="chip info">visa</span>` : ""}
-          ${col.key === "to_apply" ? `${gradeChip(j.fit_grade)}<span class="chip">fit ${j.fit}</span>${j.has_cv ? `<span class="chip good">CV</span>` : ""}${j.has_cover ? `<span class="chip good">letter</span>` : ""}` : ""}
-          ${j.applied_at ? `<span class="chip">applied</span>` : ""}${j.emailed_at ? `<span class="chip info">emailed ${esc(day(j.emailed_at))}</span>` : ""}
+          ${col.key === "to_apply" ? `<span class="chip">posted ${esc(day(postedAt(j)))}</span>${gradeChip(j.fit_grade)}<span class="chip">fit ${j.fit}</span>${j.has_cv ? `<span class="chip good">CV</span>` : ""}${j.has_cover ? `<span class="chip good">letter</span>` : ""}` : ""}
+          ${j.applied_at ? `<span class="chip">applied ${esc(day(j.applied_at))}</span>` : ""}${j.emailed_at ? `<span class="chip info">emailed ${esc(day(j.emailed_at))}</span>` : ""}
+          ${!j.applied_at && !j.emailed_at && j.reached_out_at && ["to_email", "reached_out"].includes(col.key) ? `<span class="chip">reached out ${esc(day(j.reached_out_at))}</span>` : ""}
           ${j.stage === "reached_out" && j.next_follow_up_at ? `<span class="chip ${new Date(j.next_follow_up_at) <= new Date() ? "warn" : ""}">follow-up ${esc(day(j.next_follow_up_at))}</span>` : ""}
           ${j.closed_reason && col.key === "closed" ? `<span class="chip">${esc(j.closed_reason)}${j.skip_reason ? esc(": " + ((state.status?.skip_reasons || {})[j.skip_reason] || j.skip_reason)) : ""}</span>` : ""}
         </div>
         <div class="row"><select data-move="${j.id}">${options(col.key)}</select>
-          ${col.key === "to_apply" ? `<button class="btn small danger" data-quick="skipped" data-id="${j.id}">Skip</button>${moreButton(j)}` : ""}</div>
+          ${col.key === "to_apply" ? `<button class="btn small danger" data-quick="skipped" data-id="${j.id}">Skip</button>${moreButton(j)}` : ""}
+          ${col.key === "to_email" ? moreButton(j) : ""}</div>
       </div>`).join("") || `<div class="small muted" style="margin-top:8px">Empty</div>`}</div>`;
   }).join("")}</div>`;
 }

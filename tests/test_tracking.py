@@ -49,6 +49,45 @@ def test_applying_moves_a_new_job_to_reached_out(store, filters):
     assert row["stage"] == tracking.REACHED_OUT and row["applied_at"] == iso(NOW)
 
 
+def _outreach_rows(store):
+    return {r["id"]: r for r in store.conn.execute(
+        f"SELECT j.id, a.stage, a.applied_at, a.emailed_at, a.replied_at, {tracking.OUTREACH_COLUMNS} "
+        "FROM jobs j LEFT JOIN applications a ON a.job_id = j.id")}
+
+
+def test_reached_out_is_the_later_of_applying_and_emailing_else_the_move(store, filters):
+    applied = store_job(store, filters, source_job_id="1")
+    both = store_job(store, filters, source_job_id="2", company="Beta")
+    by_hand = store_job(store, filters, source_job_id="3", company="Gamma")
+    tracking.mark_applied(store, applied, NOW - timedelta(days=3), NOW)
+    tracking.mark_applied(store, both, NOW - timedelta(days=3), NOW)
+    tracking.record_sent(store, both, 0, "ceo@beta.com", NOW - timedelta(days=1), CONFIG)
+    tracking.set_stage(store, by_hand, tracking.REACHED_OUT, NOW - timedelta(days=2))
+    rows = _outreach_rows(store)
+    assert tracking.reached_out_at(rows[applied]) == iso(NOW - timedelta(days=3))
+    assert tracking.reached_out_at(rows[both]) == iso(NOW - timedelta(days=1))
+    assert tracking.reached_out_at(rows[by_hand]) == iso(NOW - timedelta(days=2))
+
+
+def test_applied_with_nobody_emailed_needs_an_email_for_a_week(store, filters):
+    fresh = store_job(store, filters, source_job_id="1", company="Acme")
+    old = store_job(store, filters, source_job_id="2", company="Beta")
+    emailed = store_job(store, filters, source_job_id="3", company="Gamma")
+    same_company = store_job(store, filters, source_job_id="4", company="Gamma", title="Backend Engineer")
+    replied = store_job(store, filters, source_job_id="5", company="Delta")
+    saved = store_job(store, filters, source_job_id="6", company="Epsilon")
+    for job in (fresh, emailed, same_company, replied):
+        tracking.mark_applied(store, job, NOW, NOW)
+    tracking.mark_applied(store, old, NOW - timedelta(days=8), NOW - timedelta(days=8))
+    tracking.record_sent(store, emailed, 0, "ceo@gamma.com", NOW, CONFIG)
+    tracking.record_reply(store, replied, NOW, "hr@delta.com", "Thanks", NOW, ref="<r1>")
+    tracking.set_stage(store, replied, tracking.REACHED_OUT, NOW)
+    tracking.set_stage(store, saved, tracking.SAVED, NOW)
+    rows = _outreach_rows(store)
+    assert {job for job, row in rows.items() if tracking.needs_email(row, NOW, CONFIG)} == {fresh}
+    assert tracking.needs_email(rows[old], NOW - timedelta(days=2), CONFIG)
+
+
 def test_follow_ups_are_scheduled_then_stop(store, filters):
     job_id = store_job(store, filters)
     tracking.record_sent(store, job_id, 0, "ceo@acme.com", NOW, CONFIG)

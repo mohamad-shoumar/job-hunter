@@ -237,6 +237,38 @@ def apply_ghosting(store: JobStore, now: datetime, config: OutreachConfig) -> li
     return ghosted
 
 
+# --- applied, no email yet ---------------------------------------------------------
+
+# Columns for a SELECT over `jobs j LEFT JOIN applications a`: when the job last moved to
+# Reached out (set_stage writes "Saved → Reached out"), and whether anyone at the same
+# company was emailed, for any job (one email covers two roles there).
+OUTREACH_COLUMNS = f"""
+    (SELECT MAX(e.at) FROM events e WHERE e.job_id = j.id AND e.kind = 'stage'
+     AND e.detail LIKE '%→ {STAGE_LABELS[REACHED_OUT]}%') AS moved_to_reached_out_at,
+    a.updated_at AS application_updated_at,
+    EXISTS (SELECT 1 FROM applications a2 JOIN jobs j2 ON j2.id = a2.job_id
+            WHERE a2.emailed_at IS NOT NULL AND lower(trim(j2.company)) = lower(trim(j.company))) AS company_emailed
+"""
+
+
+def reached_out_at(row) -> str | None:
+    """When you reached out: the later of applying and emailing. A job you moved to Reached out
+    by hand has neither, so it is when you moved it. `row` has OUTREACH_COLUMNS."""
+    dates = [d for d in (row["applied_at"], row["emailed_at"]) if d]
+    if dates:
+        return max(dates, key=parse_datetime)
+    return row["moved_to_reached_out_at"] or row["application_updated_at"]
+
+
+def needs_email(row, now: datetime, config: OutreachConfig) -> bool:
+    """Reached out but nobody at the company emailed and no reply, within `reach_out_days`:
+    the Pipeline's Email someone column. You still send from the job's page."""
+    if row["stage"] != REACHED_OUT or row["emailed_at"] or row["replied_at"] or row["company_emailed"]:
+        return False
+    when = reached_out_at(row)
+    return bool(when) and parse_datetime(when) >= now - timedelta(days=config.reach_out_days)
+
+
 # --- sending limits -----------------------------------------------------------
 
 
