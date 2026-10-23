@@ -252,6 +252,8 @@ def test_deepseek_answers_through_the_same_check(filters):
     ("Freelance Back End / Typescript Developer", "Back End Developer"),
     ("Software engineer - Real-Time Pricing", "Software Engineer"),
     ("Software Engineers", "Software Engineer"),
+    ("Contract Senior Web Engineer", "Senior Web Engineer"),
+    ("Smart Contract Engineer", "Smart Contract Engineer"),
     # Not one engineering role: the target-role headline instead.
     ("Forward-Deployed Banker", None),
     ("Exceptional Engineers (Python -> AI coding) - AI Native scale up", None),

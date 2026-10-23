@@ -334,7 +334,7 @@ def check_headline(text: str, headlines: list[str]) -> tuple[str, str | None]:
 # The job word a CV headline ends in, the level words before it, and words that never print.
 _ROLE_NOUN = {"engineer", "developer", "programmer", "architect", "lead"}
 _LEVEL = {"senior", "staff", "principal", "lead", "junior"}
-_DROP = {"freelance", "remote", "remote-first", "contract", "junior", "medior", "mid", "mid-level", "mid-senior",
+_DROP = {"freelance", "remote", "remote-first", "junior", "medior", "mid", "mid-level", "mid-senior",
          "entry", "level", "entry-level", "graduate", "exceptional", "talented"}
 # Where the title's own words end: "Senior Software Engineer, Payments Platform", "Product Engineer (TradeNet)",
 # "Backend Engineer - Python", "Backend Developer: Python & FastAPI", "Full Stack Engineer with AI Experience".
@@ -356,6 +356,7 @@ def cv_headline(title: str) -> str | None:
     if colon and not any(_is_noun(w) for w in head.split()):
         text = tail.strip()
     text = _TITLE_END.split(text, maxsplit=1)[0]
+    text = re.sub(r"^contract\s+", "", text, flags=re.I)  # "Contract Senior Web Engineer", not "Smart Contract Engineer"
     text = re.sub(r"\bSr\b\.?", "Senior", text, flags=re.I)
     text = re.sub(r"\b(senior|staff|principal|lead)\+", r"\1", text, flags=re.I)
     # Two roles in one: keep the first. "Backend & Platform Engineer" -> "Backend Engineer",
@@ -402,9 +403,8 @@ def plan_from(answer: dict, roles: list[Role], skills: dict[str, list[str]], hea
               profile: Profile) -> Plan:
     problems: list[str] = []
     notes: list[str] = []
-    headline, why = check_headline(str(answer.get("headline") or ""), headlines)
-    if why:
-        problems.append(why)
+    # Only the fallback: tailor() prints the posting's own title when cv_headline can read it, so no retry for this.
+    headline, _ = check_headline(str(answer.get("headline") or ""), headlines)
     asked = {}
     for item in answer.get("roles") or []:
         if isinstance(item, dict):
