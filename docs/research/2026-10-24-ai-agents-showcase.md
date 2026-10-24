@@ -229,9 +229,12 @@ Example: *"Which Dutch companies sponsoring visas posted Python roles last month
 - **Then port Graph A to LangGraph** (the framework employers name most),
   reusing the same steps and checks. The README then shows the same graph, eval
   and trace with and without a framework. That is a stronger story than either
-  alone, without locking the project in. LangGraph needs version 1.0.10 or later
-  (CVE-2026-28277). Use pydantic-ai instead if your target postings name it; it
-  supports DeepSeek directly.
+  alone, without locking the project in. LangGraph needs version 1.0.10 or later:
+  older versions can run code hidden in a saved checkpoint (CVE-2026-28277,
+  [GitLab advisory](https://advisories.gitlab.com/pypi/langgraph/CVE-2026-28277/)),
+  and with a SQL injection (CVE-2025-67644) in the SQLite checkpointer the two
+  add up to remote code execution (Check Point, June 2026). Use pydantic-ai
+  instead if your target postings name it; it supports DeepSeek directly.
 - **Eval:** does the graph finish the task (CV and letter pass every check)
   across 3 repeat runs (pass^3)? Also cost and seconds per application, the
   retry rate per step, and graph tests for order, retry, budget stop and resume.
