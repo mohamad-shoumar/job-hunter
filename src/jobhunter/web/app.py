@@ -37,8 +37,9 @@ from ..cv import (
     version_of,
 )
 from ..contacts import (
-    ROLE_LABELS, ContactFinder, chosen_contact, clean_company_name, domain_from_links, job_company, rank_contacts,
-    save_manual_contact, set_domain, set_job_board, skip_list_match, targets_for, verify_email,
+    ROLE_LABELS, ContactFinder, chosen_contact, chosen_contacts, clean_company_name, company_ref, domain_from_links,
+    ensure_company, job_company, rank_contacts, save_manual_contact, set_domain, set_job_board, skip_list_match,
+    targets_for, verify_email,
 )
 from ..errors import AppError, BadRequest, Conflict, NotFound, UpstreamError
 from ..fitgrade import grade_of
@@ -219,7 +220,9 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
             raise BadRequest(f"days must be 0 (any time) or more, not {days}")
         since = datetime.combine(local_day(now()) - timedelta(days=days - 1), time.min).astimezone() if days else None
         rows = job_list(store, view, q, yoe, since)
-        return {"jobs": [_job_summary(store, row, config, now()) for row in rows]}
+        contacts = chosen_contacts(store, rows, config)
+        t = now()
+        return {"jobs": [_job_summary(row, contacts[row["id"]], config, t) for row in rows]}
 
     @app.get("/api/jobs/{job_id}")
     def job(job_id: int, store: JobStore = Depends(db)):
@@ -262,8 +265,8 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
             reassemble(store, job_id, me, t, config)
         if "contact_id" in body:
             contact_id = int(body["contact_id"])
-            company = job_company(store, store.get(job_id), t)
-            if not contact_at(store, contact_id, company["key"]):
+            _, key = company_ref(store.get(job_id)["company"])
+            if not contact_at(store, contact_id, key):
                 raise BadRequest("that contact is not at this company")
             set_application_contact(store, job_id, contact_id)
             reassemble(store, job_id, me, t, config)
@@ -300,7 +303,7 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
     def company(job_id: int, body: dict | None = Body(default=None), store: JobStore = Depends(db)):
         body = body or {}
         row = job_or_404(store, job_id)
-        company_row = job_company(store, row, now())
+        company_row = ensure_company(store, row)
         if "is_job_board" in body:
             set_job_board(store, company_row["key"], bool(body["is_job_board"]))
         if "domain" in body:
@@ -473,8 +476,8 @@ def _contact_json(contact: sqlite3.Row | None, targets: list[str] | None = None)
     return data
 
 
-def _job_summary(store: JobStore, row: sqlite3.Row, config: OutreachConfig, now: datetime) -> dict:
-    contact = chosen_contact(store, row, config)
+def _job_summary(row: sqlite3.Row, contact: sqlite3.Row | None, config: OutreachConfig, now: datetime) -> dict:
+    """A row of the job list; `contact` is its chosen_contact (looked up for the whole list at once)."""
     reasons = _reasons(row, "eligibility_reasons_json")
     company, _ = clean_company_name(row["company"])
     return {
@@ -505,8 +508,7 @@ def _cover_json(config: OutreachConfig, app) -> dict | None:
 
 
 def _job_detail(store: JobStore, row: sqlite3.Row, config: OutreachConfig, services: Services, profile, now) -> dict:
-    company = job_company(store, row, now)
-    store.commit()
+    company = job_company(store, row)
     targets, why = targets_for(company["size_range"], company["size_count"], config)
     contacts = rank_contacts(company_contacts(store, company["key"]), targets)
     chosen = chosen_contact(store, row, config)

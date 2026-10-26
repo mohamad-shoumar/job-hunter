@@ -6,8 +6,9 @@ import shutil
 import pytest
 from fastapi.testclient import TestClient
 
+from jobhunter import tracking
 from jobhunter.config import OutreachConfig, Paths
-from jobhunter.contacts import ContactFinder
+from jobhunter.contacts import ContactFinder, save_contact
 from jobhunter.hunter import HunterError
 from jobhunter.mailer import MailAccount
 from jobhunter.store import JobStore
@@ -253,3 +254,98 @@ def test_lists_carry_the_fit_grade_and_put_the_best_first(client, home):
     jobs = client.get("/api/jobs?view=shortlisted").json()["jobs"]
     assert [(j["id"], j["fit_grade"]["grade"]) for j in jobs] == [(2, 5), (1, 2)]
     assert client.get("/api/jobs/2").json()["job"]["fit_grade"]["reason"] == "Python backend, 3+ years."
+
+
+def seed_contacts(home, filters, extra_jobs=0):
+    """Jobs at companies with contacts: a small one (CEO before CTO), a big one (head of engineering before the
+    recruiter), one with a contact you added by hand, one never looked up, and a job whose contact you picked."""
+    from jobhunter.store.companies import add_company, update_company
+
+    store = JobStore(home / "data" / "jobs.sqlite")
+    for key, name in (("acme", "Acme"), ("globex", "Globex"), ("umbrella", "Umbrella")):
+        add_company(store, key, name)
+    update_company(store, "globex", size_range="201-500")
+    people = {}
+    for key, full_name, position, source in (
+            ("acme", "Cleo Tran", "CTO", "hunter"), ("acme", "Ana Ruiz", "CEO", "hunter"),
+            ("globex", "Rita Moss", "Technical Recruiter", "hunter"), ("globex", "Ed Park", "VP Engineering", "hunter"),
+            ("umbrella", "Uma Bell", "Chief Executive Officer", "hunter"), ("umbrella", "Ola Hart", "", "manual")):
+        people[full_name] = save_contact(store, key, NOW, full_name=full_name, position=position or None,
+                                         email=f"{full_name.split()[0].lower()}@{key}.io", email_status="found",
+                                         confidence=90, source=source)
+    ids = {"Acme 2": store_job(store, filters, source_job_id="3", company="Acme", title="Backend Engineer"),
+           "Globex": store_job(store, filters, source_job_id="4", company="Globex"),
+           "Umbrella": store_job(store, filters, source_job_id="5", company="Umbrella https://umbrella.io"),
+           "Initech": store_job(store, filters, source_job_id="6", company="Initech")}
+    for n in range(extra_jobs):
+        store_job(store, filters, source_job_id=f"x{n}", company=("Acme", "Globex", "Umbrella", "Hooli")[n % 4],
+                  title=f"Python Engineer {n}")
+    tracking.ensure_application(store, ids["Acme 2"], NOW)
+    store.conn.execute("UPDATE applications SET contact_id = ? WHERE job_id = ?", (people["Cleo Tran"], ids["Acme 2"]))
+    store.commit()
+    store.close()
+    return ids
+
+
+def test_the_job_list_shows_each_job_s_contact(client, home, filters):
+    ids = seed_contacts(home, filters)
+    jobs = {j["id"]: j for j in client.get("/api/jobs?view=shortlisted").json()["jobs"]}
+    contact = {job_id: j["contact"] for job_id, j in jobs.items()}
+    assert contact[1] == {"name": "Ana Ruiz", "role": "CEO", "email_status": "found"}  # small: the CEO first
+    assert contact[ids["Acme 2"]] == {"name": "Cleo Tran", "role": "CTO", "email_status": "found"}  # picked by you
+    assert contact[ids["Globex"]] == {"name": "Ed Park", "role": "Head of engineering", "email_status": "found"}
+    assert contact[ids["Umbrella"]] == {"name": "Ola Hart", "role": "Other", "email_status": "found"}  # yours first
+    assert contact[ids["Initech"]] is None and contact[2] is None  # never looked up; a job board
+    # The job's page picks the same person.
+    for job_id in (1, ids["Acme 2"], ids["Globex"], ids["Umbrella"], ids["Initech"]):
+        detail = client.get(f"/api/jobs/{job_id}").json()["contact"]
+        assert (detail or {}).get("full_name") == (contact[job_id] or {}).get("name")
+
+
+def test_reading_a_job_writes_nothing(client, home):
+    def companies():
+        store = JobStore(home / "data" / "jobs.sqlite")
+        try:
+            return store.conn.execute("SELECT COUNT(*) FROM companies").fetchone()[0]
+        finally:
+            store.close()
+
+    detail = client.get("/api/jobs/1").json()  # Acme has no companies row yet
+    assert companies() == 0
+    assert detail["company"] | {"targets": None, "why": None, "suggested_domain": None} == {
+        "key": "acme", "name": "Acme", "domain": None, "domain_source": None, "size_range": None, "size_count": None,
+        "is_job_board": 0, "email_pattern": None, "accept_all": None, "lookup_state": None, "lookup_started_at": None,
+        "looked_up_at": None, "note": None, "credits": 0.0, "cost_usd": 0.0, "targets": None, "why": None,
+        "skip_listed": False, "suggested_domain": None}
+    client.get("/api/jobs")
+    assert companies() == 0
+    # The actions that need the row make it.
+    assert client.post("/api/jobs/1/company", json={"domain": "acme.io"}, headers=AUTH).json()["company"]["domain"] == "acme.io"
+    assert companies() == 1
+
+
+def test_the_job_list_costs_the_same_few_queries_however_many_jobs(client, home, filters, monkeypatch):
+    statements: list[str] = []
+
+    class CountingStore(JobStore):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.conn.set_trace_callback(statements.append)
+
+    monkeypatch.setattr("jobhunter.web.app.JobStore", CountingStore)
+
+    def queries():
+        statements.clear()
+        jobs = client.get("/api/jobs?view=shortlisted").json()["jobs"]
+        return len(jobs), len(statements)
+
+    seed_contacts(home, filters)
+    few, few_queries = queries()
+    store = JobStore(home / "data" / "jobs.sqlite")
+    for n in range(40):
+        store_job(store, filters, source_job_id=f"y{n}", company=("Acme", "Globex", "Umbrella", "Hooli")[n % 4],
+                  title=f"Backend Engineer {n}")
+    store.close()
+    many, many_queries = queries()
+    # The list, the picked contacts, those contacts, the companies, their people: not one query per job.
+    assert many == few + 40 and many_queries == few_queries == 5

@@ -39,10 +39,11 @@ from .hunter import Account, Hunter, HunterError, size_upper_bound
 from .identity import company_key
 from .llm import Usage, error_line, find_quote, forced_tool_choice, pages_read, plain
 from .store import JobStore
-from .store.applications import add_event, get_application, update_application
+from .store.applications import add_event, picked_contacts, update_application
 from .store.companies import (
-    add_company, claim_lookup, company_contacts, contact_id_by_email, contact_id_by_name, get_company, get_contact,
-    insert_contact, set_email_status, update_company, update_contact,
+    add_company, claim_lookup, companies_by_key, company_contacts, contact_id_by_email, contact_id_by_name,
+    contacts_by_company, contacts_by_id, get_company, get_contact, insert_contact, new_company, set_email_status,
+    update_company, update_contact,
 )
 from .text import iso, parse_datetime, strip_accents
 
@@ -227,10 +228,22 @@ def rank_contacts(contacts: list, targets: list[str]) -> list:
 # --- storage ------------------------------------------------------------------
 
 
-def job_company(store: JobStore, job: sqlite3.Row, now: datetime) -> sqlite3.Row:
-    """The job's `companies` row, created on first use."""
-    name, _ = clean_company_name(job["company"])
-    key = company_key(name) or name.lower()
+def company_ref(company: str) -> tuple[str, str]:
+    """(the name to show, the `companies` key) of a job's company: 'WorkHero https://workhero.pro' ->
+    ('WorkHero', 'workhero'). A name company_key empties (no Latin letters or digits) is its own key."""
+    name, _ = clean_company_name(company)
+    return name, company_key(name) or name.lower()
+
+
+def job_company(store: JobStore, job: sqlite3.Row) -> sqlite3.Row | dict:
+    """The job's `companies` row, or the one a first lookup would create. Writes nothing (GET requests)."""
+    name, key = company_ref(job["company"])
+    return get_company(store, key) or new_company(key, name)
+
+
+def ensure_company(store: JobStore, job: sqlite3.Row) -> sqlite3.Row:
+    """The job's `companies` row, created on first use: for actions that change it or add contacts there."""
+    name, key = company_ref(job["company"])
     row = get_company(store, key)
     if row is None:
         add_company(store, key, name)
@@ -276,7 +289,7 @@ def set_domain(store: JobStore, key: str, domain: str) -> None:
 def save_manual_contact(store: JobStore, job_id: int, full_name: str, email: str, position: str,
                         now: datetime) -> int:
     job = store.get(job_id)
-    company = job_company(store, job, now)
+    company = ensure_company(store, job)
     email = email.strip().lower()
     if email and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[a-z]{2,}", email):
         raise tracking.TrackingError(f"not an email address: {email}")
@@ -293,18 +306,26 @@ def save_manual_contact(store: JobStore, job_id: int, full_name: str, email: str
 
 def chosen_contact(store: JobStore, job: sqlite3.Row, config: OutreachConfig) -> sqlite3.Row | None:
     """The contact picked for this job (by hand or by a draft), else the best one for the company."""
-    app = get_application(store, job["id"])
-    if app and app["contact_id"]:
-        row = get_contact(store, app["contact_id"])
-        if row:
-            return row
-    name, _ = clean_company_name(job["company"])
-    company = get_company(store, company_key(name))
-    if not company:
-        return None
-    targets, _ = targets_for(company["size_range"], company["size_count"], config)
-    ranked = rank_contacts(company_contacts(store, company["key"]), targets)
-    return ranked[0] if ranked else None
+    return chosen_contacts(store, [job], config)[job["id"]]
+
+
+def chosen_contacts(store: JobStore, jobs: list, config: OutreachConfig) -> dict[int, sqlite3.Row | None]:
+    """chosen_contact of each job, in a few queries however many jobs (the app's job list)."""
+    keys = {job["id"]: company_ref(job["company"])[1] for job in jobs}
+    picked_ids = picked_contacts(store, list(keys))
+    picked = contacts_by_id(store, set(picked_ids.values()))
+    companies = companies_by_key(store, set(keys.values()))
+    people = contacts_by_company(store, list(companies))
+    best: dict[str, sqlite3.Row | None] = {}
+    for key, company in companies.items():
+        targets, _ = targets_for(company["size_range"], company["size_count"], config)
+        ranked = rank_contacts(people.get(key, []), targets)
+        best[key] = ranked[0] if ranked else None
+    chosen = {}
+    for job_id, key in keys.items():
+        contact = picked.get(picked_ids.get(job_id))  # gone when the contact was deleted: the company's best then
+        chosen[job_id] = contact if contact is not None else best.get(key)
+    return chosen
 
 
 # --- Claude backup --------------------------------------------------------------
@@ -478,7 +499,7 @@ class ContactFinder:
 
     def lookup(self, store: JobStore, job: sqlite3.Row, now: datetime, use_claude: bool = True,
                force: bool = False) -> Lookup:
-        company = job_company(store, job, now)
+        company = ensure_company(store, job)
         key, name = company["key"], company["name"]
         if company["is_job_board"] or skip_list_match(job["company"], self.config):
             if not company["is_job_board"]:
@@ -695,7 +716,7 @@ def find_contacts(store: JobStore, finder: ContactFinder, jobs: list[sqlite3.Row
     done_keys: set[str] = set()
     new_lookups = 0
     for job in jobs:
-        key = job_company(store, job, now)["key"]
+        key = ensure_company(store, job)["key"]
         if key in done_keys:
             if chosen_contact(store, job, finder.config):
                 run.found_job_ids.append(job["id"])

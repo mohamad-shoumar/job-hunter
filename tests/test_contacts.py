@@ -315,8 +315,27 @@ def test_an_employee_count_counts_only_when_a_result_shows_it(filters):
 def test_a_running_lookup_is_not_started_twice(filters):
     store = JobStore(":memory:")
     job_id = acme_job(store, filters)
-    contacts.job_company(store, store.get(job_id), NOW)
+    contacts.ensure_company(store, store.get(job_id))
     store.conn.execute("UPDATE companies SET lookup_state = 'running', lookup_started_at = ?", (NOW.isoformat(),))
     hunter = FakeHunter()
     assert ContactFinder(CONFIG, hunter).lookup(store, store.get(job_id), NOW + timedelta(minutes=1)).status == "busy"
     assert ContactFinder(CONFIG, hunter).lookup(store, store.get(job_id), NOW + timedelta(minutes=11)).status == "found"
+
+
+def test_reading_a_company_gives_what_a_new_row_holds_and_writes_nothing(filters):
+    store = JobStore(":memory:")
+    job = store.get(acme_job(store, filters))
+    unsaved = contacts.job_company(store, job)
+    assert store.conn.execute("SELECT COUNT(*) FROM companies").fetchone()[0] == 0
+    assert dict(contacts.ensure_company(store, job)) == unsaved  # same columns, same defaults, in the same order
+    assert list(dict(contacts.ensure_company(store, job))) == list(unsaved)
+
+
+def test_one_key_for_a_company_whether_it_is_read_or_written(filters):
+    """A name with no Latin letters is its own key: the contact found there must show for the job."""
+    store = JobStore(":memory:")
+    job = store.get(store_job(store, filters, company="株式会社サンプル"))
+    key = contacts.ensure_company(store, job)["key"]
+    assert key == "株式会社サンプル" and contacts.company_ref(job["company"]) == ("株式会社サンプル", key)
+    contacts.save_contact(store, key, NOW, full_name="Sato Ken", position="CEO", email="ken@sample.jp", source="hunter")
+    assert chosen_contact(store, job, CONFIG)["full_name"] == "Sato Ken"

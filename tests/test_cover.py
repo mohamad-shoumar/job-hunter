@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from jobhunter.config import OutreachConfig, Paths
-from jobhunter.contacts import job_company, set_job_board
+from jobhunter.contacts import ensure_company, set_job_board
 from jobhunter.cover import (
     ANNOUNCES_ISSUE, DASH_ISSUE, GUIDELINES_FILE, LOGISTICS_ISSUE, CoverError, CoverWriter, JobText, Style, check_sentence,
     check_style, company_site, cover_for_job, load_letter_facts, research, system_prompt,
@@ -92,7 +92,7 @@ def test_research_uses_the_known_domain_and_skips_job_boards(filters):
 
     def company(**overrides):
         job = store.get(store_job(store, filters, description=POSTING, **overrides))
-        return job_company(store, job, NOW), job
+        return ensure_company(store, job), job
 
     row, job = company()
     store.conn.execute("UPDATE companies SET domain = 'acme.io' WHERE key = ?", (row["key"],))

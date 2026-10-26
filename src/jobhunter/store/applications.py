@@ -12,13 +12,19 @@ from datetime import datetime
 
 from ..models import REACHED_OUT, REPLIED
 from ..text import iso
-from .jobs import JobStore
+from .jobs import JobStore, rows_in
 
 # --- one job's row ------------------------------------------------------------
 
 
 def get_application(store: JobStore, job_id: int) -> sqlite3.Row | None:
     return store.conn.execute("SELECT * FROM applications WHERE job_id = ?", (job_id,)).fetchone()
+
+
+def picked_contacts(store: JobStore, job_ids) -> dict[int, int]:
+    """{job id: the contact picked for it}, for the jobs that have one."""
+    sql = "SELECT job_id, contact_id FROM applications WHERE contact_id IS NOT NULL AND job_id IN ({marks})"
+    return {r["job_id"]: r["contact_id"] for r in rows_in(store, sql, job_ids)}
 
 
 def insert_application(store: JobStore, job_id: int, stage: str, now: datetime) -> None:

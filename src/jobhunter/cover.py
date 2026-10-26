@@ -35,7 +35,7 @@ from pathlib import Path
 
 from . import tracking
 from .config import OutreachConfig, my_details
-from .contacts import clean_company_name, domain_from_links, job_company, skip_list_match
+from .contacts import clean_company_name, domain_from_links, ensure_company, skip_list_match
 from .cv import TAG_RULES, Role, camel, job_tags, parse_titles, printed_title
 from .errors import BadRequest
 from .extract import extract_skills
@@ -626,7 +626,7 @@ def cover_for_job(store: JobStore, job_id: int, writer: CoverWriter, profile_pat
     facts = load_letter_facts(profile_path, tags)
     if not facts.facts or not facts.name:
         raise CoverError("profile/master_profile.md has no name or no facts to write from")
-    company_row = job_company(store, job, now)
+    company_row = ensure_company(store, job)
     app = tracking.ensure_application(store, job_id, now)
     old = cover_of(app)
     store.commit()  # no write lock held while pages load and the model writes

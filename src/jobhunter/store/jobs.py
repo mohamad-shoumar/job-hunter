@@ -116,6 +116,17 @@ def row_to_job(row: sqlite3.Row) -> Job:
     )
 
 
+def rows_in(store: JobStore, sql: str, values) -> list[sqlite3.Row]:
+    """The rows of `sql`, whose `IN ({marks})` takes `values` 500 at a time (SQLite caps one statement's
+    parameters), so a list of any length costs one query per 500."""
+    values = list(values)
+    rows: list[sqlite3.Row] = []
+    for start in range(0, len(values), 500):
+        chunk = values[start:start + 500]
+        rows += store.conn.execute(sql.format(marks=", ".join("?" * len(chunk))), chunk).fetchall()
+    return rows
+
+
 class JobStore:
     """migrate=False skips the schema work (the web app migrates once at start).
 
