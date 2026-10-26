@@ -55,6 +55,8 @@ from .grounding import (
 from .llm import JsonModel, Usage, json_model
 from .profile import Profile
 from .store import JobStore
+from .store.applications import add_event, get_application, set_draft_body, write_draft, write_edited_draft
+from .store.companies import get_contact
 from .text import iso
 
 log = logging.getLogger(__name__)
@@ -395,36 +397,25 @@ def save_draft(store: JobStore, job_id: int, draft: Draft, contact: sqlite3.Row 
     body = assemble(draft.pitch, contact, company, job["title"], profile, ask_for(contact, config))
     meta = {"model": draft.model, "cost_usd": draft.cost_usd, "evidence_ids": draft.evidence_ids,
             "attempts": draft.attempts, "written_at": iso(now), "contact_id": contact["id"] if contact else None}
-    store.conn.execute(
-        """
-        UPDATE applications SET subject = ?, hook = ?, pitch = ?, body = ?, draft_version = draft_version + 1,
-            draft_edited = 0, draft_blocked = ?, draft_warnings_json = ?, draft_meta_json = ?,
-            contact_id = COALESCE(?, contact_id), updated_at = ?
-        WHERE job_id = ?
-        """,
-        (draft.subject, draft.hook, draft.pitch, body, 1 if draft.problems else 0,
-         json.dumps(draft.problems + draft.warnings), json.dumps(meta), contact["id"] if contact else None,
-         iso(now), job_id),
-    )
+    write_draft(store, job_id, draft.subject, draft.hook, draft.pitch, body, bool(draft.problems),
+                draft.problems + draft.warnings, meta, contact["id"] if contact else None, now)
     what = "Email drafted" + (" with problems: " + "; ".join(draft.problems) if draft.problems else "")
-    tracking.add_event(store, job_id, "draft", what, now)
-    return tracking.get_application(store, job_id)
+    add_event(store, job_id, "draft", what, now)
+    return get_application(store, job_id)
 
 
 def reassemble(store: JobStore, job_id: int, profile: Profile, now: datetime,
                config: OutreachConfig | None = None) -> None:
     """Rebuild an unedited draft's body after the contact or the CV changed. No AI call."""
-    app = tracking.get_application(store, job_id)
+    app = get_application(store, job_id)
     if not app or app["draft_edited"] or not app["pitch"]:
         return
     job = store.get(job_id)
-    contact = (store.conn.execute("SELECT * FROM contacts WHERE id = ?", (app["contact_id"],)).fetchone()
-               if app["contact_id"] else None)
+    contact = get_contact(store, app["contact_id"]) if app["contact_id"] else None
     company, _ = clean_company_name(job["company"])
     body = assemble(app["pitch"], contact, company, job["title"], profile, ask_for(contact, config))
     if body != app["body"]:
-        store.conn.execute("UPDATE applications SET body = ?, draft_version = draft_version + 1, updated_at = ? "
-                           "WHERE job_id = ?", (body, iso(now), job_id))
+        set_draft_body(store, job_id, body, now)
 
 
 def edit_draft(store: JobStore, job_id: int, subject: str, body: str, profile: Profile, now: datetime) -> sqlite3.Row:
@@ -439,14 +430,10 @@ def edit_draft(store: JobStore, job_id: int, subject: str, body: str, profile: P
     about_you = " ".join(x for x in sentences if not re.search(r"\byou(?:r|'re|'ve)?\b", x, re.I))
     problems, warnings = check_draft(subject, about_them, about_you, [], profile, posting,
                                      set(extract_skills(posting)), [company])
-    store.conn.execute(
-        "UPDATE applications SET subject = ?, body = ?, draft_version = draft_version + 1, draft_edited = 1, "
-        "draft_blocked = 0, draft_warnings_json = ?, updated_at = ? WHERE job_id = ?",
-        (subject.strip(), body.strip(), json.dumps(problems + warnings), iso(now), job_id),
-    )
+    write_edited_draft(store, job_id, subject.strip(), body.strip(), problems + warnings, now)
     if not app["draft_edited"]:
-        tracking.add_event(store, job_id, "draft", "Email edited by you", now)
-    return tracking.get_application(store, job_id)
+        add_event(store, job_id, "draft", "Email edited by you", now)
+    return get_application(store, job_id)
 
 
 def _personal_part(body: str, profile: Profile, title: str) -> str:
@@ -469,7 +456,7 @@ def fixed_draft(job: sqlite3.Row, profile: Profile, config: OutreachConfig) -> D
 def draft_for_job(store: JobStore, job_id: int, writer: PitchWriter | None, profile: Profile, config: OutreachConfig,
                   now: datetime, force: bool = False) -> str:
     """Write (or rewrite) the draft for one job. Returns a short status line. `writer` is only used in "ai" mode."""
-    app = tracking.get_application(store, job_id)
+    app = get_application(store, job_id)
     if app and app["draft_edited"] and not force:
         return "kept your edited draft"
     if app and app["emailed_at"] and not force:

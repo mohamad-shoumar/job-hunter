@@ -43,6 +43,7 @@ from .llm import JsonModel, Usage, find_quote, json_model
 from .pitch import role_family, short_title
 from .profile import sections, skills_in, split_tags, strip_notes, years_in
 from .store import JobStore
+from .store.applications import add_event, save_cover_letter
 from .text import iso
 
 MAX_POSTING_CHARS = 6000
@@ -655,8 +656,7 @@ def cover_for_job(store: JobStore, job_id: int, writer: CoverWriter, profile_pat
         "model": writer.model.model, "cost_usd": usage.cost(writer.model.model) or 0.0,
         "attempts": attempts, "written_at": iso(now), "text": text,
     }
-    store.conn.execute("UPDATE applications SET cover_letter_json = ?, updated_at = ? WHERE job_id = ?",
-                       (json.dumps(meta), iso(now), job_id))
-    tracking.add_event(store, job_id, "cover", f"Cover letter written: {name}" + (" (again)" if old else ""), now)
+    save_cover_letter(store, job_id, meta, now)
+    add_event(store, job_id, "cover", f"Cover letter written: {name}" + (" (again)" if old else ""), now)
     store.commit()
     return meta

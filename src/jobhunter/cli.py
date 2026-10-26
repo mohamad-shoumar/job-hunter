@@ -135,6 +135,7 @@ def cmd_run(args) -> int:
 def cmd_boards(args) -> int:
     """The company boards watched because a job there was shortlisted (boards.py)."""
     from . import boards
+    from .store.watched import watched_boards
 
     paths, _, _ = _load(args)
     store = JobStore(paths.db_file)
@@ -144,7 +145,7 @@ def cmd_boards(args) -> int:
                 raise SystemExit(f"not watched: {args.remove} (write it as kind:slug, e.g. ashby:dualentry)")
             print(f"stopped watching {args.remove}; it will not be added again")
             return 0
-        rows = boards.watched(store, include_removed=args.all)
+        rows = watched_boards(store, include_removed=args.all)
     finally:
         store.close()
     if not rows:
@@ -569,9 +570,7 @@ def cmd_contacts(args) -> int:
         if args.job_ids:
             rows = [r for r in (store.get(i) for i in args.job_ids) if r]
         else:
-            rows = store.conn.execute(
-                "SELECT * FROM jobs WHERE status = 'shortlisted' AND report_date IS NOT NULL ORDER BY id DESC"
-            ).fetchall()
+            rows = store.reported_shortlisted()
         account = finder.account()
         if account and account.remaining is not None:
             print(f"Hunter: {account.remaining:g} credits left, reset {account.reset_date}")

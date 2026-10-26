@@ -46,6 +46,20 @@ REJECTED = "rejected"
 # The separate list of jobs abroad that sponsor a work visa (visa.py): not in the shortlist or "To apply".
 VISA_LIST = "visa_list"
 
+# Where you are with a job (applications.stage; tracking.py moves jobs between them)
+NEW = "new"
+SAVED = "saved"
+REACHED_OUT = "reached_out"
+REPLIED = "replied"
+INTERVIEWING = "interviewing"
+OFFER = "offer"
+CLOSED = "closed"
+STAGES = [NEW, SAVED, REACHED_OUT, REPLIED, INTERVIEWING, OFFER, CLOSED]
+STAGE_LABELS = {
+    NEW: "New", SAVED: "Saved", REACHED_OUT: "Reached out", REPLIED: "Replied",
+    INTERVIEWING: "Interviewing", OFFER: "Offer", CLOSED: "Closed",
+}
+
 
 @dataclass
 class Job:

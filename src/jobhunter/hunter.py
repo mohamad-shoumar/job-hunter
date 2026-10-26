@@ -15,6 +15,7 @@ after, instead of trusting these numbers.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 import httpx
@@ -34,6 +35,16 @@ class HunterError(RuntimeError):
     def fatal(self) -> bool:
         """Every later call would fail the same way: bad key, no access, out of credits or rate limited."""
         return self.status in (401, 403, 429)
+
+
+def size_upper_bound(size_range: str | None, size_count: int | None = None) -> int | None:
+    """The top of Hunter's size range: "11-50" -> 50, "10K+" -> 10000. An exact count wins."""
+    if size_count:
+        return int(size_count)
+    numbers = []
+    for value, k in re.findall(r"(\d+(?:\.\d+)?)\s*([kK])?", size_range or ""):
+        numbers.append(int(float(value) * (1000 if k else 1)))
+    return max(numbers) if numbers else None
 
 
 @dataclass

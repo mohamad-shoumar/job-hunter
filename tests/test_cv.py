@@ -17,7 +17,9 @@ from jobhunter.cv import (
     tailor_for_job, tailored_of, version_of,
 )
 from jobhunter.llm import JsonModel
+from jobhunter.models import NEW
 from jobhunter.store import JobStore
+from jobhunter.store.applications import events_for, get_application
 from jobhunter.text import iso
 from jobhunter.web.app import create_app
 
@@ -330,15 +332,15 @@ def test_tailoring_writes_the_version_builds_it_and_attaches_it(resume, filters)
     assert meta["tags"] == {} and meta["titles"] == {"R1": "Algorithmic Trader"}
     assert meta["changes"][0].startswith("Core bullets only") and meta["changes"][1:] == GOOD["changes"]
     assert "Present\nAlgorithmic Trader\n- " in build.sources[1] and f"// [lead] - {R1[6]}" in build.sources[1]
-    app = tracking.get_application(store, job_id)
-    assert app["cv_file"] == meta["file"] and app["stage"] == tracking.NEW
+    app = get_application(store, job_id)
+    assert app["cv_file"] == meta["file"] and app["stage"] == NEW
     assert (resume / "versions" / "Backend_Acme_Sep2026.md").read_text() == build.sources[1]
     rows = list(csv.reader((resume / "applications.csv").open()))
     assert rows[1][:3] == ["Acme", "Senior Backend Engineer (Python)", "output/Shoumar_Backend_Acme_Sep2026.pdf"]
 
     again = tailor_for_job(store, job_id, writer(GOOD), PROFILE_FILE, config_for(resume), NOW, builder=FakeBuild())
     assert again["file"] == meta["file"] and len(list(csv.reader((resume / "applications.csv").open()))) == 2
-    assert [e["detail"] for e in tracking.events_for(store, job_id)][-1].endswith("(again)")
+    assert [e["detail"] for e in events_for(store, job_id)][-1].endswith("(again)")
 
 
 def test_a_title_that_is_not_one_role_keeps_the_target_role_headline(resume, filters):
@@ -378,7 +380,7 @@ def test_the_daily_run_keeps_a_cv_you_picked(resume, filters):
     tracking.ensure_application(store, job_id, NOW)
     store.conn.execute("UPDATE applications SET cv_file = 'Shoumar_Resume_General.pdf' WHERE job_id = ?", (job_id,))
     tailor_for_job(store, job_id, writer(GOOD), PROFILE_FILE, config_for(resume), NOW, builder=FakeBuild(), pick=False)
-    assert tracking.get_application(store, job_id)["cv_file"] == "Shoumar_Resume_General.pdf"
+    assert get_application(store, job_id)["cv_file"] == "Shoumar_Resume_General.pdf"
 
 
 def test_the_daily_run_tailors_new_shortlisted_jobs(resume, filters, tmp_path, monkeypatch):
@@ -496,8 +498,8 @@ def test_you_can_edit_a_tailored_cv_and_rebuild_it_without_the_model(resume, fil
     assert result["source"] == meta["source"] and result["file"] == meta["file"] and result["pages"] == 1
     assert source.read_text() == edited == build.sources[0]  # what you saved is what was built
     assert source.with_suffix(".md.bak").read_text() == original  # one step back
-    assert tailored_of(tracking.get_application(store, job_id))["edited_at"] == iso(later)
-    assert [e["detail"] for e in tracking.events_for(store, job_id)][-1] == f"CV edited by you: {meta['file']}"
+    assert tailored_of(get_application(store, job_id))["edited_at"] == iso(later)
+    assert [e["detail"] for e in events_for(store, job_id)][-1] == f"CV edited by you: {meta['file']}"
 
     with pytest.raises(TailorError, match="You edited this CV"):  # tailoring again asks first
         tailor_for_job(store, job_id, writer(GOOD), PROFILE_FILE, config, NOW, builder=FakeBuild())
@@ -529,7 +531,7 @@ def test_only_files_in_versions_can_be_edited(resume, filters):
     for source in ("../resume.md", "versions/../resume.md", "resume.md"):
         store.conn.execute("UPDATE applications SET cv_tailored_json = ? WHERE job_id = ?",
                            (json.dumps({"source": source}), job_id))
-        assert version_of(config_for(resume), "Nobody", tracking.get_application(store, job_id)) is None
+        assert version_of(config_for(resume), "Nobody", get_application(store, job_id)) is None
 
 
 def test_the_cv_text_can_be_edited_in_the_app(cv_client):

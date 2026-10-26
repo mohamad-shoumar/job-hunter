@@ -14,9 +14,11 @@ from jobhunter.mailer import (
     GmailInbox, InboxMessage, MailAccount, NotSent, SendError, Unsure, bounce_info, build_message, is_auto_reply,
     new_message_id, scan_inbox, send_for_job,
 )
+from jobhunter.models import NEW, REACHED_OUT, REPLIED
 from jobhunter.pitch import edit_draft
 from jobhunter.profile import load_profile
 from jobhunter.store import JobStore
+from jobhunter.store.applications import events_for, get_application
 from jobhunter.text import iso
 
 from .conftest import FIXTURES, NOW, ROOT, store_job
@@ -46,7 +48,7 @@ def ready_job(store, filters, email="ana@acme.io", company="Acme", source_job_id
 
 
 def send(store, job_id, sender, when=NOW, **kwargs):
-    version = tracking.get_application(store, job_id)["draft_version"]
+    version = get_application(store, job_id)["draft_version"]
     return send_for_job(store, job_id, sender, ME, PROFILE, CONFIG, when, draft_version=version, **kwargs)
 
 
@@ -67,8 +69,8 @@ def test_sending_records_the_email_and_starts_the_follow_up_timer(filters):
     result = send(store, job_id, sender, seq=0)
     assert result["to"] == "ana@acme.io" and len(sender.sent) == 1
     assert sender.sent[0].get_body(("plain",)).get_content().strip().startswith("Hi Ana,")
-    app = tracking.get_application(store, job_id)
-    assert app["stage"] == tracking.REACHED_OUT and app["emailed_at"] == iso(NOW)
+    app = get_application(store, job_id)
+    assert app["stage"] == REACHED_OUT and app["emailed_at"] == iso(NOW)
     assert app["next_follow_up_at"] == iso(tracking.add_business_days(NOW, 4))
 
 
@@ -93,7 +95,7 @@ def test_the_follow_up_replies_in_the_thread(filters):
     send(store, job_id, sender, when=later, seq=1)
     first, follow = sender.sent
     assert follow["Subject"] == "Re: Python backend role at Acme" and follow["In-Reply-To"] == first["Message-ID"]
-    assert tracking.get_application(store, job_id)["follow_ups"] == 1
+    assert get_application(store, job_id)["follow_ups"] == 1
 
 
 def test_a_changed_draft_is_not_sent(filters):
@@ -108,7 +110,7 @@ def test_a_refused_send_can_be_retried_and_an_unclear_one_waits(filters):
     job_id = ready_job(store, filters)
     with pytest.raises(SendError, match="Not sent"):
         send(store, job_id, FakeSender(NotSent("Gmail refused the login")))
-    assert tracking.get_application(store, job_id)["emailed_at"] is None
+    assert get_application(store, job_id)["emailed_at"] is None
     with pytest.raises(SendError, match="did not confirm"):
         send(store, job_id, FakeSender(Unsure("timeout")))
     assert store.conn.execute("SELECT state FROM sent_mail ORDER BY id DESC").fetchone()[0] == "sending"
@@ -140,7 +142,7 @@ def test_the_daily_cap_and_blocked_drafts_stop_sending(filters):
         send(store, job_id, FakeSender())
     store.conn.execute("UPDATE applications SET draft_blocked = 0")
     config = OutreachConfig(daily_send_cap=0)
-    version = tracking.get_application(store, job_id)["draft_version"]
+    version = get_application(store, job_id)["draft_version"]
     with pytest.raises(SendError, match="Daily limit"):
         send_for_job(store, job_id, FakeSender(), ME, PROFILE, config, NOW, draft_version=version)
 
@@ -151,7 +153,7 @@ def test_a_test_send_goes_to_you_and_counts_for_nothing(filters):
     sender = FakeSender()
     send(store, job_id, sender, test=True)
     assert sender.sent[0]["To"] == "me@gmail.com" and sender.sent[0]["Subject"].startswith("[test] ")
-    app = tracking.get_application(store, job_id)
+    app = get_application(store, job_id)
     assert app["emailed_at"] is None and tracking.sends_today(store, NOW)["total"] == 0
     send(store, job_id, sender, seq=0)  # the real one still goes out
     assert sender.sent[1]["To"] == "ana@acme.io"
@@ -245,11 +247,11 @@ def test_a_reply_moves_the_job_and_a_second_scan_changes_nothing(filters):
     job_id, mid = sent_job(store, filters)
     inbox = FakeInbox([(mail("Ana Ruiz <ana@acme.io>", "Re: Python backend role at Acme", in_reply_to=mid), "t1")])
     result = scan_inbox(store, inbox, ME, CONFIG, NOW + timedelta(days=1))
-    app = tracking.get_application(store, job_id)
-    assert result.replies == 1 and app["stage"] == tracking.REPLIED and app["reply_snippet"] == "Thanks, let's talk."
+    app = get_application(store, job_id)
+    assert result.replies == 1 and app["stage"] == REPLIED and app["reply_snippet"] == "Thanks, let's talk."
     assert app["next_follow_up_at"] is None
     assert scan_inbox(store, inbox, ME, CONFIG, NOW + timedelta(days=1)).replies == 0
-    assert len([e for e in tracking.events_for(store, job_id) if e["kind"] == "replied"]) == 1
+    assert len([e for e in events_for(store, job_id) if e["kind"] == "replied"]) == 1
 
 
 def test_your_own_mail_and_out_of_office_are_not_replies(filters):
@@ -262,7 +264,7 @@ def test_your_own_mail_and_out_of_office_are_not_replies(filters):
     ])
     result = scan_inbox(store, inbox, ME, CONFIG, NOW)
     assert (result.replies, result.auto_replies) == (0, 2)
-    assert tracking.get_application(store, job_id)["stage"] == tracking.REACHED_OUT
+    assert get_application(store, job_id)["stage"] == REACHED_OUT
 
 
 def test_a_colleague_at_the_company_is_a_probable_reply(filters):
@@ -270,7 +272,7 @@ def test_a_colleague_at_the_company_is_a_probable_reply(filters):
     job_id, _ = sent_job(store, filters)
     inbox = FakeInbox([(mail("Kim Ho <kim@acme.io>", "Your note to Ana"), "t9")])
     result = scan_inbox(store, inbox, ME, CONFIG, NOW)
-    assert result.probable == 1 and tracking.get_application(store, job_id)["stage"] == tracking.REPLIED
+    assert result.probable == 1 and get_application(store, job_id)["stage"] == REPLIED
 
 
 def test_a_permanent_bounce_marks_the_address_and_a_delay_does_not(filters):
@@ -284,7 +286,7 @@ def test_a_permanent_bounce_marks_the_address_and_a_delay_does_not(filters):
                                           (dsn("5.1.1", "ana@acme.io", mid), "t1")]), ME, CONFIG, NOW)
     assert result.bounces == 1
     assert store.conn.execute("SELECT email_status FROM contacts").fetchone()[0] == "bounced"
-    assert tracking.get_application(store, job_id)["next_follow_up_at"] is None
+    assert get_application(store, job_id)["next_follow_up_at"] is None
 
 
 def test_your_reply_to_a_test_email_is_only_noted(filters):
@@ -296,8 +298,8 @@ def test_your_reply_to_a_test_email_is_only_noted(filters):
     inbox = FakeInbox([(mail(ME.address, "Re: [test] Python backend role", in_reply_to=test_id, body="Looks good"), "t1")])
     result = scan_inbox(store, inbox, ME, CONFIG, NOW)
     assert result.test_replies == 1
-    assert tracking.get_application(store, job_id)["stage"] == tracking.NEW
-    assert any("Reply to your test email: Looks good" in e["detail"] for e in tracking.events_for(store, job_id))
+    assert get_application(store, job_id)["stage"] == NEW
+    assert any("Reply to your test email: Looks good" in e["detail"] for e in events_for(store, job_id))
 
 
 def test_an_unclear_send_is_settled_by_gmail_s_copy(filters):
@@ -308,7 +310,7 @@ def test_an_unclear_send_is_settled_by_gmail_s_copy(filters):
     mid = store.conn.execute("SELECT message_id FROM sent_mail").fetchone()[0]
     result = scan_inbox(store, FakeInbox([], threads={mid: "t1"}), ME, CONFIG, NOW + timedelta(minutes=1))
     assert result.resolved == [f"#{job_id}: it went out"]
-    assert tracking.get_application(store, job_id)["emailed_at"] is not None
+    assert get_application(store, job_id)["emailed_at"] is not None
 
     store = JobStore(":memory:")
     job_id = ready_job(store, filters)
@@ -366,13 +368,13 @@ def test_the_cv_is_attached_unless_you_pick_none(filters, tmp_path):
     store = JobStore(":memory:")
     job_id = ready_job(store, filters)
     sender = FakeSender()
-    version = tracking.get_application(store, job_id)["draft_version"]
+    version = get_application(store, job_id)["draft_version"]
     send_for_job(store, job_id, sender, ME, PROFILE, config, NOW, draft_version=version)
     [attachment] = list(sender.sent[0].iter_attachments())
     assert attachment.get_filename() == "Shoumar_Resume_General.pdf" and attachment.get_content() == b"%PDF-1.4 cv"
     other = ready_job(store, filters, company="Beta", email="bo@beta.io", source_job_id="2")
     store.conn.execute("UPDATE applications SET cv_file = 'none' WHERE job_id = ?", (other,))
     sender = FakeSender()
-    version = tracking.get_application(store, other)["draft_version"]
+    version = get_application(store, other)["draft_version"]
     send_for_job(store, other, sender, ME, PROFILE, config, NOW, draft_version=version)
     assert list(sender.sent[0].iter_attachments()) == []

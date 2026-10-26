@@ -35,6 +35,8 @@ from .models import SHORTLISTED
 from .pitch import build_writer, cv_for, default_cv, draft_for_job
 from .profile import load_profile
 from .store import JobStore
+from .store.applications import get_application
+from .store.lists import shortlisted_new_or_saved
 from . import tracking
 
 log = logging.getLogger(__name__)
@@ -73,7 +75,7 @@ def run_outreach(store: JobStore, paths: Paths, new_ids: list[int], now: datetim
             if fixed or writer:
                 profile = load_profile(paths.profile_file)
                 for job_id in ready[:MAX_DRAFTS_PER_RUN]:
-                    app = tracking.get_application(store, job_id)
+                    app = get_application(store, job_id)
                     if app and app["body"]:
                         continue  # a draft exists; the button rewrites it
                     try:
@@ -136,11 +138,7 @@ def to_prepare(store: JobStore, new_shortlisted: list, config: OutreachConfig, n
     if config.catch_up_days > 0:
         since = (now.astimezone().date() - timedelta(days=config.catch_up_days)).isoformat()
         seen = {row["id"] for row in rows}
-        older = store.conn.execute(
-            "SELECT jobs.* FROM jobs LEFT JOIN applications ON applications.job_id = jobs.id "
-            "WHERE jobs.status = ? AND jobs.report_date >= ? AND COALESCE(applications.stage, ?) IN (?, ?)",
-            (SHORTLISTED, since, tracking.NEW, tracking.NEW, tracking.SAVED),
-        ).fetchall()
+        older = shortlisted_new_or_saved(store, since)
         rows += best_first(row for row in older if row["id"] not in seen)
     return rows
 
@@ -148,7 +146,7 @@ def to_prepare(store: JobStore, new_shortlisted: list, config: OutreachConfig, n
 def prepare(summary: dict, key: str, label: str, rows: list, done, limit: int, build, make, store: JobStore) -> None:
     """Make one thing (a CV, a cover letter) for each job in `rows` that has none yet, up to `limit`."""
     try:
-        todo = [row for row in rows if not done(row, tracking.get_application(store, row["id"]))]  # the button redoes one
+        todo = [row for row in rows if not done(row, get_application(store, row["id"]))]  # the button redoes one
         if not todo:
             return
         writer, note = build()

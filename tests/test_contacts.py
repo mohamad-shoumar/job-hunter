@@ -9,10 +9,9 @@ import pytest
 from jobhunter import contacts
 from jobhunter.config import OutreachConfig
 from jobhunter.contacts import (
-    ContactFinder, chosen_contact, domain_from_links, find_contacts, guess_email, role_of, run_budget, size_upper_bound,
-    targets_for,
+    ContactFinder, chosen_contact, domain_from_links, find_contacts, guess_email, role_of, run_budget, targets_for,
 )
-from jobhunter.hunter import Account, Hunter, HunterError
+from jobhunter.hunter import Account, Hunter, HunterError, size_upper_bound
 from jobhunter.store import JobStore
 
 from .conftest import NOW, fixture_json, store_job

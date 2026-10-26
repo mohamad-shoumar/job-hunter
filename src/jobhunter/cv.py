@@ -59,6 +59,7 @@ from .llm import JsonModel, Usage, json_model, key_note
 from .pitch import cv_for, role_family
 from .profile import Profile, load_profile, sections, split_tags, strip_notes
 from .store import JobStore
+from .store.applications import add_event, get_application, save_tailored_cv
 from .text import iso
 
 MAX_NEW_WORDS = 4
@@ -808,12 +809,8 @@ def tailor_for_job(store: JobStore, job_id: int, writer: CvWriter, profile_path:
         "written_at": iso(now),
     }
     attach = attachable and (pick or not app["cv_file"] or (old is not None and app["cv_file"] == old["file"]))
-    store.conn.execute(
-        "UPDATE applications SET cv_tailored_json = ?, cv_file = CASE WHEN ? THEN ? ELSE cv_file END, updated_at = ? "
-        "WHERE job_id = ?",
-        (json.dumps(meta), 1 if attach else 0, pdf.name, iso(now), job_id),
-    )
-    tracking.add_event(store, job_id, "cv", f"CV tailored: {pdf.name}" + (" (again)" if old else ""), now)
+    save_tailored_cv(store, job_id, meta, now, attach=pdf.name if attach else None)
+    add_event(store, job_id, "cv", f"CV tailored: {pdf.name}" + (" (again)" if old else ""), now)
     store.commit()
     return meta
 
@@ -913,7 +910,7 @@ def save_version(store: JobStore, job_id: int, config: OutreachConfig, profile_p
     if job is None:
         raise TailorError(f"no job #{job_id}")
     company, _ = clean_company_name(job["company"])
-    app = tracking.get_application(store, job_id)
+    app = get_application(store, job_id)
     source = version_of(config, company, app)
     if source is None:
         raise TailorError("This job uses the general CV (resume.md), which is not edited here: tailor a CV first, "
@@ -934,9 +931,8 @@ def save_version(store: JobStore, job_id: int, config: OutreachConfig, profile_p
     meta = tailored_of(app)
     if meta and (folder / str(meta.get("source", ""))).resolve() == source:
         meta.update(edited_at=iso(now), pages=pages, file=pdf.name, path=str(pdf))
-        store.conn.execute("UPDATE applications SET cv_tailored_json = ?, updated_at = ? WHERE job_id = ?",
-                           (json.dumps(meta), iso(now), job_id))
-    tracking.add_event(store, job_id, "cv", f"CV edited by you: {pdf.name}", now)
+        save_tailored_cv(store, job_id, meta, now)
+    add_event(store, job_id, "cv", f"CV edited by you: {pdf.name}", now)
     store.commit()
     notes = [] if pages <= 1 else [f"It is {pages} pages even in the compact layout: cut a line"]
     return {"source": rel, "file": pdf.name, "pages": pages, "notes": notes,

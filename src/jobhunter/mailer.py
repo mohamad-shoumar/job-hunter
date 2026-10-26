@@ -48,7 +48,13 @@ from .contacts import WEBMAIL, chosen_contact, clean_company_name
 from .pitch import cv_for, follow_up, to_html, to_plain
 from .profile import Profile
 from .store import JobStore
-from .text import iso, parse_datetime
+from .store.applications import add_event, get_application
+from .store.companies import get_contact
+from .store.mail import (
+    company_contacted, get_mail, has_mail, is_seen, mark_seen, our_mail, sent_for_job, set_error, set_failed, set_sent,
+    set_thread, start_send,
+)
+from .text import parse_datetime
 
 log = logging.getLogger(__name__)
 
@@ -155,14 +161,8 @@ class SmtpSender:
 
 def _contact(store: JobStore, job: sqlite3.Row, app: sqlite3.Row, config: OutreachConfig) -> sqlite3.Row | None:
     if app["contact_id"]:
-        return store.conn.execute("SELECT * FROM contacts WHERE id = ?", (app["contact_id"],)).fetchone()
+        return get_contact(store, app["contact_id"])
     return chosen_contact(store, job, config)
-
-
-def _sent(store: JobStore, job_id: int) -> list[sqlite3.Row]:
-    return store.conn.execute(
-        "SELECT * FROM sent_mail WHERE job_id = ? AND kind != 'test' AND state = 'sent' ORDER BY seq", (job_id,)
-    ).fetchall()
 
 
 @dataclass
@@ -183,11 +183,11 @@ def outgoing(store: JobStore, job_id: int, test: bool, account: MailAccount, pro
              config: OutreachConfig) -> Outgoing:
     """What Send would send right now: the first email, the next follow-up, or a test of either."""
     job = store.get(job_id)
-    app = tracking.get_application(store, job_id)
+    app = get_application(store, job_id)
     if job is None or app is None or not app["body"]:
         raise SendError("There is no email draft for this job yet.")
     contact = _contact(store, job, app, config)
-    sent = _sent(store, job_id)
+    sent = sent_for_job(store, job_id)
     company, _ = clean_company_name(job["company"])
     if not sent:
         if not contact or not contact["email"]:
@@ -224,7 +224,7 @@ def send_for_job(store: JobStore, job_id: int, sender, account: MailAccount, pro
     """`draft_version` and `seq` are what the page showed: a double click, or a page opened before a send,
     is refused instead of sending the next step."""
     confirm = confirm or set()
-    app = tracking.get_application(store, job_id)
+    app = get_application(store, job_id)
     if app is None or app["draft_version"] != draft_version:
         raise SendError("The draft changed since this page loaded. Check it again before sending.")
     out = outgoing(store, job_id, test, account, profile, config)
@@ -249,37 +249,29 @@ def send_for_job(store: JobStore, job_id: int, sender, account: MailAccount, pro
                 raise SendError(f"{out.to} is a guess, not a found address. A bounce hurts your Gmail's "
                                 "reputation. Send anyway?", confirm="guessed")
         if out.kind == "first" and out.contact and "same_company" not in confirm:
-            earlier = tracking.company_contacted(store, out.contact["company_key"], job_id)
+            earlier = company_contacted(store, out.contact["company_key"], job_id)
             if earlier:
                 e = earlier[-1]
                 raise SendError(f"You already emailed {e['to_addr']} at this company on {e['sent_at'][:10]} "
                                 f"about \"{e['title']}\". Email about this job too?", confirm="same_company")
     message_id = new_message_id()
     try:
-        cur = store.conn.execute(
-            """
-            INSERT INTO sent_mail (job_id, contact_id, kind, seq, message_id, in_reply_to, to_addr, subject, body,
-                                   guessed, state, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'sending', ?)
-            """,
-            (job_id, out.contact["id"] if out.contact else None, out.kind, out.seq, message_id, out.in_reply_to,
-             out.to, out.subject, out.body, 1 if out.guessed else 0, iso(now)),
-        )
+        row_id = start_send(store, job_id, out.contact["id"] if out.contact else None, out.kind, out.seq, message_id,
+                            out.in_reply_to, out.to, out.subject, out.body, out.guessed, now)
         store.commit()  # saved before the network call: the unique index now blocks a second send
     except sqlite3.IntegrityError:
-        store.conn.rollback()
+        store.rollback()
         raise SendError("This email was already sent (or is being sent).") from None
-    row_id = cur.lastrowid
     msg = build_message(account, out.to, out.subject, out.body, message_id, out.in_reply_to, out.references,
                         out.attachment)
     try:
         sender.send(msg)
     except NotSent as exc:
-        store.conn.execute("UPDATE sent_mail SET state = 'failed', error = ? WHERE id = ?", (str(exc), row_id))
+        set_failed(store, row_id, str(exc))
         store.commit()
         raise SendError(f"Not sent: {exc}") from None
     except Unsure as exc:
-        store.conn.execute("UPDATE sent_mail SET error = ? WHERE id = ?", (f"unsure: {exc}", row_id))
+        set_error(store, row_id, f"unsure: {exc}")
         store.commit()
         raise SendError("Gmail did not confirm the send. Check inbox in a minute: it will show whether it "
                         "went out. Don't send again before that.") from None
@@ -289,11 +281,10 @@ def send_for_job(store: JobStore, job_id: int, sender, account: MailAccount, pro
 
 
 def _mark_sent(store: JobStore, row_id: int, when: datetime, config: OutreachConfig) -> None:
-    row = store.conn.execute("SELECT * FROM sent_mail WHERE id = ?", (row_id,)).fetchone()
-    store.conn.execute("UPDATE sent_mail SET state = 'sent', sent_at = ?, error = NULL WHERE id = ?",
-                       (iso(when), row_id))
+    row = get_mail(store, row_id)
+    set_sent(store, row_id, when)
     if row["kind"] == "test":
-        tracking.add_event(store, row["job_id"], "test", f"Test email sent to you: {row['subject']}", when)
+        add_event(store, row["job_id"], "test", f"Test email sent to you: {row['subject']}", when)
     else:
         tracking.record_sent(store, row["job_id"], row["seq"], row["to_addr"], when, config)
 
@@ -470,7 +461,7 @@ def _domain(address: str) -> str:
 def scan_inbox(store: JobStore, inbox: GmailInbox, account: MailAccount, config: OutreachConfig,
                now: datetime) -> ScanResult:
     result = ScanResult()
-    ours = {r["message_id"]: r for r in store.conn.execute("SELECT * FROM sent_mail WHERE state != 'failed'")}
+    ours = {r["message_id"]: r for r in our_mail(store, include_sending=True)}
     if not ours:
         result.notes.append("nothing sent yet")
         return result
@@ -479,23 +470,22 @@ def scan_inbox(store: JobStore, inbox: GmailInbox, account: MailAccount, config:
     for row in [r for r in ours.values() if r["state"] == "sending"]:
         thread = inbox.find(row["message_id"])
         if thread is not None:
-            store.conn.execute("UPDATE sent_mail SET thread_id = ? WHERE id = ?", (thread or None, row["id"]))
+            set_thread(store, row["id"], thread or None)
             _mark_sent(store, row["id"], parse_datetime(row["created_at"]), config)
             result.resolved.append(f"#{row['job_id']}: it went out")
         elif now - parse_datetime(row["created_at"]) > UNSURE_AFTER:
-            store.conn.execute("UPDATE sent_mail SET state = 'failed', error = 'Gmail has no copy: not sent' "
-                               "WHERE id = ?", (row["id"],))
+            set_failed(store, row["id"], "Gmail has no copy: not sent")
             result.resolved.append(f"#{row['job_id']}: it did not go out; you can send it again")
     store.commit()
-    ours = {r["message_id"]: r for r in store.conn.execute("SELECT * FROM sent_mail WHERE state = 'sent'")}
+    ours = {r["message_id"]: r for r in our_mail(store)}
     # 2. Gmail thread ids of our sent emails.
     for row in ours.values():
         if not row["thread_id"]:
             thread = inbox.find(row["message_id"])
             if thread:
-                store.conn.execute("UPDATE sent_mail SET thread_id = ? WHERE id = ?", (thread, row["id"]))
+                set_thread(store, row["id"], thread)
     store.commit()
-    ours = {r["message_id"]: r for r in store.conn.execute("SELECT * FROM sent_mail WHERE state = 'sent'")}
+    ours = {r["message_id"]: r for r in our_mail(store)}
     if not ours:
         return result
     threads: dict[str, sqlite3.Row] = {}
@@ -530,7 +520,7 @@ def _handle(store: JobStore, inbox: GmailInbox, message: InboxMessage, ours: dic
     if message_id in ours:
         return  # our own sent copy
     key = message_id or f"uid:{inbox.uidvalidity}:{message.uid}"
-    if store.conn.execute("SELECT 1 FROM mail_seen WHERE message_key = ?", (key,)).fetchone():
+    if is_seen(store, key):
         return
     sender = parseaddr(str(h.get("From") or ""))[1].lower()
     subject = str(h.get("Subject") or "")
@@ -562,8 +552,8 @@ def _handle(store: JobStore, inbox: GmailInbox, message: InboxMessage, ours: dic
         if tests and not real:
             job_id, kind = tests[0]["job_id"], "test_reply"
             full = inbox.full(message.uid)
-            if tracking.add_event(store, job_id, "test", f"Reply to your test email: {_text_of(full) if full else subject}",
-                                  now, ref=key):
+            if add_event(store, job_id, "test", f"Reply to your test email: {_text_of(full) if full else subject}",
+                         now, ref=key):
                 result.test_replies += 1
         else:
             kind = "mine"  # your own mail, e.g. a reply you wrote in Gmail
@@ -586,16 +576,14 @@ def _handle(store: JobStore, inbox: GmailInbox, message: InboxMessage, ours: dic
                 if tracking.record_reply(store, job_id, when, sender, snippet, now, ref=key, probable=probable):
                     result.probable += probable
                     result.replies += not probable
-    store.conn.execute("INSERT OR IGNORE INTO mail_seen (message_key, job_id, kind, seen_at) VALUES (?, ?, ?, ?)",
-                       (key, job_id, kind, iso(now)))
+    mark_seen(store, key, job_id, kind, now)
 
 
 def check_inbox(store: JobStore, account: MailAccount, config: OutreachConfig, now: datetime,
                 inbox: GmailInbox | None = None) -> ScanResult:
     """Scan, then close as ghosted what waited long enough. Opens (and closes) its own IMAP connection."""
-    has_mail = store.conn.execute("SELECT 1 FROM sent_mail WHERE state != 'failed' LIMIT 1").fetchone()
     result = ScanResult()
-    if has_mail:
+    if has_mail(store):
         own = inbox is None
         inbox = inbox or GmailInbox(account)
         try:

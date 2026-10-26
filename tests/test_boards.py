@@ -7,6 +7,7 @@ from jobhunter.config import Filters, OutreachConfig, Paths
 from jobhunter.models import SHORTLISTED
 from jobhunter.sources import build_sources, greenhouse, himalayas, lever
 from jobhunter.store import JobStore
+from jobhunter.store.watched import watched_boards
 
 from .conftest import NOW, FakeHttp, fixture_json, store_job
 
@@ -34,7 +35,7 @@ def test_a_board_named_in_the_jobs_own_link_is_watched_without_any_request(filte
     assert run.added == [{"board": "ashby:dualentry", "company": "DualEntry",
                           "reason": f"job #{job_id} links to its posting there: "
                                     "https://jobs.ashbyhq.com/dualentry/5eca795c-48dd-496a-be23-2181068a5450"}]
-    assert [(r["kind"], r["slug"], r["from_job_id"]) for r in boards.watched(store)] == [("ashby", "dualentry", job_id)]
+    assert [(r["kind"], r["slug"], r["from_job_id"]) for r in watched_boards(store)] == [("ashby", "dualentry", job_id)]
 
 
 def test_a_guessed_board_is_kept_only_when_it_lists_the_jobs_title(filters):
@@ -54,7 +55,7 @@ def test_a_guessed_board_of_another_company_is_not_watched_and_not_retried_for_a
     http = FakeHttp({greenhouse.API.format(token="fingerprint"): fixture_json("greenhouse_gitlab.json"),
                      lever.API.format(token="fingerprint"): {"ok": False, "error": "Document not found"}})
     run = watch(store, http, filters)  # Ashby is not in the routes: an error, so no board
-    assert run.added == [] and boards.watched(store) == []
+    assert run.added == [] and watched_boards(store) == []
     assert len(http.calls) == 3
     again = watch(store, http, filters, now=NOW + timedelta(days=5))
     assert again.probed == 0 and len(http.calls) == 3
@@ -96,7 +97,7 @@ def test_a_board_already_in_the_config_or_removed_by_you_is_not_added(filters):
                 application_url="https://jobs.ashbyhq.com/dualentry/5eca795c-48dd-496a-be23-2181068a5450")
     assert watch(store, FakeHttp({}), filters).added
     assert boards.remove(store, "ashby:DualEntry", NOW)
-    assert boards.watched(store) == [] and watch(store, FakeHttp({}), filters).added == []
+    assert watched_boards(store) == [] and watch(store, FakeHttp({}), filters).added == []
 
 
 def test_watched_boards_join_the_sources_and_skip_duplicates(filters):

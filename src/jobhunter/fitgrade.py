@@ -30,14 +30,16 @@ from pathlib import Path
 
 from .extract import find_required_yoe
 from .llm import JsonModel, Usage, error_line, json_model
+from .models import NEEDS_REVIEW, SHORTLISTED, VISA_LIST
 from .profile import load_profile, sections
 from .store import JobStore
+from .store.lists import applied_jobs, jobs_to_grade, skipped_jobs
 from .text import iso
 from .tracking import SKIP_REASONS
 
 log = logging.getLogger(__name__)
 
-SHOWN = ("shortlisted", "needs_review", "visa_list")
+SHOWN = (SHORTLISTED, NEEDS_REVIEW, VISA_LIST)
 
 SYSTEM = """You help one job seeker sort the job postings they will read today. Grade how much this \
 person would want to apply to the job below, from 1 (they would skip it) to 5 (exactly what they look for).
@@ -100,7 +102,7 @@ class Examples:
 
 def _where(row: sqlite3.Row) -> str:
     place = row["location_raw"] or "no location given"
-    abroad = "; on-site abroad, would need a visa" if row["status"] == "visa_list" else ""
+    abroad = "; on-site abroad, would need a visa" if row["status"] == VISA_LIST else ""
     return f"{row['remote_status']}, {place}{abroad}"
 
 
@@ -115,17 +117,8 @@ def load_examples(store: JobStore, config: FitGradeConfig) -> Examples:
 
     Skips you gave a reason for come first: they say the most.
     """
-    liked = store.conn.execute(
-        "SELECT j.* FROM applications a JOIN jobs j ON j.id = a.job_id "
-        "WHERE a.applied_at IS NOT NULL AND NOT (a.stage = 'closed' AND a.closed_reason = 'skipped') "
-        "ORDER BY a.applied_at DESC LIMIT ?", (config.max_liked_examples,),
-    ).fetchall()
-    skipped = store.conn.execute(
-        "SELECT j.*, a.skip_reason, a.skip_note FROM applications a JOIN jobs j ON j.id = a.job_id "
-        "WHERE a.stage = 'closed' AND a.closed_reason = 'skipped' "
-        "ORDER BY (a.skip_reason IS NOT NULL OR a.skip_note IS NOT NULL) DESC, a.updated_at DESC LIMIT ?",
-        (config.max_skipped_examples,),
-    ).fetchall()
+    liked = applied_jobs(store, config.max_liked_examples)
+    skipped = skipped_jobs(store, config.max_skipped_examples)
 
     def why(row) -> str:
         said = "; ".join(x for x in (SKIP_REASONS.get(row["skip_reason"] or ""), row["skip_note"]) if x)
@@ -217,14 +210,7 @@ class GradeRun:
 def to_grade(store: JobStore, now: datetime, days: int, regrade: bool = False) -> list[sqlite3.Row]:
     """Shown jobs from the last `days` report days that you have not acted on (New or Saved), newest first."""
     since = (now.astimezone().date() - timedelta(days=max(1, days) - 1)).isoformat()
-    ungraded = "" if regrade else " AND j.fit_grade_json IS NULL"
-    marks = ", ".join("?" for _ in SHOWN)
-    return store.conn.execute(
-        f"SELECT j.* FROM jobs j LEFT JOIN applications a ON a.job_id = j.id "
-        f"WHERE j.status IN ({marks}) AND j.report_date >= ? AND COALESCE(a.stage, 'new') IN ('new', 'saved')"
-        f"{ungraded} ORDER BY j.report_date DESC, j.id DESC",
-        (*SHOWN, since),
-    ).fetchall()
+    return jobs_to_grade(store, SHOWN, since, regrade)
 
 
 def grade_jobs(store: JobStore, grader: FitGrader, rows, profile_path: Path, now: datetime,

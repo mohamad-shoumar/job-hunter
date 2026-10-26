@@ -36,7 +36,9 @@ from .models import SHORTLISTED, VISA_LIST
 from .sources import ashby, greenhouse, lever
 from .sources.base import Source
 from .store import JobStore
-from .text import iso, parse_datetime
+from .store.companies import company_domains, job_board_keys
+from .store.watched import add_watched_board, board_probes, record_probe, remove_watched_board, watched_boards
+from .text import parse_datetime
 
 log = logging.getLogger(__name__)
 
@@ -167,17 +169,12 @@ def configured_boards(sources_config: dict) -> set[str]:
     return found
 
 
-def watched(store: JobStore, include_removed: bool = False) -> list:
-    where = "" if include_removed else " WHERE removed_at IS NULL"
-    return store.conn.execute(f"SELECT * FROM watched_boards{where} ORDER BY added_at, kind, slug").fetchall()
-
-
 def add_watched_sources(sources: list[Source], store: JobStore, sources_config: dict) -> int:
     """Add the watched boards to the matching config source (or a new one). Returns how many were added."""
     configured = configured_boards(sources_config)
     by_name = {s.name: s for s in sources}
     added = 0
-    for row in watched(store):
+    for row in watched_boards(store):
         if f"{row['kind']}:{row['slug'].lower()}" in configured:
             continue
         entry = {"company": row["company"], "board_token": row["slug"]}
@@ -201,16 +198,14 @@ def watch_shortlisted(store: JobStore, http, sources_config: dict, filters: Filt
     config = config or WatchConfig.from_sources(sources_config)
     run = WatchRun()
     configured = configured_boards(sources_config)
-    known = {r["company_key"] for r in watched(store, include_removed=True)}
-    known_boards = {f"{r['kind']}:{r['slug'].lower()}" for r in watched(store, include_removed=True)}
-    job_boards = {r["key"] for r in store.conn.execute("SELECT key FROM companies WHERE is_job_board = 1")}
-    domains = {r["key"]: r["domain"] for r in store.conn.execute("SELECT key, domain FROM companies")}
+    known = {r["company_key"] for r in watched_boards(store, include_removed=True)}
+    known_boards = {f"{r['kind']}:{r['slug'].lower()}" for r in watched_boards(store, include_removed=True)}
+    job_boards = job_board_keys(store)
+    domains = company_domains(store)
     retry_before = now - timedelta(days=config.retry_after_days)
-    probes = {r["company_key"]: parse_datetime(r["probed_at"])
-              for r in store.conn.execute("SELECT * FROM board_probes")}
+    probes = {r["company_key"]: parse_datetime(r["probed_at"]) for r in board_probes(store)}
     # A job on the visa list counts too: the company sponsors visas, so its next jobs abroad are wanted.
-    rows = store.conn.execute("SELECT * FROM jobs WHERE status IN (?, ?) ORDER BY id DESC",
-                              (SHORTLISTED, VISA_LIST)).fetchall()
+    rows = store.with_status(SHORTLISTED, VISA_LIST)
     done: set[str] = set()
     for job in rows:
         key = company_key(re.sub(r"https?://\S+", " ", job["company"] or ""))
@@ -234,17 +229,11 @@ def watch_shortlisted(store: JobStore, http, sources_config: dict, filters: Filt
             continue
         run.probed += probed
         if board is None:
-            store.conn.execute(
-                "INSERT INTO board_probes (company_key, probed_at, note) VALUES (?, ?, ?) "
-                "ON CONFLICT (company_key) DO UPDATE SET probed_at = excluded.probed_at, note = excluded.note",
-                (key, iso(now), f"no board found for job #{job['id']}"))
+            record_probe(store, key, now, f"no board found for job #{job['id']}")
             continue
         if board.name.lower() in configured or board.name.lower() in known_boards:
             continue  # already fetched from config/sources.json, or one you removed
-        store.conn.execute(
-            "INSERT INTO watched_boards (kind, slug, company, company_key, from_job_id, reason, added_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (board.kind, board.slug, board.company, key, board.from_job_id, board.reason, iso(now)))
+        add_watched_board(store, board.kind, board.slug, board.company, key, board.from_job_id, board.reason, now)
         known_boards.add(board.name.lower())
         run.added.append({"board": board.name, "company": board.company, "reason": board.reason})
     store.commit()
@@ -254,8 +243,6 @@ def watch_shortlisted(store: JobStore, http, sources_config: dict, filters: Filt
 def remove(store: JobStore, name: str, now: datetime) -> bool:
     """Stop watching 'kind:slug'. The row stays (removed), so the board is never added again."""
     kind, _, slug = name.partition(":")
-    cur = store.conn.execute(
-        "UPDATE watched_boards SET removed_at = ? WHERE kind = ? AND lower(slug) = lower(?) AND removed_at IS NULL",
-        (iso(now), kind.strip().lower(), slug.strip()))
+    removed = remove_watched_board(store, kind.strip().lower(), slug.strip(), now)
     store.commit()
-    return cur.rowcount > 0
+    return removed

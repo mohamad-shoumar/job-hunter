@@ -34,10 +34,15 @@ from urllib.parse import urlsplit
 
 from . import tracking
 from .config import OutreachConfig
-from .hunter import Account, Hunter, HunterError
+from .hunter import Account, Hunter, HunterError, size_upper_bound
 from .identity import company_key
 from .llm import Usage, error_line, find_quote, forced_tool_choice, pages_read, plain
 from .store import JobStore
+from .store.applications import add_event, get_application, update_application
+from .store.companies import (
+    add_company, claim_lookup, company_contacts, contact_id_by_email, contact_id_by_name, get_company, get_contact,
+    insert_contact, set_email_status, update_company, update_contact,
+)
 from .text import iso, parse_datetime, strip_accents
 
 log = logging.getLogger(__name__)
@@ -104,16 +109,6 @@ def role_of(position: str | None) -> str:
         if pattern.search(text):
             return role
     return "other"
-
-
-def size_upper_bound(size_range: str | None, size_count: int | None = None) -> int | None:
-    """The top of Hunter's size range: "11-50" -> 50, "10K+" -> 10000. An exact count wins."""
-    if size_count:
-        return int(size_count)
-    numbers = []
-    for value, k in re.findall(r"(\d+(?:\.\d+)?)\s*([kK])?", size_range or ""):
-        numbers.append(int(float(value) * (1000 if k else 1)))
-    return max(numbers) if numbers else None
 
 
 def targets_for(size_range: str | None, size_count: int | None, config: OutreachConfig) -> tuple[list[str], str]:
@@ -235,49 +230,31 @@ def job_company(store: JobStore, job: sqlite3.Row, now: datetime) -> sqlite3.Row
     """The job's `companies` row, created on first use."""
     name, _ = clean_company_name(job["company"])
     key = company_key(name) or name.lower()
-    row = store.conn.execute("SELECT * FROM companies WHERE key = ?", (key,)).fetchone()
+    row = get_company(store, key)
     if row is None:
-        store.conn.execute("INSERT INTO companies (key, name) VALUES (?, ?)", (key, name))
-        row = store.conn.execute("SELECT * FROM companies WHERE key = ?", (key,)).fetchone()
+        add_company(store, key, name)
+        row = get_company(store, key)
     return row
-
-
-def company_contacts(store: JobStore, key: str) -> list[sqlite3.Row]:
-    return store.conn.execute("SELECT * FROM contacts WHERE company_key = ? ORDER BY id", (key,)).fetchall()
-
-
-def _update_company(store: JobStore, key: str, **values) -> None:
-    assignments = ", ".join(f"{k} = :{k}" for k in values)
-    store.conn.execute(f"UPDATE companies SET {assignments} WHERE key = :key", {**values, "key": key})
 
 
 def save_contact(store: JobStore, key: str, now: datetime, **values) -> int:
     """Insert or update (same company and email, else same name). Returns the contact id."""
     email = (values.get("email") or "").lower() or None
     values["email"] = email
-    existing = None
-    if email:
-        existing = store.conn.execute(
-            "SELECT id FROM contacts WHERE company_key = ? AND lower(email) = ?", (key, email)).fetchone()
+    existing = contact_id_by_email(store, key, email) if email else None
     if existing is None:
-        existing = store.conn.execute(
-            "SELECT id FROM contacts WHERE company_key = ? AND lower(full_name) = lower(?)",
-            (key, values["full_name"])).fetchone()
-    if existing:
-        current = store.conn.execute("SELECT * FROM contacts WHERE id = ?", (existing["id"],)).fetchone()
+        existing = contact_id_by_name(store, key, values["full_name"])
+    if existing is not None:
+        current = get_contact(store, existing)
         if current["email_status"] == "bounced" and current["email"] == email:
             values.pop("email_status", None)  # a bounce is a fact; a later lookup does not undo it
-        assignments = ", ".join(f"{k} = :{k}" for k in values)
-        store.conn.execute(f"UPDATE contacts SET {assignments} WHERE id = :id", {**values, "id": existing["id"]})
-        return existing["id"]
+        update_contact(store, existing, values)
+        return existing
     values.setdefault("first_name", split_name(values["full_name"])[0])
     values.setdefault("last_name", split_name(values["full_name"])[1])
     values.setdefault("role", role_of(values.get("position")))
     values["created_at"] = iso(now)
-    columns = ", ".join(["company_key", *values])
-    marks = ", ".join(["?"] * (len(values) + 1))
-    cur = store.conn.execute(f"INSERT INTO contacts ({columns}) VALUES ({marks})", [key, *values.values()])
-    return cur.lastrowid
+    return insert_contact(store, key, values)
 
 
 def skip_list_match(name: str, config: OutreachConfig) -> bool:
@@ -286,13 +263,13 @@ def skip_list_match(name: str, config: OutreachConfig) -> bool:
 
 
 def set_job_board(store: JobStore, key: str, is_job_board: bool) -> None:
-    _update_company(store, key, is_job_board=1 if is_job_board else 0,
+    update_company(store, key, is_job_board=1 if is_job_board else 0,
                     note="Marked as a job board or agency in the app" if is_job_board else None)
 
 
 def set_domain(store: JobStore, key: str, domain: str) -> None:
     domain = registrable_domain(_host(domain.strip())) if domain.strip() else None
-    _update_company(store, key, domain=domain, domain_source="manual" if domain else None)
+    update_company(store, key, domain=domain, domain_source="manual" if domain else None)
 
 
 def save_manual_contact(store: JobStore, job_id: int, full_name: str, email: str, position: str,
@@ -308,21 +285,20 @@ def save_manual_contact(store: JobStore, job_id: int, full_name: str, email: str
         source="manual", verified=1,
     )
     tracking.ensure_application(store, job_id, now)
-    store.conn.execute("UPDATE applications SET contact_id = ?, updated_at = ? WHERE job_id = ?",
-                       (contact_id, iso(now), job_id))
-    tracking.add_event(store, job_id, "contact", f"Contact set by hand: {full_name} <{email}>", now)
+    update_application(store, job_id, {"contact_id": contact_id}, now)
+    add_event(store, job_id, "contact", f"Contact set by hand: {full_name} <{email}>", now)
     return contact_id
 
 
 def chosen_contact(store: JobStore, job: sqlite3.Row, config: OutreachConfig) -> sqlite3.Row | None:
     """The contact picked for this job (by hand or by a draft), else the best one for the company."""
-    app = tracking.get_application(store, job["id"])
+    app = get_application(store, job["id"])
     if app and app["contact_id"]:
-        row = store.conn.execute("SELECT * FROM contacts WHERE id = ?", (app["contact_id"],)).fetchone()
+        row = get_contact(store, app["contact_id"])
         if row:
             return row
     name, _ = clean_company_name(job["company"])
-    company = store.conn.execute("SELECT * FROM companies WHERE key = ?", (company_key(name),)).fetchone()
+    company = get_company(store, company_key(name))
     if not company:
         return None
     targets, _ = targets_for(company["size_range"], company["size_count"], config)
@@ -505,18 +481,13 @@ class ContactFinder:
         key, name = company["key"], company["name"]
         if company["is_job_board"] or skip_list_match(job["company"], self.config):
             if not company["is_job_board"]:
-                _update_company(store, key, is_job_board=1, note="On the skip list in config/outreach.json")
+                update_company(store, key, is_job_board=1, note="On the skip list in config/outreach.json")
                 store.commit()
             return Lookup(name, "job_board", "Job board or agency: apply through the link.")
         if company["lookup_state"] == "done" and not force:
             return Lookup(name, "reused", company["note"] or "")
         started = parse_datetime(company["lookup_started_at"])
-        stale = iso(now - timedelta(minutes=LOCK_MINUTES))
-        claimed = store.conn.execute(
-            "UPDATE companies SET lookup_state = 'running', lookup_started_at = ? WHERE key = ? "
-            "AND (lookup_state IS NULL OR lookup_state != 'running' OR lookup_started_at < ?)",
-            (iso(now), key, stale),
-        ).rowcount
+        claimed = claim_lookup(store, key, now, now - timedelta(minutes=LOCK_MINUTES))
         store.commit()  # release the write lock before any network call
         if not claimed:
             return Lookup(name, "busy", f"already being looked up (since {iso(started)})")
@@ -531,8 +502,8 @@ class ContactFinder:
         after = self.account(refresh=True) if before else None
         if before and after and before.remaining is not None and after.remaining is not None:
             result.credits = round(max(0.0, before.remaining - after.remaining), 2)
-        current = store.conn.execute("SELECT credits, cost_usd FROM companies WHERE key = ?", (key,)).fetchone()
-        _update_company(store, key, lookup_state=state, looked_up_at=iso(now), note=result.note,
+        current = get_company(store, key)
+        update_company(store, key, lookup_state=state, looked_up_at=iso(now), note=result.note,
                         credits=(current["credits"] or 0) + result.credits,
                         cost_usd=(current["cost_usd"] or 0) + result.cost_usd)
         store.commit()
@@ -544,14 +515,14 @@ class ContactFinder:
         domain = company["domain"] or domain_from_links(job["company"], [
             job["application_url"] or "", job["source_url"] or "", job["description"] or ""])
         if domain and not company["domain"]:
-            _update_company(store, key, domain=domain, domain_source="links")
+            update_company(store, key, domain=domain, domain_source="links")
         notes = []
         if not domain and self._hunter_ok():
             matches = self._hunter_call(self.hunter.domain_finder, name)
             same = [m for m in matches if company_key(m.get("company_name") or "") == key and m.get("domain")]
             if same:
                 domain = same[0]["domain"]
-                _update_company(store, key, domain=domain, domain_source="hunter")
+                update_company(store, key, domain=domain, domain_source="hunter")
             elif matches:
                 notes.append(f"Hunter suggests {matches[0].get('domain')} ({matches[0].get('company_name')}); "
                              "set the domain in the app if that is right")
@@ -565,7 +536,7 @@ class ContactFinder:
                     metrics = info.get("metrics") or {}
                     size_range, size_count = metrics.get("employees"), metrics.get("employeesCount")
                     if size_range or size_count:
-                        _update_company(store, key, size_range=size_range, size_count=size_count)
+                        update_company(store, key, size_range=size_range, size_count=size_count)
                 found_people = self._hunter_people(store, key, domain, size_range, size_count, count, now)
             else:
                 notes.append("Hunter knows no emails at this domain")
@@ -602,7 +573,7 @@ class ContactFinder:
             if not any(departments.get(d) for d in ("it", "hr", "management", "executive")):
                 return False
             data = self._hunter_call(self.hunter.domain_search, domain, "senior,executive", "it,hr,management,executive")
-        _update_company(store, key, email_pattern=data.get("pattern"), accept_all=1 if data.get("accept_all") else 0)
+        update_company(store, key, email_pattern=data.get("pattern"), accept_all=1 if data.get("accept_all") else 0)
         for email in data.get("emails") or []:
             full = " ".join(x for x in (email.get("first_name"), email.get("last_name")) if x) or email.get("value")
             sources = email.get("sources") or []
@@ -623,13 +594,13 @@ class ContactFinder:
         result.cost_usd += web.cost_usd
         if web.domain and not domain:
             domain = web.domain
-            _update_company(store, key, domain=domain, domain_source="web")
+            update_company(store, key, domain=domain, domain_source="web")
         if web.employees and not size_range:
             size_range = web.employees.replace("employees", "").strip()
-            _update_company(store, key, size_range=size_range)
+            update_company(store, key, size_range=size_range)
             targets, _ = targets_for(size_range, size_count, self.config)
         small = targets == self.config.small_company_targets
-        company = store.conn.execute("SELECT * FROM companies WHERE key = ?", (key,)).fetchone()
+        company = get_company(store, key)
         ranked = sorted(web.people, key=lambda p: (not p.verified, targets.index(role_of(p.title))
                                                    if role_of(p.title) in targets else 99))
         for n, person in enumerate(ranked):
@@ -663,13 +634,13 @@ def _linkedin(value: str | None) -> str | None:
 
 def verify_email(store: JobStore, hunter: Hunter, contact_id: int) -> str:
     """Hunter Email Verifier on click (0.5 credit). Returns the new status."""
-    contact = store.conn.execute("SELECT * FROM contacts WHERE id = ?", (contact_id,)).fetchone()
+    contact = get_contact(store, contact_id)
     if not contact or not contact["email"]:
         raise tracking.TrackingError("this contact has no email to verify")
     data = hunter.email_verifier(contact["email"])
     status = {"valid": "verified", "accept_all": "accept_all", "invalid": "invalid"}.get(data.get("status"),
                                                                                            contact["email_status"])
-    store.conn.execute("UPDATE contacts SET email_status = ? WHERE id = ?", (status, contact_id))
+    set_email_status(store, contact_id, status)
     return status
 
 
@@ -726,7 +697,7 @@ def find_contacts(store: JobStore, finder: ContactFinder, jobs: list[sqlite3.Row
             if chosen_contact(store, job, finder.config):
                 run.found_job_ids.append(job["id"])
             continue
-        company = store.conn.execute("SELECT * FROM companies WHERE key = ?", (key,)).fetchone()
+        company = get_company(store, key)
         fresh = company["lookup_state"] != "done" and not company["is_job_board"]
         if fresh and limit is not None and new_lookups >= limit:
             run.waiting += 1

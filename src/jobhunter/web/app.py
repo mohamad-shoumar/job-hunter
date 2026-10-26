@@ -37,19 +37,24 @@ from ..cv import (
     version_of,
 )
 from ..contacts import (
-    ROLE_LABELS, ContactFinder, chosen_contact, clean_company_name, company_contacts, domain_from_links, job_company,
-    rank_contacts, save_manual_contact, set_domain, set_job_board, skip_list_match, targets_for, verify_email,
+    ROLE_LABELS, ContactFinder, chosen_contact, clean_company_name, domain_from_links, job_company, rank_contacts,
+    save_manual_contact, set_domain, set_job_board, skip_list_match, targets_for, verify_email,
 )
 from ..fitgrade import grade_of
 from ..hunter import Hunter, HunterError
 from ..llm import anthropic_client, error_line, key_note
 from ..mailer import GmailInbox, MailAccount, SendError, SmtpSender, check_inbox, mail_account, outgoing, send_for_job
+from ..models import NEW, SAVED, STAGE_LABELS, STAGES
 from ..pipeline import local_day
 from ..pitch import PitchWriter, build_writer, cv_for, cv_options, draft_for_job, edit_draft, reassemble, word_count
 from ..profile import load_profile
 from ..report import salary_text
 from ..store import JobStore
-from ..text import iso, parse_datetime, utcnow
+from ..store.applications import events_for, get_application, set_application_contact, set_cv_file
+from ..store.companies import company_contacts, contact_at, forget_lookup
+from ..store.lists import JOB_VIEWS, YEARS, job_list
+from ..store.mail import company_contacted, has_mail, mail_for_job
+from ..text import parse_datetime, utcnow
 
 STATIC = Path(__file__).parent / "static"
 _MUTATING = {"POST", "PUT", "PATCH", "DELETE"}
@@ -204,58 +209,23 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
             "cv_model": config.cv_model, "cv_tailor_note": tailor_note(config),
             "cover_model": cover_model(config), "cover_note": key_note(cover_model(config), "Cover letters"),
             "sends_today": tracking.sends_today(store, now()),
-            "stages": tracking.STAGES, "stage_labels": tracking.STAGE_LABELS,
+            "stages": STAGES, "stage_labels": STAGE_LABELS,
             "closed_reasons": tracking.CLOSED_REASONS, "skip_reasons": tracking.SKIP_REASONS,
             "role_labels": ROLE_LABELS,
         }
 
     @app.get("/api/jobs")
     def jobs(view: str = "active", q: str = "", yoe: str = "", days: int = 0, store: JobStore = Depends(db)):
-        where = {
-            "active": "j.status IN ('shortlisted', 'needs_review') AND COALESCE(a.stage, 'new') != 'closed'",
-            "shortlisted": "j.status = 'shortlisted' AND COALESCE(a.stage, 'new') != 'closed'",
-            "needs_review": "j.status = 'needs_review' AND COALESCE(a.stage, 'new') != 'closed'",
-            "visa_list": "j.status = 'visa_list' AND COALESCE(a.stage, 'new') != 'closed'",
-            "tracked": "a.stage IS NOT NULL AND a.stage NOT IN ('new', 'closed')",
-            "closed": "a.stage = 'closed'",
-            "rejected": "j.status = 'rejected' AND j.report_date IS NOT NULL",
-        }.get(view)
-        if where is None:
+        if view not in JOB_VIEWS:
             raise tracking.TrackingError(f"unknown view {view!r}")
-        params: list = []
-        if q.strip():
-            where += " AND (j.title LIKE ? OR j.company LIKE ?)"
-            params += [f"%{q.strip()}%"] * 2
-        # Years asked, in brackets that don't overlap: a job that doesn't say is only in "none".
-        years = {"lt3": "j.required_yoe < 3", "3-4": "j.required_yoe >= 3 AND j.required_yoe < 4",
-                 "4-5": "j.required_yoe >= 4 AND j.required_yoe < 5", "5+": "j.required_yoe >= 5",
-                 "none": "j.required_yoe IS NULL"}
-        if yoe and yoe not in years:
+        if yoe and yoe not in YEARS:
             raise tracking.TrackingError(f"unknown years filter {yoe!r}")
-        if yoe:
-            where += f" AND {years[yoe]}"
         # Posted: the date the row shows (when the job was posted, or when it was found if the source
         # gives none), from local midnight; days=1 is today only.
         if days < 0:
             raise tracking.TrackingError(f"days must be 0 (any time) or more, not {days}")
-        if days:
-            where += " AND COALESCE(j.posted_at, j.first_seen) >= ?"
-            params.append(iso(datetime.combine(local_day(now()) - timedelta(days=days - 1), time.min).astimezone()))
-        rows = store.conn.execute(
-            f"""
-            SELECT j.*, a.stage, a.closed_reason, a.skip_reason, a.body IS NOT NULL AS has_draft, a.draft_blocked,
-                   a.next_follow_up_at, a.emailed_at, a.applied_at, a.replied_at,
-                   a.cv_tailored_json IS NOT NULL AS has_cv, a.cover_letter_json IS NOT NULL AS has_cover,
-                   {tracking.OUTREACH_COLUMNS}
-            FROM jobs j LEFT JOIN applications a ON a.job_id = j.id
-            WHERE {where}
-            ORDER BY COALESCE(j.report_date, substr(j.first_seen, 1, 10)) DESC,
-                     CASE j.status WHEN 'shortlisted' THEN 0 ELSE 1 END,
-                     COALESCE(json_extract(j.fit_grade_json, '$.grade'), 3) DESC, j.fit_score DESC, j.id DESC
-            LIMIT 500
-            """,
-            params,
-        ).fetchall()
+        since = datetime.combine(local_day(now()) - timedelta(days=days - 1), time.min).astimezone() if days else None
+        rows = job_list(store, view, q, yoe, since)
         return {"jobs": [_job_summary(store, row, config, now()) for row in rows]}
 
     @app.get("/api/jobs/{job_id}")
@@ -300,19 +270,18 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
         if "contact_id" in body:
             contact_id = int(body["contact_id"])
             company = job_company(store, store.get(job_id), t)
-            if not store.conn.execute("SELECT 1 FROM contacts WHERE id = ? AND company_key = ?",
-                                      (contact_id, company["key"])).fetchone():
+            if not contact_at(store, contact_id, company["key"]):
                 raise tracking.TrackingError("that contact is not at this company")
-            store.conn.execute("UPDATE applications SET contact_id = ? WHERE job_id = ?", (contact_id, job_id))
+            set_application_contact(store, job_id, contact_id)
             reassemble(store, job_id, me, t, config)
         if "cv_file" in body:
             choice = str(body["cv_file"] or "")
             if choice not in ("", "none", *cv_options(config)):
                 raise tracking.TrackingError(f"no CV named {choice} in {config.cv_dir}")
-            store.conn.execute("UPDATE applications SET cv_file = ? WHERE job_id = ?", (choice or None, job_id))
+            set_cv_file(store, job_id, choice or None)
             reassemble(store, job_id, me, t, config)
         if "subject" in body or "body" in body:
-            app_row = tracking.get_application(store, job_id)
+            app_row = get_application(store, job_id)
             if body.get("draft_version") is not None and int(body["draft_version"]) != app_row["draft_version"]:
                 raise tracking.TrackingError("The draft changed since this page loaded (the daily run or another "
                                              "tab). Reload before editing.")
@@ -343,7 +312,7 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
             set_job_board(store, company_row["key"], bool(body["is_job_board"]))
         if "domain" in body:
             set_domain(store, company_row["key"], str(body["domain"] or ""))
-            store.conn.execute("UPDATE companies SET lookup_state = NULL WHERE key = ?", (company_row["key"],))
+            forget_lookup(store, company_row["key"])
         store.commit()
         return _job_detail(store, store.get(job_id), config, services, profile(), now())
 
@@ -402,7 +371,7 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
         """The text behind the job's CV (versions/<name>.md), to edit, and the lines that say more than the profile."""
         row = job_or_404(store, job_id)
         company, _ = clean_company_name(row["company"])
-        source = version_of(config, company, tracking.get_application(store, job_id))
+        source = version_of(config, company, get_application(store, job_id))
         if source is None:
             return JSONResponse({"error": "This job uses the general CV: tailor one first"}, status_code=404)
         text = source.read_text()
@@ -473,8 +442,7 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
         account = services.account()
         if account is None:
             raise tracking.TrackingError("Gmail is not set up: add GMAIL_ADDRESS and GMAIL_APP_PASSWORD to .env")
-        has_mail = store.conn.execute("SELECT 1 FROM sent_mail WHERE state != 'failed' LIMIT 1").fetchone()
-        inbox = services.inbox(account) if has_mail else None
+        inbox = services.inbox(account) if has_mail(store) else None
         try:
             result = check_inbox(store, account, config, now(), inbox=inbox)
         finally:
@@ -517,7 +485,7 @@ def _job_summary(store: JobStore, row: sqlite3.Row, config: OutreachConfig, now:
         "draft_blocked": bool(row["draft_blocked"]), "emailed_at": row["emailed_at"], "applied_at": row["applied_at"],
         "has_cv": bool(row["has_cv"]), "has_cover": bool(row["has_cover"]),
         "replied_at": row["replied_at"], "next_follow_up_at": row["next_follow_up_at"],
-        "reached_out_at": tracking.reached_out_at(row) if row["stage"] not in (None, tracking.NEW, tracking.SAVED) else None,
+        "reached_out_at": tracking.reached_out_at(row) if row["stage"] not in (None, NEW, SAVED) else None,
         "to_email": tracking.needs_email(row, now, config),
         "job_board": skip_list_match(row["company"], config),
         "contact": {"name": contact["full_name"], "role": ROLE_LABELS.get(contact["role"], contact["role"]),
@@ -539,8 +507,8 @@ def _job_detail(store: JobStore, row: sqlite3.Row, config: OutreachConfig, servi
     targets, why = targets_for(company["size_range"], company["size_count"], config)
     contacts = rank_contacts(company_contacts(store, company["key"]), targets)
     chosen = chosen_contact(store, row, config)
-    app = tracking.get_application(store, row["id"])
-    sent = store.conn.execute("SELECT * FROM sent_mail WHERE job_id = ? ORDER BY id", (row["id"],)).fetchall()
+    app = get_application(store, row["id"])
+    sent = mail_for_job(store, row["id"])
     preview, preview_error = None, None
     account = services.account()
     if app and app["body"]:
@@ -550,7 +518,7 @@ def _job_detail(store: JobStore, row: sqlite3.Row, config: OutreachConfig, servi
                        "guessed": out.guessed, "words": word_count(out.body)}
         except SendError as exc:
             preview_error = str(exc)
-    earlier = tracking.company_contacted(store, company["key"], row["id"])
+    earlier = company_contacted(store, company["key"], row["id"])
     sightings = store.sightings_for([row["id"]])[row["id"]]
     return {
         "job": {
@@ -576,7 +544,7 @@ def _job_detail(store: JobStore, row: sqlite3.Row, config: OutreachConfig, servi
         "application": {**dict(app), "warnings": tracking.warnings_of(app),
                         "draft_meta": json.loads(app["draft_meta_json"]) if app["draft_meta_json"] else None}
         if app else None,
-        "events": [dict(e) for e in tracking.events_for(store, row["id"])],
+        "events": [dict(e) for e in events_for(store, row["id"])],
         "sent": [dict(s) for s in sent],
         "outgoing": preview, "outgoing_error": preview_error,
         "earlier_at_company": [dict(e) for e in earlier],

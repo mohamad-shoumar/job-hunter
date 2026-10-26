@@ -143,6 +143,9 @@ class JobStore:
     def commit(self) -> None:
         self.conn.commit()
 
+    def rollback(self) -> None:
+        self.conn.rollback()
+
     def close(self) -> None:
         self.conn.commit()
         self.conn.close()
@@ -303,6 +306,17 @@ class JobStore:
 
     def jobs_for_report(self, day: str) -> list[sqlite3.Row]:
         return self.conn.execute("SELECT * FROM jobs WHERE report_date = ? ORDER BY id", (day,)).fetchall()
+
+    def with_status(self, *statuses: str) -> list[sqlite3.Row]:
+        """Every job with one of these statuses, newest first."""
+        marks = ", ".join("?" * len(statuses))
+        return self.conn.execute(f"SELECT * FROM jobs WHERE status IN ({marks}) ORDER BY id DESC", statuses).fetchall()
+
+    def reported_shortlisted(self) -> list[sqlite3.Row]:
+        """Shortlisted jobs that are in a daily report, newest first."""
+        return self.conn.execute(
+            "SELECT * FROM jobs WHERE status = ? AND report_date IS NOT NULL ORDER BY id DESC", (SHORTLISTED,)
+        ).fetchall()
 
     def applications_for(self, job_ids) -> dict[int, sqlite3.Row]:
         """{job id: its applications row}, for the jobs that have one."""

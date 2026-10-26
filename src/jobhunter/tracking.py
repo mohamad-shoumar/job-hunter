@@ -2,10 +2,10 @@
 
 A job you act on gets one `applications` row. Its history is in `events`, and
 every email sent is in `sent_mail` (see mailer.py). None of these tables are
-touched by `reclassify`.
+touched by `reclassify`. Their queries are in store/applications.py and store/mail.py.
 
-Stages, in order: new -> saved -> reached_out -> replied -> interviewing ->
-offer, plus closed (with a reason: rejected, ghosted, skipped). "New" is a job
+Stages, in order (models.STAGES): new -> saved -> reached_out -> replied ->
+interviewing -> offer, plus closed (with a reason: rejected, ghosted, skipped). "New" is a job
 you have not acted on yet: no row, or a row that only holds a draft or a
 contact the daily run found. "Reached out" covers both applying through the posting and emailing a
 person; `applied_at` and `emailed_at` say which.
@@ -24,21 +24,18 @@ import sqlite3
 from datetime import datetime, timedelta
 
 from .config import OutreachConfig
+from .hunter import size_upper_bound
+from .models import CLOSED, NEW, REACHED_OUT, REPLIED, SAVED, SHORTLISTED, STAGE_LABELS, STAGES, VISA_LIST
 from .store import JobStore
+from .store.applications import (
+    add_event, applied_count, bounce_count, first_emails, follow_ups_due, get_application, ghost_candidates,
+    ghosted_since, insert_application, replied, stage_counts, update_application,
+)
+from .store.companies import mark_bounced
+from .store.lists import new_jobs
+from .store.mail import sends_since, sent_count_since, unsure_sends
 from .text import iso, parse_datetime
 
-NEW = "new"
-SAVED = "saved"
-REACHED_OUT = "reached_out"
-REPLIED = "replied"
-INTERVIEWING = "interviewing"
-OFFER = "offer"
-CLOSED = "closed"
-STAGES = [NEW, SAVED, REACHED_OUT, REPLIED, INTERVIEWING, OFFER, CLOSED]
-STAGE_LABELS = {
-    NEW: "New", SAVED: "Saved", REACHED_OUT: "Reached out", REPLIED: "Replied",
-    INTERVIEWING: "Interviewing", OFFER: "Offer", CLOSED: "Closed",
-}
 CLOSED_REASONS = ("rejected", "ghosted", "skipped")
 # Why you skipped a job: one tap, plus an optional note in your own words. The fit grade
 # (fitgrade.py) shows these to the model with the job, so later grades follow them.
@@ -82,43 +79,14 @@ def local_day(dt: datetime) -> str:
 # --- rows -------------------------------------------------------------------
 
 
-def get_application(store: JobStore, job_id: int) -> sqlite3.Row | None:
-    return store.conn.execute("SELECT * FROM applications WHERE job_id = ?", (job_id,)).fetchone()
-
-
-def add_event(store: JobStore, job_id: int, kind: str, detail: str, now: datetime, ref: str | None = None) -> bool:
-    """False when an event with the same (kind, ref) exists, so repeated inbox scans add nothing."""
-    try:
-        store.conn.execute(
-            "INSERT INTO events (job_id, at, kind, detail, ref) VALUES (?, ?, ?, ?, ?)",
-            (job_id, iso(now), kind, detail, ref),
-        )
-    except sqlite3.IntegrityError:
-        return False
-    return True
-
-
-def events_for(store: JobStore, job_id: int) -> list[sqlite3.Row]:
-    return store.conn.execute("SELECT * FROM events WHERE job_id = ? ORDER BY at, id", (job_id,)).fetchall()
-
-
 def ensure_application(store: JobStore, job_id: int, now: datetime) -> sqlite3.Row:
     row = get_application(store, job_id)
     if row:
         return row
     if not store.get(job_id):
         raise TrackingError(f"no job #{job_id}")
-    store.conn.execute(
-        "INSERT INTO applications (job_id, stage, created_at, updated_at) VALUES (?, ?, ?, ?)",
-        (job_id, NEW, iso(now), iso(now)),
-    )
+    insert_application(store, job_id, NEW, now)
     return get_application(store, job_id)
-
-
-def _update(store: JobStore, job_id: int, values: dict, now: datetime) -> None:
-    values = {**values, "updated_at": iso(now)}
-    assignments = ", ".join(f"{k} = :{k}" for k in values)
-    store.conn.execute(f"UPDATE applications SET {assignments} WHERE job_id = :job_id", {**values, "job_id": job_id})
 
 
 def _stage_label(stage: str, reason: str | None) -> str:
@@ -144,7 +112,8 @@ def set_stage(store: JobStore, job_id: int, stage: str, now: datetime, reason: s
         return row
     # next_follow_up_at is kept: follow-ups are only shown for jobs in "reached
     # out", so moving a job away and back restores its schedule.
-    _update(store, job_id, {"stage": stage, "closed_reason": reason, "skip_reason": why, "skip_note": note or None}, now)
+    update_application(store, job_id, {"stage": stage, "closed_reason": reason, "skip_reason": why,
+                                       "skip_note": note or None}, now)
     text = f"{_stage_label(row['stage'], row['closed_reason'])} → {_stage_label(stage, reason)}"
     said = ", ".join(x for x in (SKIP_REASONS.get(why or ""), note) if x)
     add_event(store, job_id, "stage", text + (f": {said}" if said else "") + (f": {detail}" if detail else ""), now)
@@ -153,13 +122,13 @@ def set_stage(store: JobStore, job_id: int, stage: str, now: datetime, reason: s
 
 def update_notes(store: JobStore, job_id: int, notes: str, now: datetime) -> None:
     ensure_application(store, job_id, now)
-    _update(store, job_id, {"notes": notes}, now)
+    update_application(store, job_id, {"notes": notes}, now)
 
 
 def mark_applied(store: JobStore, job_id: int, when: datetime | None, now: datetime) -> sqlite3.Row:
     """Applied through the posting. `when=None` clears it."""
     row = ensure_application(store, job_id, now)
-    _update(store, job_id, {"applied_at": iso(when) if when else None}, now)
+    update_application(store, job_id, {"applied_at": iso(when) if when else None}, now)
     if when:
         add_event(store, job_id, "applied", f"Applied through the posting ({local_day(when)})", now)
         if row["stage"] in (NEW, SAVED):
@@ -180,7 +149,7 @@ def record_sent(store: JobStore, job_id: int, seq: int, to_addr: str, now: datet
     values: dict = {"follow_ups": seq, "next_follow_up_at": iso(next_due) if not row["replied_at"] else None}
     if seq == 0:
         values["emailed_at"] = iso(now)
-    _update(store, job_id, values, now)
+    update_application(store, job_id, values, now)
     what = "Emailed" if seq == 0 else f"Follow-up {seq} sent"
     add_event(store, job_id, "emailed" if seq == 0 else "follow_up", f"{what} to {to_addr}", now)
     if row["stage"] in (NEW, SAVED, CLOSED):
@@ -193,7 +162,7 @@ def record_reply(store: JobStore, job_id: int, when: datetime, sender: str, snip
     what = "Probable reply" if probable else "Reply"
     if not add_event(store, job_id, "replied", f"{what} from {sender}: {snippet[:200]}", now, ref=ref):
         return False
-    _update(store, job_id, {
+    update_application(store, job_id, {
         "replied_at": row["replied_at"] or iso(when), "reply_from": sender, "reply_snippet": snippet[:500],
         "next_follow_up_at": None,
     }, now)
@@ -209,26 +178,16 @@ def record_auto_reply(store: JobStore, job_id: int, sender: str, subject: str, n
 def record_bounce(store: JobStore, job_id: int, address: str, detail: str, now: datetime, ref: str) -> bool:
     if not add_event(store, job_id, "bounced", f"Bounced: {address} ({detail[:150]})", now, ref=ref):
         return False
-    store.conn.execute(
-        "UPDATE contacts SET email_status = 'bounced' WHERE lower(email) = lower(?)", (address,)
-    )
+    mark_bounced(store, address)
     if get_application(store, job_id):
-        _update(store, job_id, {"next_follow_up_at": None}, now)
+        update_application(store, job_id, {"next_follow_up_at": None}, now)
     return True
 
 
 def apply_ghosting(store: JobStore, now: datetime, config: OutreachConfig) -> list[int]:
     """Close as ghosted the jobs emailed long enough ago with no reply. Returns their ids."""
     ghosted = []
-    # A job you moved back after it was ghosted once is left alone.
-    rows = store.conn.execute(
-        """
-        SELECT * FROM applications a WHERE stage = ? AND emailed_at IS NOT NULL AND replied_at IS NULL
-        AND NOT EXISTS (SELECT 1 FROM events e WHERE e.job_id = a.job_id AND e.kind = 'ghosted')
-        """,
-        (REACHED_OUT,),
-    ).fetchall()
-    for row in rows:
+    for row in ghost_candidates(store):
         if now >= ghost_date(parse_datetime(row["emailed_at"]), config):
             set_stage(store, row["job_id"], CLOSED, now, reason="ghosted",
                       detail="no reply after the first email and the follow-up schedule")
@@ -239,21 +198,10 @@ def apply_ghosting(store: JobStore, now: datetime, config: OutreachConfig) -> li
 
 # --- applied, no email yet ---------------------------------------------------------
 
-# Columns for a SELECT over `jobs j LEFT JOIN applications a`: when the job last moved to
-# Reached out (set_stage writes "Saved → Reached out"), and whether anyone at the same
-# company was emailed, for any job (one email covers two roles there).
-OUTREACH_COLUMNS = f"""
-    (SELECT MAX(e.at) FROM events e WHERE e.job_id = j.id AND e.kind = 'stage'
-     AND e.detail LIKE '%→ {STAGE_LABELS[REACHED_OUT]}%') AS moved_to_reached_out_at,
-    a.updated_at AS application_updated_at,
-    EXISTS (SELECT 1 FROM applications a2 JOIN jobs j2 ON j2.id = a2.job_id
-            WHERE a2.emailed_at IS NOT NULL AND lower(trim(j2.company)) = lower(trim(j.company))) AS company_emailed
-"""
-
 
 def reached_out_at(row) -> str | None:
     """When you reached out: the later of applying and emailing. A job you moved to Reached out
-    by hand has neither, so it is when you moved it. `row` has OUTREACH_COLUMNS."""
+    by hand has neither, so it is when you moved it. `row` has store.lists.OUTREACH_COLUMNS."""
     dates = [d for d in (row["applied_at"], row["emailed_at"]) if d]
     if dates:
         return max(dates, key=parse_datetime)
@@ -276,81 +224,28 @@ def sends_today(store: JobStore, now: datetime) -> dict:
     """Real emails sent (or being sent) on today's local date. Test sends to yourself do not count."""
     today = local_day(now)
     total = guessed = 0
-    for row in store.conn.execute(
-        "SELECT created_at, guessed FROM sent_mail WHERE kind != 'test' AND state != 'failed' AND created_at >= ?",
-        (iso(now - timedelta(days=2)),),
-    ):
+    for row in sends_since(store, now - timedelta(days=2)):
         if local_day(parse_datetime(row["created_at"])) == today:
             total += 1
             guessed += row["guessed"]
     return {"total": total, "guessed": guessed}
 
 
-def company_contacted(store: JobStore, company_key: str, job_id: int) -> list[sqlite3.Row]:
-    """Emails already sent to anyone at this company for another job."""
-    return store.conn.execute(
-        """
-        SELECT sm.*, j.title FROM sent_mail sm
-        JOIN jobs j ON j.id = sm.job_id
-        JOIN contacts c ON c.id = sm.contact_id
-        WHERE c.company_key = ? AND sm.job_id != ? AND sm.kind != 'test' AND sm.state = 'sent'
-        ORDER BY sm.created_at
-        """,
-        (company_key, job_id),
-    ).fetchall()
-
-
 # --- views --------------------------------------------------------------------
 
 
 def today(store: JobStore, now: datetime, config: OutreachConfig) -> dict:
-    replies = store.conn.execute(
-        "SELECT a.*, j.title, j.company FROM applications a JOIN jobs j ON j.id = a.job_id "
-        "WHERE a.stage = ? ORDER BY a.replied_at DESC", (REPLIED,),
-    ).fetchall()
-    due = store.conn.execute(
-        """
-        SELECT a.*, j.title, j.company, c.full_name, c.email, c.email_status FROM applications a
-        JOIN jobs j ON j.id = a.job_id LEFT JOIN contacts c ON c.id = a.contact_id
-        WHERE a.stage = ? AND a.replied_at IS NULL AND a.next_follow_up_at IS NOT NULL
-        AND a.next_follow_up_at <= ? AND COALESCE(c.email_status, '') != 'bounced'
-        ORDER BY a.next_follow_up_at
-        """,
-        (REACHED_OUT, iso(now)),
-    ).fetchall()
-    week_ago = iso(now - timedelta(days=7))
-    new_jobs = store.conn.execute(
-        """
-        SELECT j.id, j.title, j.company, j.status, j.fit_score, j.report_date,
-               json_extract(j.fit_grade_json, '$.grade') AS fit_grade FROM jobs j
-        LEFT JOIN applications a ON a.job_id = j.id
-        WHERE (a.job_id IS NULL OR a.stage = 'new') AND j.status = 'shortlisted' AND j.first_seen >= ?
-        ORDER BY COALESCE(json_extract(j.fit_grade_json, '$.grade'), 3) DESC, j.fit_score DESC, j.id DESC
-        """,
-        (week_ago,),
-    ).fetchall()
-    new_visa = store.conn.execute(
-        """
-        SELECT j.id, j.title, j.company, j.status, j.fit_score, j.report_date,
-               json_extract(j.fit_grade_json, '$.grade') AS fit_grade FROM jobs j
-        LEFT JOIN applications a ON a.job_id = j.id
-        WHERE (a.job_id IS NULL OR a.stage = 'new') AND j.status = 'visa_list' AND j.first_seen >= ?
-        ORDER BY COALESCE(json_extract(j.fit_grade_json, '$.grade'), 3) DESC, j.fit_score DESC, j.id DESC
-        """,
-        (week_ago,),
-    ).fetchall()
-    ghosted = store.conn.execute(
-        "SELECT e.job_id, e.at, j.title, j.company FROM events e JOIN jobs j ON j.id = e.job_id "
-        "WHERE e.kind = 'ghosted' AND e.at >= ? ORDER BY e.at DESC", (week_ago,),
-    ).fetchall()
-    unsure = store.conn.execute(
-        "SELECT sm.*, j.title, j.company FROM sent_mail sm JOIN jobs j ON j.id = sm.job_id "
-        "WHERE sm.state = 'sending' AND sm.created_at <= ?", (iso(now - timedelta(minutes=2)),),
-    ).fetchall()
+    replies = replied(store)
+    due = follow_ups_due(store, now)
+    week_ago = now - timedelta(days=7)
+    new_shortlisted = new_jobs(store, SHORTLISTED, week_ago)
+    new_visa = new_jobs(store, VISA_LIST, week_ago)
+    ghosted = ghosted_since(store, week_ago)
+    unsure = unsure_sends(store, now - timedelta(minutes=2))
     return {
         "replies": [dict(r) for r in replies],
         "follow_ups_due": [dict(r) for r in due],
-        "new_jobs": [dict(r) for r in new_jobs],
+        "new_jobs": [dict(r) for r in new_shortlisted],
         "new_visa_jobs": [dict(r) for r in new_visa],
         "ghosted": [dict(r) for r in ghosted],
         "unsure_sends": [dict(r) for r in unsure],
@@ -360,8 +255,6 @@ def today(store: JobStore, now: datetime, config: OutreachConfig) -> dict:
 
 
 def _size_bucket(size_range: str | None, config: OutreachConfig) -> str:
-    from .contacts import size_upper_bound  # contacts imports tracking; import here to avoid a cycle
-
     upper = size_upper_bound(size_range)
     if upper is None:
         return "unknown"
@@ -372,38 +265,28 @@ def _size_bucket(size_range: str | None, config: OutreachConfig) -> str:
 def stats(store: JobStore, now: datetime, config: OutreachConfig) -> dict:
     stages = {s: 0 for s in STAGES}
     closed: dict[str, int] = {}
-    for row in store.conn.execute("SELECT stage, closed_reason, COUNT(*) AS n FROM applications GROUP BY 1, 2"):
+    for row in stage_counts(store):
         stages[row["stage"]] += row["n"]
         if row["stage"] == CLOSED:
             closed[row["closed_reason"] or "?"] = row["n"]
     # Reply rate per contact role and company size, over jobs that got a real email.
     by_role: dict[str, dict] = {}
     by_size: dict[str, dict] = {}
-    rows = store.conn.execute(
-        """
-        SELECT a.job_id, a.replied_at, c.role, co.size_range FROM applications a
-        JOIN sent_mail sm ON sm.job_id = a.job_id AND sm.seq = 0 AND sm.kind = 'first' AND sm.state = 'sent'
-        LEFT JOIN contacts c ON c.id = sm.contact_id
-        LEFT JOIN companies co ON co.key = c.company_key
-        """
-    ).fetchall()
+    rows = first_emails(store)
     for row in rows:
         for table, key in ((by_role, row["role"] or "unknown"), (by_size, _size_bucket(row["size_range"], config))):
             entry = table.setdefault(key, {"emailed": 0, "replied": 0})
             entry["emailed"] += 1
             entry["replied"] += 1 if row["replied_at"] else 0
-    week_ago = iso(now - timedelta(days=7))
-    sent_week = store.conn.execute(
-        "SELECT COUNT(*) FROM sent_mail WHERE kind != 'test' AND state = 'sent' AND sent_at >= ?", (week_ago,)
-    ).fetchone()[0]
-    bounced = store.conn.execute("SELECT COUNT(*) FROM events WHERE kind = 'bounced'").fetchone()[0]
+    sent_week = sent_count_since(store, now - timedelta(days=7))
+    bounced = bounce_count(store)
     return {
         "stages": stages,
         "closed": closed,
         "emailed": len(rows),
         "replied": sum(1 for r in rows if r["replied_at"]),
         "bounced": bounced,
-        "applied": store.conn.execute("SELECT COUNT(*) FROM applications WHERE applied_at IS NOT NULL").fetchone()[0],
+        "applied": applied_count(store),
         "by_role": by_role,
         "by_size": by_size,
         "sent_this_week": sent_week,

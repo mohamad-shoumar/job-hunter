@@ -9,12 +9,14 @@ from jobhunter import tracking
 from jobhunter.config import OutreachConfig
 from jobhunter.contacts import save_manual_contact
 from jobhunter.llm import JsonModel
+from jobhunter.models import NEW
 from jobhunter.pitch import (
     PitchWriter, assemble, build_writer, check_draft, cv_for, draft_for_job, edit_draft, follow_up, reassemble,
     subject_for, to_html, to_plain,
 )
 from jobhunter.profile import load_profile
 from jobhunter.store import JobStore
+from jobhunter.store.applications import get_application
 
 from .conftest import FIXTURES, NOW, store_job
 
@@ -75,7 +77,7 @@ def test_the_email_is_your_template(filters):
     job_id = store_job(store, filters, company="LigaData", title="Full Stack Engineer - MENA")
     save_manual_contact(store, job_id, "Rima Haddad", "rima@ligadata.com", "HR Manager", NOW)
     assert draft_for_job(store, job_id, None, PROFILE, FIXED, NOW) == "drafted"  # no AI, no key needed
-    app = tracking.get_application(store, job_id)
+    app = get_application(store, job_id)
     assert app["subject"] == "Full Stack Engineer - Mohamad Shoumar"
     assert app["body"] == (
         "Hi Rima,\n\n"
@@ -93,13 +95,13 @@ def test_hr_and_recruiters_get_their_own_question(filters):
     job_id = store_job(store, filters, company="LigaData", title="Full Stack Engineer")
     draft_for_job(store, job_id, None, PROFILE, FIXED, NOW)
     role_question = "\n\nOnce this role is filled, what's the first thing you'd want that person to get right?\n\n"
-    assert role_question in tracking.get_application(store, job_id)["body"]  # no contact yet
+    assert role_question in get_application(store, job_id)["body"]  # no contact yet
     save_manual_contact(store, job_id, "Sam Lee", "sam@ligadata.com", "Talent Acquisition Partner", NOW)
     reassemble(store, job_id, PROFILE, NOW, FIXED)
-    assert "for this role at LigaData?" in tracking.get_application(store, job_id)["body"]
+    assert "for this role at LigaData?" in get_application(store, job_id)["body"]
     save_manual_contact(store, job_id, "Ana Ruiz", "ana@ligadata.com", "CEO", NOW)
     reassemble(store, job_id, PROFILE, NOW, FIXED)
-    assert role_question in tracking.get_application(store, job_id)["body"]
+    assert role_question in get_application(store, job_id)["body"]
 
 
 def test_the_plain_copy_spells_out_the_link():
@@ -177,9 +179,9 @@ def test_a_draft_that_stays_bad_is_blocked(filters):
     store = JobStore(":memory:")
     job_id = acme(store, filters)
     draft_for_job(store, job_id, writer(FakeClient(BAD, BAD)), PROFILE, CONFIG, NOW)
-    app = tracking.get_application(store, job_id)
+    app = get_application(store, job_id)
     assert app["draft_blocked"] == 1 and any("claims 5 years" in w for w in tracking.warnings_of(app))
-    assert app["stage"] == tracking.NEW  # a draft alone does not move the job
+    assert app["stage"] == NEW  # a draft alone does not move the job
 
 
 def test_opus_5_5_gets_low_effort_instead_of_disabled_thinking(filters):
@@ -195,21 +197,21 @@ def test_your_edits_are_kept_and_unblock_sending(filters):
     draft_for_job(store, job_id, writer(FakeClient(BAD, BAD)), PROFILE, CONFIG, NOW)
     edit_draft(store, job_id, "Backend role", "Hi,\n\nI saw you're hiring a senior backend engineer. "
                "I built RESTful APIs in Python.\n\nCould I send you my CV?\n\nMohamad Shoumar", PROFILE, NOW)
-    app = tracking.get_application(store, job_id)
+    app = get_application(store, job_id)
     assert app["draft_edited"] == 1 and app["draft_blocked"] == 0 and tracking.warnings_of(app) == []
     assert draft_for_job(store, job_id, writer(FakeClient(GOOD)), PROFILE, CONFIG, NOW) == "kept your edited draft"
     edit_draft(store, job_id, "Backend role", "Hi,\n\nAs a senior engineer I built APIs.", PROFILE, NOW)
-    assert tracking.warnings_of(tracking.get_application(store, job_id)) == ['says "senior", which is not in your profile']
+    assert tracking.warnings_of(get_application(store, job_id)) == ['says "senior", which is not in your profile']
 
 
 def test_a_new_contact_rebuilds_an_unedited_draft(filters):
     store = JobStore(":memory:")
     job_id = acme(store, filters)
     draft_for_job(store, job_id, None, PROFILE, FIXED, NOW)
-    assert tracking.get_application(store, job_id)["body"].startswith("Hi Acme team,\n\nI just applied for the Senior")
+    assert get_application(store, job_id)["body"].startswith("Hi Acme team,\n\nI just applied for the Senior")
     save_manual_contact(store, job_id, "Ana Ruiz", "ana@acme.io", "CEO", NOW)
     reassemble(store, job_id, PROFILE, NOW, FIXED)
-    assert tracking.get_application(store, job_id)["body"].startswith("Hi Ana,")
+    assert get_application(store, job_id)["body"].startswith("Hi Ana,")
 
 
 def test_deepseek_writes_drafts_through_the_same_guard(filters):

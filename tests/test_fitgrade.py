@@ -16,6 +16,7 @@ from jobhunter.fitgrade import (
     profile_summary,
     to_grade,
 )
+from jobhunter.models import CLOSED, REACHED_OUT, SAVED
 from jobhunter.report import write_report
 from jobhunter.sources import himalayas
 from jobhunter.store import JobStore
@@ -60,10 +61,10 @@ def open_jobs(store, filters, n=3) -> list[int]:
 def test_examples_are_your_applied_and_skipped_jobs_with_reasons(store, filters):
     applied, skipped, reasoned, reached = open_jobs(store, filters, 4)
     tracking.mark_applied(store, applied, NOW, NOW)
-    tracking.set_stage(store, skipped, tracking.CLOSED, NOW, reason="skipped")
-    tracking.set_stage(store, reasoned, tracking.CLOSED, NOW, reason="skipped", skip_reason="too_senior",
+    tracking.set_stage(store, skipped, CLOSED, NOW, reason="skipped")
+    tracking.set_stage(store, reasoned, CLOSED, NOW, reason="skipped", skip_reason="too_senior",
                        skip_note="wants 7 years of Go")
-    tracking.set_stage(store, reached, tracking.REACHED_OUT, NOW)  # a stage you set by hand: not a like
+    tracking.set_stage(store, reached, REACHED_OUT, NOW)  # a stage you set by hand: not a like
     examples = load_examples(store, FitGradeConfig())
     assert [line.split('"')[1] for line in examples.liked] == ["Backend Engineer 0"]
     assert examples.skipped[0].endswith("| skipped: Too senior; wants 7 years of Go")  # a reason comes first
@@ -105,8 +106,8 @@ def test_only_open_shown_ungraded_jobs_are_graded(store, filters):
     rejected = store_job(store, filters, source_job_id="r", title="Sales Manager")
     store.set_report_date([rejected], pipeline.local_day(NOW).isoformat())
     store.set_report_date([old], (pipeline.local_day(NOW) - pipeline.timedelta(days=10)).isoformat())
-    tracking.set_stage(store, saved, tracking.SAVED, NOW)
-    tracking.set_stage(store, skipped, tracking.CLOSED, NOW, reason="skipped")
+    tracking.set_stage(store, saved, SAVED, NOW)
+    tracking.set_stage(store, skipped, CLOSED, NOW, reason="skipped")
     store.save_fit_grade(graded, {"grade": 2, "reason": "x"})
     assert {r["id"] for r in to_grade(store, NOW, 7)} == {new, saved}
     assert {r["id"] for r in to_grade(store, NOW, 7, regrade=True)} == {new, saved, graded}

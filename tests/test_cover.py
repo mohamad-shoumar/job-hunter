@@ -6,7 +6,6 @@ import shutil
 import pytest
 from fastapi.testclient import TestClient
 
-from jobhunter import tracking
 from jobhunter.config import OutreachConfig, Paths
 from jobhunter.contacts import job_company, set_job_board
 from jobhunter.cover import (
@@ -14,8 +13,10 @@ from jobhunter.cover import (
     check_style, company_site, cover_for_job, load_letter_facts, research, system_prompt,
 )
 from jobhunter.llm import JsonModel
+from jobhunter.models import NEW
 from jobhunter.report import _prepared_line
 from jobhunter.store import JobStore
+from jobhunter.store.applications import events_for, get_application
 from jobhunter.web.app import create_app
 
 from .conftest import FIXTURES, NOW, ROOT, YOUR_PROFILES, FakeHttp, store_job
@@ -240,9 +241,9 @@ def test_the_letter_is_why_this_company_then_your_paragraph(tmp_path, filters):
     assert meta["file"] == path.name and meta["pages"] == ["https://acme.com"] and meta["quote_found_at"]
     text = path.read_text()
     assert text == f"{GOOD['paragraph']}\n\n{SECOND}\n"  # only the two paragraphs: no header, greeting or sign-off
-    app = tracking.get_application(store, job_id)
-    assert json.loads(app["cover_letter_json"])["text"] == text and app["stage"] == tracking.NEW
-    assert [e["detail"] for e in tracking.events_for(store, job_id)][-1] == f"Cover letter written: {path.name}"
+    app = get_application(store, job_id)
+    assert json.loads(app["cover_letter_json"])["text"] == text and app["stage"] == NEW
+    assert [e["detail"] for e in events_for(store, job_id)][-1] == f"Cover letter written: {path.name}"
 
     again = cover_for_job(store, job_id, writer(GOOD), PROFILE_FILE, config_for(tmp_path), NOW)
     assert again["file"] == meta["file"] and len(list((tmp_path / "output").glob("*.md"))) == 1
@@ -266,7 +267,7 @@ def test_an_answer_with_nothing_usable_writes_nothing(tmp_path, filters):
     with pytest.raises(CoverError, match="No cover letter written"):
         cover_for_job(store, job_id, writer({}, {}, {}), PROFILE_FILE, config_for(tmp_path), NOW)
     assert not list((tmp_path / "output").glob("*.md"))
-    assert tracking.get_application(store, job_id)["cover_letter_json"] is None
+    assert get_application(store, job_id)["cover_letter_json"] is None
 
 
 def test_a_letter_made_by_hand_is_never_overwritten(tmp_path, filters):

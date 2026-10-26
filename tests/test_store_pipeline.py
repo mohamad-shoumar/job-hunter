@@ -12,12 +12,13 @@ from jobhunter import http as http_module
 from jobhunter.ai_check import CheckRun
 from jobhunter.config import Filters, Paths
 from jobhunter.fitgrade import GradeRun
-from jobhunter.models import NEEDS_REVIEW, REJECTED, SHORTLISTED
+from jobhunter.models import CLOSED, NEEDS_REVIEW, REJECTED, SAVED, SHORTLISTED
 from jobhunter.posted_date import DateRun
 from jobhunter.report import write_report
 from jobhunter.sources import Source, SourceResult
 from jobhunter.sources import greenhouse, himalayas
 from jobhunter.store import JobStore
+from jobhunter.store.applications import get_application
 
 from .conftest import NOW, FakeHttp, fixture_json, make_job
 
@@ -299,13 +300,13 @@ def test_reclassify_leaves_tracking_alone(tmp_path, filters):
     shutil.copytree(ROOT / "config", tmp_path / "config")
     store = JobStore(tmp_path / "data" / "jobs.sqlite")
     job_id = store_job(store, filters)
-    tracking.set_stage(store, job_id, tracking.SAVED, NOW)
+    tracking.set_stage(store, job_id, SAVED, NOW)
     tracking.update_notes(store, job_id, "keep me", NOW)
     store.commit()
     store.close()
     assert cli.main(["--home", str(tmp_path), "reclassify"]) == 0
-    row = tracking.get_application(JobStore(tmp_path / "data" / "jobs.sqlite"), job_id)
-    assert (row["stage"], row["notes"]) == (tracking.SAVED, "keep me")
+    row = get_application(JobStore(tmp_path / "data" / "jobs.sqlite"), job_id)
+    assert (row["stage"], row["notes"]) == (SAVED, "keep me")
 
 
 def test_reclassify_lets_the_web_app_save_while_it_runs(tmp_path, filters, monkeypatch):
@@ -331,7 +332,7 @@ def test_reclassify_lets_the_web_app_save_while_it_runs(tmp_path, filters, monke
         if len(saved) < 2 and job.source_job_id in ("5", "120"):  # in the first batch, and after one was saved
             web = JobStore(db, migrate=False)
             web.conn.execute("PRAGMA busy_timeout = 0")  # no waiting: fails at once if a write is open
-            tracking.set_stage(web, ids[int(job.source_job_id)], tracking.CLOSED, NOW, reason="skipped")
+            tracking.set_stage(web, ids[int(job.source_job_id)], CLOSED, NOW, reason="skipped")
             web.close()
             saved.append(job.source_job_id)
         return classify(job, *args, **kwargs)
@@ -341,7 +342,7 @@ def test_reclassify_lets_the_web_app_save_while_it_runs(tmp_path, filters, monke
     assert cli.main(["--home", str(tmp_path), "reclassify"]) == 0
     assert saved == ["5", "120"]
     store = JobStore(db)
-    assert tracking.get_application(store, ids[120])["closed_reason"] == "skipped"
+    assert get_application(store, ids[120])["closed_reason"] == "skipped"
     assert store.conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0] == 150
 
 
