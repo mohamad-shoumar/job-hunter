@@ -493,8 +493,10 @@ def check_jobs(store: JobStore, checker: AiChecker, rows, filters: Filters, now:
             try:
                 check = future.result()
             except Exception as exc:
+                if stopped and _fatal(exc):
+                    continue  # the same error again, from a job that started before the stop
                 run.errors.append(f"#{row['id']} {row['company']}: {error_line(exc)}")
-                if _fatal(exc) and not stopped:
+                if _fatal(exc):
                     stopped = True
                     run.notes.append("stopped early: the same error would hit every job")
                     for other in futures:
