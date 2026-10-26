@@ -52,29 +52,6 @@ _BOARD_LINKS = [
     (re.compile(r"jobs\.ashbyhq\.com/([^/?#\s]+)/[0-9a-f]{8}-", re.I), "ashby"),
 ]
 
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS watched_boards (
-    kind TEXT NOT NULL,
-    slug TEXT NOT NULL,
-    company TEXT NOT NULL,
-    company_key TEXT NOT NULL,
-    from_job_id INTEGER,
-    reason TEXT NOT NULL,
-    added_at TEXT NOT NULL,
-    removed_at TEXT,
-    PRIMARY KEY (kind, slug)
-);
-CREATE INDEX IF NOT EXISTS watched_boards_company ON watched_boards (company_key);
-
--- Companies whose board was guessed and not found, so they are not tried every day.
-CREATE TABLE IF NOT EXISTS board_probes (
-    company_key TEXT PRIMARY KEY,
-    probed_at TEXT NOT NULL,
-    note TEXT
-);
-"""
-
-
 @dataclass
 class WatchConfig:
     """The "watch_boards" section of config/sources.json."""
@@ -115,10 +92,6 @@ class WatchRun:
 
     def to_dict(self) -> dict:
         return asdict(self)
-
-
-def ensure_schema(store: JobStore) -> None:
-    store.conn.executescript(SCHEMA)
 
 
 def board_from_links(urls) -> tuple[str, str, str] | None:
@@ -195,7 +168,6 @@ def configured_boards(sources_config: dict) -> set[str]:
 
 
 def watched(store: JobStore, include_removed: bool = False) -> list:
-    ensure_schema(store)
     where = "" if include_removed else " WHERE removed_at IS NULL"
     return store.conn.execute(f"SELECT * FROM watched_boards{where} ORDER BY added_at, kind, slug").fetchall()
 
@@ -228,7 +200,6 @@ def watch_shortlisted(store: JobStore, http, sources_config: dict, filters: Filt
     """Look for the board of each shortlisted job's company that has none yet (newest jobs first)."""
     config = config or WatchConfig.from_sources(sources_config)
     run = WatchRun()
-    ensure_schema(store)
     configured = configured_boards(sources_config)
     known = {r["company_key"] for r in watched(store, include_removed=True)}
     known_boards = {f"{r['kind']}:{r['slug'].lower()}" for r in watched(store, include_removed=True)}
@@ -282,7 +253,6 @@ def watch_shortlisted(store: JobStore, http, sources_config: dict, filters: Filt
 
 def remove(store: JobStore, name: str, now: datetime) -> bool:
     """Stop watching 'kind:slug'. The row stays (removed), so the board is never added again."""
-    ensure_schema(store)
     kind, _, slug = name.partition(":")
     cur = store.conn.execute(
         "UPDATE watched_boards SET removed_at = ? WHERE kind = ? AND lower(slug) = lower(?) AND removed_at IS NULL",

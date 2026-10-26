@@ -101,7 +101,6 @@ def test_a_board_already_in_the_config_or_removed_by_you_is_not_added(filters):
 
 def test_watched_boards_join_the_sources_and_skip_duplicates(filters):
     store = JobStore(":memory:")
-    boards.ensure_schema(store)
     for kind, slug, company in [("ashby", "dualentry", "DualEntry"), ("greenhouse", "fingerprint", "Fingerprint"),
                                 ("ashby", "percona", "Percona")]:
         store.conn.execute("INSERT INTO watched_boards (kind, slug, company, company_key, reason, added_at) "

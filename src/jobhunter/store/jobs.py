@@ -1,10 +1,11 @@
-"""SQLite persistence. The database is the system's memory; reports are output.
+"""JobStore: the connection, and the jobs, sightings, runs and kv tables.
 
 Tables:
   jobs       one row per real-world job (after cross-source dedup), including
              rejected ones, so a rejected job never comes back as "new"
   sightings  every (source, source_job_id) that pointed at a job
   runs       one row per pipeline run, with per-source stats
+  kv         small values a step keeps between runs (the inbox scan's last message)
 
 A job is classified once, when it is first seen. Later sightings only update
 last_seen and fill in fields that were empty. `jobhunter reclassify` re-runs
@@ -31,197 +32,10 @@ from dataclasses import asdict
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from .identity import ats_key_from_url, fingerprint
-from .models import AiCheck, Classification, DateCheck, Job
-from .text import iso, parse_datetime
-
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS runs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    started_at TEXT NOT NULL,
-    finished_at TEXT,
-    stats_json TEXT
-);
-
-CREATE TABLE IF NOT EXISTS jobs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    fingerprint TEXT NOT NULL,
-    ats_key TEXT,
-    company TEXT NOT NULL,
-    title TEXT NOT NULL,
-    description TEXT NOT NULL DEFAULT '',
-    source TEXT NOT NULL,
-    source_url TEXT,
-    application_url TEXT,
-    company_location TEXT,
-    location_raw TEXT,
-    allowed_locations_json TEXT NOT NULL DEFAULT '[]',
-    allowed_utc_offsets_json TEXT NOT NULL DEFAULT '[]',
-    remote_status TEXT NOT NULL,
-    employment_type TEXT,
-    contract_info_json TEXT NOT NULL DEFAULT '[]',
-    salary_min REAL,
-    salary_max REAL,
-    salary_currency TEXT,
-    salary_period TEXT,
-    salary_raw TEXT,
-    required_yoe INTEGER,
-    skills_json TEXT NOT NULL DEFAULT '[]',
-    posted_at TEXT,
-    first_seen TEXT NOT NULL,
-    last_seen TEXT NOT NULL,
-    first_seen_run_id INTEGER REFERENCES runs(id),
-    status TEXT NOT NULL,
-    eligibility TEXT NOT NULL,
-    eligibility_reasons_json TEXT NOT NULL DEFAULT '[]',
-    relevance TEXT NOT NULL,
-    relevance_reasons_json TEXT NOT NULL DEFAULT '[]',
-    fit_score INTEGER NOT NULL DEFAULT 0,
-    reject_reason TEXT,
-    reject_code TEXT,
-    reported_at TEXT,
-    report_date TEXT,
-    ai_check_json TEXT
-);
-CREATE INDEX IF NOT EXISTS jobs_fingerprint ON jobs (fingerprint);
-CREATE UNIQUE INDEX IF NOT EXISTS jobs_ats_key ON jobs (ats_key) WHERE ats_key IS NOT NULL;
-CREATE INDEX IF NOT EXISTS jobs_unreported ON jobs (status) WHERE reported_at IS NULL;
-
-CREATE TABLE IF NOT EXISTS sightings (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    job_id INTEGER NOT NULL REFERENCES jobs(id),
-    source TEXT NOT NULL,
-    source_job_id TEXT NOT NULL,
-    source_url TEXT,
-    location_raw TEXT,
-    first_seen TEXT NOT NULL,
-    last_seen TEXT NOT NULL,
-    UNIQUE (source, source_job_id)
-);
-CREATE INDEX IF NOT EXISTS sightings_job ON sightings (job_id);
-""" + """
--- Outreach and tracking (contacts.py, pitch.py, mailer.py, tracking.py).
--- Separate from `jobs`, so `reclassify` never touches them.
-
-CREATE TABLE IF NOT EXISTS companies (
-    key TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    domain TEXT,
-    domain_source TEXT,
-    size_range TEXT,
-    size_count INTEGER,
-    is_job_board INTEGER NOT NULL DEFAULT 0,
-    email_pattern TEXT,
-    accept_all INTEGER,
-    lookup_state TEXT,
-    lookup_started_at TEXT,
-    looked_up_at TEXT,
-    note TEXT,
-    credits REAL NOT NULL DEFAULT 0,
-    cost_usd REAL NOT NULL DEFAULT 0
-);
-
-CREATE TABLE IF NOT EXISTS contacts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    company_key TEXT NOT NULL REFERENCES companies(key),
-    full_name TEXT NOT NULL,
-    first_name TEXT,
-    last_name TEXT,
-    position TEXT,
-    role TEXT NOT NULL,
-    email TEXT,
-    email_status TEXT,
-    confidence INTEGER,
-    linkedin_url TEXT,
-    source TEXT NOT NULL,
-    evidence_url TEXT,
-    evidence_quote TEXT,
-    verified INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS contacts_company ON contacts (company_key);
-
-CREATE TABLE IF NOT EXISTS applications (
-    job_id INTEGER PRIMARY KEY REFERENCES jobs(id),
-    stage TEXT NOT NULL,
-    closed_reason TEXT,
-    contact_id INTEGER REFERENCES contacts(id),
-    subject TEXT,
-    hook TEXT,
-    pitch TEXT,
-    body TEXT,
-    draft_version INTEGER NOT NULL DEFAULT 0,
-    draft_edited INTEGER NOT NULL DEFAULT 0,
-    draft_blocked INTEGER NOT NULL DEFAULT 0,
-    draft_warnings_json TEXT NOT NULL DEFAULT '[]',
-    draft_meta_json TEXT,
-    applied_at TEXT,
-    emailed_at TEXT,
-    follow_ups INTEGER NOT NULL DEFAULT 0,
-    next_follow_up_at TEXT,
-    replied_at TEXT,
-    reply_from TEXT,
-    reply_snippet TEXT,
-    notes TEXT NOT NULL DEFAULT '',
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    cv_file TEXT,
-    cv_tailored_json TEXT,
-    cover_letter_json TEXT
-);
-
-CREATE TABLE IF NOT EXISTS events (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    job_id INTEGER NOT NULL REFERENCES jobs(id),
-    at TEXT NOT NULL,
-    kind TEXT NOT NULL,
-    detail TEXT NOT NULL DEFAULT '',
-    ref TEXT
-);
-CREATE INDEX IF NOT EXISTS events_job ON events (job_id);
-CREATE UNIQUE INDEX IF NOT EXISTS events_ref ON events (kind, ref) WHERE ref IS NOT NULL;
-
--- Every email sent. seq 0 is the first email, 1 and 2 the follow-ups. The
--- unique index is the check-and-set that stops a double send: a second
--- 'sending' row for the same step cannot be inserted.
-CREATE TABLE IF NOT EXISTS sent_mail (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    job_id INTEGER REFERENCES jobs(id),
-    contact_id INTEGER REFERENCES contacts(id),
-    kind TEXT NOT NULL,
-    seq INTEGER NOT NULL DEFAULT 0,
-    message_id TEXT NOT NULL UNIQUE,
-    in_reply_to TEXT,
-    to_addr TEXT NOT NULL,
-    subject TEXT NOT NULL,
-    body TEXT NOT NULL,
-    guessed INTEGER NOT NULL DEFAULT 0,
-    state TEXT NOT NULL,
-    error TEXT,
-    thread_id TEXT,
-    created_at TEXT NOT NULL,
-    sent_at TEXT
-);
-CREATE UNIQUE INDEX IF NOT EXISTS sent_mail_once ON sent_mail (job_id, seq)
-    WHERE kind != 'test' AND state != 'failed';
-
--- Inbox messages already handled, so two scans never count one twice.
-CREATE TABLE IF NOT EXISTS mail_seen (
-    message_key TEXT PRIMARY KEY,
-    job_id INTEGER,
-    kind TEXT NOT NULL,
-    seen_at TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS kv (
-    key TEXT PRIMARY KEY,
-    value TEXT
-);
-"""
-
-# Columns added after the first release, for databases created before them.
-_ADDED_COLUMNS = {"report_date": "TEXT", "ai_check_json": "TEXT", "fit_grade_json": "TEXT", "date_check_json": "TEXT"}
-_ADDED_APPLICATION_COLUMNS = ("cv_file", "cv_tailored_json", "cover_letter_json", "skip_reason", "skip_note")
+from ..identity import ats_key_from_url, fingerprint
+from ..models import NEEDS_REVIEW, SHORTLISTED, UNCLEAR, VISA_LIST, AiCheck, Classification, DateCheck, Job
+from ..text import iso, parse_datetime
+from .schema import migrate as migrate_schema
 
 # Filled from a later sighting only when the stored value is empty.
 _FILL_IF_EMPTY = (
@@ -324,17 +138,7 @@ class JobStore:
             return
         if on_disk:
             self.conn.execute("PRAGMA journal_mode = WAL")
-        self.conn.executescript(SCHEMA)
-        existing = {row["name"] for row in self.conn.execute("PRAGMA table_info(jobs)")}
-        for column, kind in _ADDED_COLUMNS.items():
-            if column not in existing:
-                self.conn.execute(f"ALTER TABLE jobs ADD COLUMN {column} {kind}")
-        app_columns = {row["name"] for row in self.conn.execute("PRAGMA table_info(applications)")}
-        for column in _ADDED_APPLICATION_COLUMNS:
-            if column not in app_columns:
-                self.conn.execute(f"ALTER TABLE applications ADD COLUMN {column} TEXT")
-        self.conn.execute("CREATE INDEX IF NOT EXISTS jobs_report_date ON jobs (report_date)")
-        self.conn.commit()
+        migrate_schema(self.conn)
 
     def commit(self) -> None:
         self.conn.commit()
@@ -471,8 +275,8 @@ class JobStore:
         """Undated jobs waiting for review, newest first. `recheck` includes ones searched before without luck."""
         unchecked = "" if recheck else " AND date_check_json IS NULL"
         return self.conn.execute(
-            f"SELECT * FROM jobs WHERE status = 'needs_review' AND posted_at IS NULL{unchecked} "
-            "ORDER BY first_seen DESC, id DESC"
+            f"SELECT * FROM jobs WHERE status = ? AND posted_at IS NULL{unchecked} "
+            "ORDER BY first_seen DESC, id DESC", (NEEDS_REVIEW,)
         ).fetchall()
 
     def needs_ai_check(self, recheck: bool = False) -> list[sqlite3.Row]:
@@ -480,14 +284,14 @@ class JobStore:
         first. `recheck` includes ones already checked."""
         unchecked = "" if recheck else " AND ai_check_json IS NULL"
         return self.conn.execute(
-            f"SELECT * FROM jobs WHERE status = 'needs_review' AND eligibility = 'unclear'{unchecked} "
-            "ORDER BY COALESCE(posted_at, first_seen) DESC, id DESC"
+            f"SELECT * FROM jobs WHERE status = ? AND eligibility = ?{unchecked} "
+            "ORDER BY COALESCE(posted_at, first_seen) DESC, id DESC", (NEEDS_REVIEW, UNCLEAR)
         ).fetchall()
 
     def unreported(self) -> list[sqlite3.Row]:
         return self.conn.execute(
-            "SELECT * FROM jobs WHERE reported_at IS NULL AND status IN ('shortlisted', 'needs_review', 'visa_list') "
-            "ORDER BY id"
+            "SELECT * FROM jobs WHERE reported_at IS NULL AND status IN (?, ?, ?) ORDER BY id",
+            (SHORTLISTED, NEEDS_REVIEW, VISA_LIST),
         ).fetchall()
 
     def mark_reported(self, job_ids: list[int], now: datetime) -> None:

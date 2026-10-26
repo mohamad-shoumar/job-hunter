@@ -1,7 +1,7 @@
 """reports/<YYYY-MM-DD>.md, one file per day. Output only - the database is the memory.
 
 A day's file is rendered from every job whose report_date is that day (see
-store.py), so it can be rebuilt at any time and a second run on the same day
+store/jobs.py), so it can be rebuilt at any time and a second run on the same day
 simply adds to it.
 """
 

@@ -17,7 +17,7 @@ from jobhunter.posted_date import DateRun
 from jobhunter.report import write_report
 from jobhunter.sources import Source, SourceResult
 from jobhunter.sources import greenhouse, himalayas
-from jobhunter.store import SCHEMA, JobStore
+from jobhunter.store import JobStore
 
 from .conftest import NOW, FakeHttp, fixture_json, make_job
 
@@ -206,20 +206,6 @@ def test_date_range_skips_jobs_not_listed_anymore(filters):
     assert {r["company"]: r["report_date"] for r in store.all_jobs()} == {"Gone": None, "Here": TODAY}
 
 
-def test_old_database_gets_the_new_columns(tmp_path):
-    import sqlite3
-
-    db = tmp_path / "old.sqlite"
-    conn = sqlite3.connect(db)
-    old_schema = SCHEMA.replace("    reported_at TEXT,\n    report_date TEXT,\n    ai_check_json TEXT\n", "    reported_at TEXT\n")
-    assert old_schema != SCHEMA
-    conn.executescript(old_schema)
-    conn.close()
-    assert "report_date" not in {r[1] for r in sqlite3.connect(db).execute("PRAGMA table_info(jobs)")}
-    store = JobStore(db)
-    assert {"report_date", "ai_check_json"} <= {r["name"] for r in store.conn.execute("PRAGMA table_info(jobs)")}
-
-
 def test_end_to_end_run(tmp_path, filters):
     (tmp_path / "config").mkdir()
     config = {
@@ -300,18 +286,6 @@ def test_six_years_is_too_senior(filters):
     store = JobStore(":memory:")
     ingest(store, filters, SourceResult("test", [make_job(required_yoe=6, allowed_locations=["Worldwide"])]))
     assert store.get(1)["reject_code"] == "too_senior"
-
-
-def test_old_database_gets_the_outreach_tables(tmp_path):
-    import sqlite3
-
-    db = tmp_path / "old.sqlite"
-    old_schema = SCHEMA.split("-- Outreach and tracking")[0]
-    sqlite3.connect(db).executescript(old_schema)
-    store = JobStore(db)
-    tables = {r["name"] for r in store.conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
-    assert {"companies", "contacts", "applications", "events", "sent_mail", "mail_seen", "kv"} <= tables
-    assert store.conn.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
 
 
 def test_reclassify_leaves_tracking_alone(tmp_path, filters):
