@@ -12,7 +12,14 @@ Locked to you:
     when the Chrome extension applies for you. Nothing there changes anything.
 
 Each request opens its own SQLite connection; the schema is migrated once at
-startup. Emails are sent only by POST /api/jobs/{id}/send, i.e. by your click.
+startup. A GET never writes, so it holds no write lock while the daily run
+writes. Emails are sent only by POST /api/jobs/{id}/send, i.e. by your click.
+
+Every error is {"error": "..."} (plus "confirm" from Send), with the status
+its kind carries (errors.py): 400 for a request that makes no sense, or a
+value of the wrong type (the request bodies below name the field), 404 for
+no such job, 409 when the job changed since the page loaded, 502 when the
+model, build.py, Hunter or Gmail failed.
 """
 
 from __future__ import annotations
@@ -25,16 +32,17 @@ from datetime import datetime, time, timedelta
 from pathlib import Path
 from typing import Callable
 
-from fastapi import Body, Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, ConfigDict
 
 from .. import tracking
 from ..config import OutreachConfig, Paths
 from ..cover import build_cover_writer, cover_for_job, cover_model, cover_of, letter_text
 from ..cv import (
-    TailorError, build_cv_writer, build_pdf, check_version, save_version, tailor_for_job, tailor_note, tailored_of,
-    version_of,
+    build_cv_writer, build_pdf, check_version, save_version, tailor_for_job, tailor_note, tailored_of, version_of,
 )
 from ..contacts import (
     ROLE_LABELS, ContactFinder, chosen_contact, chosen_contacts, clean_company_name, company_ref, domain_from_links,
@@ -62,6 +70,73 @@ STATIC = Path(__file__).parent / "static"
 _MUTATING = {"POST", "PUT", "PATCH", "DELETE"}
 # Only CV PDFs are open to other sites (see the top of this file).
 _CV_CORS = {"Access-Control-Allow-Origin": "*", "Access-Control-Allow-Private-Network": "true"}
+
+
+# --- request bodies: FastAPI checks each value's type, and a wrong one is a 400 naming the field ---------
+
+
+class _Body(BaseModel):
+    model_config = ConfigDict(extra="ignore")  # keys a route does not use are left alone
+
+
+class StageChange(_Body):
+    stage: str
+    reason: str | None = None  # closed: rejected, ghosted or skipped
+    skip_reason: str | None = None
+    skip_note: str | None = None
+
+
+class ApplicationChange(_Body):
+    """Only the keys sent are changed (model_fields_set)."""
+    notes: str | None = None
+    applied: bool | None = None
+    applied_at: str | None = None  # with applied: when (default now)
+    contact_id: int | None = None
+    cv_file: str | None = None
+    subject: str | None = None
+    body: str | None = None
+    draft_version: int | None = None  # the version the page showed, so an edit never overwrites a newer draft
+
+
+class ManualContact(_Body):
+    full_name: str | None = None
+    email: str | None = None
+    position: str | None = None
+
+
+class CompanyChange(_Body):
+    """Only the keys sent are changed (model_fields_set)."""
+    is_job_board: bool | None = None
+    domain: str | None = None
+
+
+class ContactLookup(_Body):
+    use_claude: bool = True
+    force: bool = False
+
+
+class TailorRequest(_Body):
+    replace_edits: bool = False
+
+
+class CvText(_Body):
+    text: str
+
+
+class SendRequest(_Body):
+    draft_version: int = -1  # the version the page showed, and the step (seq): a double click sends nothing
+    seq: int | None = None
+    test: bool = False
+    confirm: list[str] | None = None  # what you said yes to: guessed, same_company, early
+
+
+def _validation_message(exc: RequestValidationError) -> str:
+    """'contact_id: Input should be a valid integer...': the first problem, by field."""
+    error = exc.errors()[0]
+    if error.get("type") == "json_invalid":
+        return "The request body is not valid JSON"
+    field = ".".join(str(part) for part in error.get("loc", ())[1:]) or "body"
+    return f"{field}: {error.get('msg', 'not valid')}"
 
 
 class Services:
@@ -150,6 +225,11 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
     @app.exception_handler(AppError)
     async def app_error(request: Request, exc: AppError):
         return JSONResponse(exc.to_dict(), status_code=exc.http_status)
+
+    @app.exception_handler(RequestValidationError)
+    async def bad_value(request: Request, exc: RequestValidationError):
+        # FastAPI's own answer is a 422 listing every problem as objects; the page shows one line.
+        return JSONResponse({"error": _validation_message(exc)}, status_code=400)
 
     def db():
         store = JobStore(paths.db_file, migrate=False, check_same_thread=False)
@@ -242,92 +322,87 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
     # --- changing --------------------------------------------------------------
 
     @app.post("/api/jobs/{job_id}/stage")
-    def stage(job_id: int, body: dict | None = Body(default=None), store: JobStore = Depends(db)):
-        body = body or {}
+    def stage(job_id: int, body: StageChange, store: JobStore = Depends(db)):
         job_or_404(store, job_id)
-        tracking.set_stage(store, job_id, body.get("stage"), now(), reason=body.get("reason"),
-                           skip_reason=body.get("skip_reason") or None, skip_note=str(body.get("skip_note") or ""))
+        tracking.set_stage(store, job_id, body.stage, now(), reason=body.reason, skip_reason=body.skip_reason or None,
+                           skip_note=body.skip_note or "")
         store.commit()
         return _job_detail(store, store.get(job_id), config, services, profile(), now())
 
     @app.patch("/api/jobs/{job_id}/application")
-    def application(job_id: int, body: dict | None = Body(default=None), store: JobStore = Depends(db)):
-        body = body or {}
+    def application(job_id: int, change: ApplicationChange = ApplicationChange(), store: JobStore = Depends(db)):
         job_or_404(store, job_id)
+        sent = change.model_fields_set
         t = now()
         me = profile()
+        when = parse_datetime(change.applied_at) if change.applied_at else t
+        if when is None:
+            raise BadRequest(f"applied_at: not a date: {change.applied_at}")
         tracking.ensure_application(store, job_id, t)
-        if "notes" in body:
-            tracking.update_notes(store, job_id, str(body["notes"] or ""), t)
-        if "applied" in body:
-            when = parse_datetime(body.get("applied_at")) if body.get("applied_at") else t
-            tracking.mark_applied(store, job_id, when if body["applied"] else None, t)
+        if "notes" in sent:
+            tracking.update_notes(store, job_id, change.notes or "", t)
+        if "applied" in sent:
+            tracking.mark_applied(store, job_id, when if change.applied else None, t)
             reassemble(store, job_id, me, t, config)
-        if "contact_id" in body:
-            contact_id = int(body["contact_id"])
+        if "contact_id" in sent:
             _, key = company_ref(store.get(job_id)["company"])
-            if not contact_at(store, contact_id, key):
+            if change.contact_id is None or not contact_at(store, change.contact_id, key):
                 raise BadRequest("that contact is not at this company")
-            set_application_contact(store, job_id, contact_id)
+            set_application_contact(store, job_id, change.contact_id)
             reassemble(store, job_id, me, t, config)
-        if "cv_file" in body:
-            choice = str(body["cv_file"] or "")
+        if "cv_file" in sent:
+            choice = change.cv_file or ""
             if choice not in ("", "none", *cv_options(config)):
                 raise BadRequest(f"no CV named {choice} in {config.cv_dir}")
             set_cv_file(store, job_id, choice or None)
             reassemble(store, job_id, me, t, config)
-        if "subject" in body or "body" in body:
+        if "subject" in sent or "body" in sent:
             app_row = get_application(store, job_id)
-            if body.get("draft_version") is not None and int(body["draft_version"]) != app_row["draft_version"]:
+            if change.draft_version is not None and change.draft_version != app_row["draft_version"]:
                 raise Conflict("The draft changed since this page loaded (the daily run or another tab). "
                                "Reload before editing.")
-            edit_draft(store, job_id, str(body.get("subject", app_row["subject"] or "")),
-                       str(body.get("body", app_row["body"] or "")), me, t)
+            edit_draft(store, job_id, change.subject if change.subject is not None else app_row["subject"] or "",
+                       change.body if change.body is not None else app_row["body"] or "", me, t)
         store.commit()
         return _job_detail(store, store.get(job_id), config, services, me, t)
 
     @app.put("/api/jobs/{job_id}/contact")
-    def manual_contact(job_id: int, body: dict | None = Body(default=None), store: JobStore = Depends(db)):
-        body = body or {}
+    def manual_contact(job_id: int, body: ManualContact = ManualContact(), store: JobStore = Depends(db)):
         job_or_404(store, job_id)
         t = now()
-        if not (body.get("full_name") or "").strip() and not (body.get("email") or "").strip():
+        if not (body.full_name or "").strip() and not (body.email or "").strip():
             raise BadRequest("give a name or an email")
-        save_manual_contact(store, job_id, str(body.get("full_name") or ""), str(body.get("email") or ""),
-                            str(body.get("position") or ""), t)
+        save_manual_contact(store, job_id, body.full_name or "", body.email or "", body.position or "", t)
         reassemble(store, job_id, profile(), t, config)
         store.commit()
         return _job_detail(store, store.get(job_id), config, services, profile(), t)
 
     @app.post("/api/jobs/{job_id}/company")
-    def company(job_id: int, body: dict | None = Body(default=None), store: JobStore = Depends(db)):
-        body = body or {}
+    def company(job_id: int, change: CompanyChange = CompanyChange(), store: JobStore = Depends(db)):
         row = job_or_404(store, job_id)
         company_row = ensure_company(store, row)
-        if "is_job_board" in body:
-            set_job_board(store, company_row["key"], bool(body["is_job_board"]))
-        if "domain" in body:
-            set_domain(store, company_row["key"], str(body["domain"] or ""))
+        if "is_job_board" in change.model_fields_set:
+            set_job_board(store, company_row["key"], bool(change.is_job_board))
+        if "domain" in change.model_fields_set:
+            set_domain(store, company_row["key"], change.domain or "")
             forget_lookup(store, company_row["key"])
         store.commit()
         return _job_detail(store, store.get(job_id), config, services, profile(), now())
 
     @app.post("/api/jobs/{job_id}/find-contact")
-    def find_contact(job_id: int, body: dict | None = Body(default=None), store: JobStore = Depends(db)):
-        body = body or {}
+    def find_contact(job_id: int, body: ContactLookup = ContactLookup(), store: JobStore = Depends(db)):
         row = job_or_404(store, job_id)
         finder, note = services.finder()
         if finder is None:
             raise BadRequest(note or "no lookup service configured")
-        result = finder.lookup(store, row, now(), use_claude=bool(body.get("use_claude", True)),
-                               force=bool(body.get("force")))
+        result = finder.lookup(store, row, now(), use_claude=body.use_claude, force=body.force)
         store.commit()
         detail = _job_detail(store, store.get(job_id), config, services, profile(), now())
         detail["lookup"] = result.__dict__
         return detail
 
     @app.post("/api/contacts/{contact_id}/verify")
-    def verify(contact_id: int, body: dict | None = Body(default=None), store: JobStore = Depends(db)):
+    def verify(contact_id: int, store: JobStore = Depends(db)):
         finder, note = services.finder()
         if finder is None or finder.hunter is None:
             raise BadRequest("verifying needs HUNTER_API_KEY")
@@ -336,7 +411,7 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
         return {"email_status": status}
 
     @app.post("/api/jobs/{job_id}/draft")
-    def draft(job_id: int, body: dict | None = Body(default=None), store: JobStore = Depends(db)):
+    def draft(job_id: int, store: JobStore = Depends(db)):
         job_or_404(store, job_id)
         writer, note = (None, None) if config.pitch_mode != "ai" else services.writer()
         if config.pitch_mode == "ai" and writer is None:
@@ -351,14 +426,14 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
         return _job_detail(store, store.get(job_id), config, services, profile(), now())
 
     @app.post("/api/jobs/{job_id}/tailor")
-    def tailor(job_id: int, body: dict | None = Body(default=None), store: JobStore = Depends(db)):
+    def tailor(job_id: int, body: TailorRequest = TailorRequest(), store: JobStore = Depends(db)):
         job_or_404(store, job_id)
         writer, note = services.cv_writer()
         if writer is None:
             raise BadRequest(note or "tailoring is off")
         try:
             result = tailor_for_job(store, job_id, writer, paths.profile_file, config, now(), builder=services.build_pdf,
-                                    replace_edits=bool((body or {}).get("replace_edits")))
+                                    replace_edits=body.replace_edits)
         except AppError:
             raise
         except Exception as exc:  # the model failed: say so on the page (build.py's own failures are a BuildError)
@@ -381,14 +456,12 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
                 "checks": check_version(text, paths.profile_file)}
 
     @app.put("/api/jobs/{job_id}/cv-text")
-    def save_cv_text(job_id: int, body: dict | None = Body(default=None), store: JobStore = Depends(db)):
+    def save_cv_text(job_id: int, body: CvText, store: JobStore = Depends(db)):
         """Save your edit and rebuild the PDF with build.py. No model: what you save is what prints."""
         job_or_404(store, job_id)
-        text = (body or {}).get("text")
-        if not isinstance(text, str):
-            raise TailorError("send the CV text as {\"text\": ...}")
         try:
-            result = save_version(store, job_id, config, paths.profile_file, now(), text, builder=services.build_pdf)
+            result = save_version(store, job_id, config, paths.profile_file, now(), body.text,
+                                  builder=services.build_pdf)
         except AppError:
             raise
         except Exception as exc:  # build.py could not run: say so on the page
@@ -398,7 +471,7 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
         return detail
 
     @app.post("/api/jobs/{job_id}/cover")
-    def cover(job_id: int, body: dict | None = Body(default=None), store: JobStore = Depends(db)):
+    def cover(job_id: int, store: JobStore = Depends(db)):
         job_or_404(store, job_id)
         writer, note = services.cover_writer()
         if writer is None:
@@ -422,8 +495,7 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
                             headers={"Cache-Control": "no-store"})
 
     @app.post("/api/jobs/{job_id}/send")
-    def send(job_id: int, body: dict | None = Body(default=None), store: JobStore = Depends(db)):
-        body = body or {}
+    def send(job_id: int, body: SendRequest = SendRequest(), store: JobStore = Depends(db)):
         job_or_404(store, job_id)
         account = services.account()
         if account is None:
@@ -431,15 +503,14 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
         me = profile()
         account = MailAccount(account.address, account.password, me.name)
         result = send_for_job(store, job_id, services.sender(account), account, me, config, now(),
-                              draft_version=int(body.get("draft_version", -1)), test=bool(body.get("test")),
-                              confirm=set(body.get("confirm") or []),
-                              seq=int(body["seq"]) if body.get("seq") is not None else None)
+                              draft_version=body.draft_version, test=body.test, confirm=set(body.confirm or []),
+                              seq=body.seq)
         detail = _job_detail(store, store.get(job_id), config, services, me, now())
         detail["sent"] = result
         return detail
 
     @app.post("/api/inbox/check")
-    def inbox_check(body: dict | None = Body(default=None), store: JobStore = Depends(db)):
+    def inbox_check(store: JobStore = Depends(db)):
         account = services.account()
         if account is None:
             raise BadRequest("Gmail is not set up: add GMAIL_ADDRESS and GMAIL_APP_PASSWORD to .env")

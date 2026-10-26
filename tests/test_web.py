@@ -148,6 +148,43 @@ def test_status_codes_say_what_went_wrong(client):
     assert client.post("/api/contacts/99/verify", json={}, headers=AUTH).status_code == 404
 
 
+def test_a_bad_value_is_a_400_that_names_the_field(client):
+    def error(method, path, **kwargs):
+        r = client.request(method, path, headers={**AUTH, **kwargs.pop("headers", {})}, **kwargs)
+        assert r.status_code == 400, r.text
+        return r.json()["error"]
+
+    assert error("PATCH", "/api/jobs/1/application", json={"contact_id": "abc"}).startswith(
+        "contact_id: Input should be a valid integer")
+    assert error("POST", "/api/jobs/1/send", json={"draft_version": 0, "seq": "next"}).startswith("seq: ")
+    assert error("POST", "/api/jobs/1/send", json={"confirm": "guessed"}).startswith("confirm: ")
+    assert error("POST", "/api/jobs/1/stage", json={}) == "stage: Field required"
+    assert error("POST", "/api/jobs/1/stage", json=["saved"]).startswith("body: ")
+    assert error("PUT", "/api/jobs/1/cv-text", json={"text": None}).startswith("text: ")
+    assert error("POST", "/api/jobs/1/stage", content="{stage", headers={"Content-Type": "application/json"}) == \
+        "The request body is not valid JSON"
+    assert error("PATCH", "/api/jobs/1/application", json={"applied": True, "applied_at": "soon"}) == \
+        "applied_at: not a date: soon"
+    assert client.get("/api/jobs?days=week").json()["error"].startswith("days: ")
+    assert client.get("/api/jobs/one").status_code == 400
+    # Keys a route does not use are ignored, as before.
+    assert client.post("/api/jobs/1/stage", json={"stage": "saved", "from": "board"}, headers=AUTH).status_code == 200
+
+
+def test_editing_the_application_changes_only_the_keys_sent(client):
+    def patch(**body):
+        return client.patch("/api/jobs/1/application", json=body, headers=AUTH).json()["application"]
+
+    applied = "2026-09-20T10:00:00+00:00"
+    patch(applied=True, applied_at="2026-09-20T10:00:00Z")
+    patch(subject="Python role", body="Hi,\n\nI build APIs.")
+    app = patch(notes="Referred by Sam")
+    assert (app["applied_at"], app["subject"], app["notes"]) == (applied, "Python role", "Referred by Sam")
+    app = patch(subject="Backend role")
+    assert (app["subject"], app["body"], app["applied_at"]) == ("Backend role", "Hi,\n\nI build APIs.", applied)
+    assert patch(applied=False)["applied_at"] is None
+
+
 def test_manual_contact_must_be_an_email(client):
     r = client.put("/api/jobs/1/contact", json={"full_name": "Ana", "email": "not-an-email"}, headers=AUTH)
     assert r.status_code == 400 and "not an email" in r.json()["error"]
@@ -320,7 +357,8 @@ def test_reading_a_job_writes_nothing(client, home):
     client.get("/api/jobs")
     assert companies() == 0
     # The actions that need the row make it.
-    assert client.post("/api/jobs/1/company", json={"domain": "acme.io"}, headers=AUTH).json()["company"]["domain"] == "acme.io"
+    changed = client.post("/api/jobs/1/company", json={"domain": "acme.io"}, headers=AUTH).json()
+    assert changed["company"]["domain"] == "acme.io"
     assert companies() == 1
 
 
