@@ -39,7 +39,7 @@ Without a profile, the run still finds and judges jobs; it just makes no CVs, co
 | --- | --- | --- |
 | `DEEPSEEK_API_KEY` | AI check step 1, fit grade, tailored CVs, and the email's one AI line when `pitch_mode` is `"ai"` | those steps are skipped |
 | the `claude` CLI (Claude Code), signed in | AI check step 2 (web search), posting-date lookups, cover letters | the AI check uses DeepSeek only; dates come from job pages only; no cover letters |
-| `ANTHROPIC_API_KEY` | only a `claude-*` model in a config file, and the contact lookup's "search the web" backup | nothing in the default settings |
+| `ANTHROPIC_API_KEY` | only a `claude-*` model in a config file, and the contact lookup's "search the web" backup | the "Search the web with Claude" button is off |
 | `HUNTER_API_KEY` | finding who to email | you add contacts by hand (or use the backup above) |
 | `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD` | sending, and reading replies and bounces | no sending |
 | `SERPAPI_API_KEY` | the Google Jobs source | that source is skipped |

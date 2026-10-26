@@ -90,7 +90,8 @@ The full reasoning, with dates and trade-offs, is in [docs/decisions.md](docs/de
   link, or the same company and title within 60 days, unless their ATS ids differ.
   ([decision 3](docs/decisions.md#3-the-same-job-on-several-sites-three-keys-strongest-first))
 - **The web app answers only your own browser.** It listens on 127.0.0.1, checks the Host header (against
-  DNS rebinding), needs a startup token and a JSON body on every change, and sends no CORS headers.
+  DNS rebinding), and needs a startup token and a JSON body on every change. No other site may read its
+  answers, except the CV PDFs, which a Chrome extension attaches on job sites.
   ([decision 15](docs/decisions.md#15-the-web-app-only-answers-my-own-browser))
 
 ## Try it
