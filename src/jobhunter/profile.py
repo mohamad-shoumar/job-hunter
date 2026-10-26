@@ -1,4 +1,4 @@
-"""Reading profile/master_profile.md, the only source of facts about you (see CLAUDE.md).
+"""Reading profile/master_profile.md, the only source of facts about you (see .claude/CLAUDE.md).
 
 `load_profile` gives the facts the email and the fit grade use: experience, skills and
 education, never the Basics (phone, email) or logistics (salary). The CV (cv.load_facts)

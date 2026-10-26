@@ -1,7 +1,7 @@
 # Decisions
 
 The main choices I made building jobhunter, and why, in my own words. Dates come from the commits.
-`CLAUDE.md` holds the same rules written as instructions for coding agents; this file is the human version.
+[`.claude/CLAUDE.md`](../.claude/CLAUDE.md) holds the same rules written as instructions for coding agents; this file is the human version.
 
 Sentences marked "(draft: check)" give a reason I have not written down anywhere else yet.
 

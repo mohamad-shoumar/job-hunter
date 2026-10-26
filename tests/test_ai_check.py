@@ -139,7 +139,7 @@ def test_verified_can_hire_shortlists_as_likely(filters):
 
 
 def test_verified_visa_sponsorship_in_any_country_shortlists(filters):
-    # The user's call (2026-10-22): a company that sponsors the move counts, wherever it is.
+    # A company that sponsors the move counts, wherever it is (decision 2026-10-22, see docs/decisions.md).
     offer = AiCheck("sponsors_visa", "The careers FAQ says it sponsors H-1B visas for engineers.",
                     "We sponsor H-1B visas for all engineering roles", "https://acme.com/faq", verified=True)
     cls = classify(make_job(ai_check=offer), filters, NOW)

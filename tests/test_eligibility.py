@@ -55,7 +55,7 @@ def test_description_residency_rule_rejects_when_location_is_silent():
 
 
 def test_worldwide_field_narrowed_by_description_is_rejected_quoting_both():
-    # The narrower rule applies (the user's call, 2026-10-22).
+    # The narrower rule applies (decision 2026-10-22, see docs/decisions.md).
     a = verdict(allowed_locations=["Worldwide"], description="Candidates must be based in the UK.")
     assert (a.verdict, a.code) == (NOT_ELIGIBLE, "location_conflict")
     assert a.reasons[0] == 'Location says "Worldwide", but: Candidates must be based in the UK'

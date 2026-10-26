@@ -22,7 +22,7 @@ checks below apply to it.
 The model gets the profile's experience, skills and education as numbered
 facts (never the phone or salary lines) and says which facts it used. Then
 plain code (check_draft, with grounding.py) checks the line against
-profile/master_profile.md, the only source of facts about you (see CLAUDE.md):
+profile/master_profile.md, the only source of facts about you (see .claude/CLAUDE.md):
 
   - every number is in a cited fact, next to the same word
     ("800+ concurrent jobs" passes; "5 engineers" passes, "5 years" does not);

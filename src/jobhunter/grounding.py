@@ -3,7 +3,7 @@
 
 The rule: a generated line may only use numbers, names, skills and seniority words found
 in the profile facts it cites (profile/master_profile.md, the only source of facts about
-you; see CLAUDE.md). Each check decides which facts a line may cite and what happens to a
+you; see .claude/CLAUDE.md). Each check decides which facts a line may cite and what happens to a
 line that fails; these helpers decide what counts as the same number, name or word. So a
 change here changes what all three let through.
 """

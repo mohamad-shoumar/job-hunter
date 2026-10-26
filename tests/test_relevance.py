@@ -96,7 +96,7 @@ def test_fit_score_counts_profile_skills(filters):
     assert score >= 3 + 3 + 2 + 2  # python, fastapi, postgresql, aws
 
 
-# AI and forward-deployed roles only at junior level (the user's call 2026-10-20).
+# AI and forward-deployed roles only at junior level (decision 2026-10-20, see docs/decisions.md).
 @pytest.mark.parametrize(
     "title, description, reason",
     [

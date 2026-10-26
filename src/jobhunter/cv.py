@@ -2,7 +2,7 @@
 
 The model only chooses, orders and rewords. Code writes the file and checks
 every line against profile/master_profile.md, the only source of facts about
-you (see CLAUDE.md):
+you (see .claude/CLAUDE.md):
 
   - the name, contact lines, employers, job titles, dates and education are
     copied from resume.md in resume_dir (resume/ in the project), never written

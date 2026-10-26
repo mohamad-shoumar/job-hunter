@@ -13,7 +13,7 @@ question, one field or one stuck page. Make a sensible choice, note it, keep goi
 
 1. **Never press the final Apply / Submit / Send application button.** Fill everything, scroll to it,
    leave the tab open for the user to press it.
-2. **Never press Send on an email** in the app. Draft it and leave it. (CLAUDE.md: emails go out
+2. **Never press Send on an email** in the app. Draft it and leave it. (.claude/CLAUDE.md: emails go out
    only from the user's own click on Send.)
 
 Everything else (uploading the CV, answering questions, clicking Next between form pages, Tailor CV,

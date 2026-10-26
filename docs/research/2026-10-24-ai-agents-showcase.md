@@ -272,7 +272,7 @@ Example: *"Which Dutch companies sponsoring visas posted Python roles last month
   "My eval found that a planted line passes the quote check" says more than any
   framework name.
 - If the repo goes public: real data is already git-ignored, but check the
-  tracked files first (`CLAUDE.md` mentions the logged-out LinkedIn reading,
+  tracked files first (`.claude/CLAUDE.md` mentions the logged-out LinkedIn reading,
   which breaks LinkedIn's terms).
 
 ## Effort and cost
