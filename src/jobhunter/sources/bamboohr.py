@@ -7,6 +7,8 @@ request per job. Toters (Lebanon) hires through it.
 
 from __future__ import annotations
 
+from functools import partial
+
 from ..models import HYBRID, ONSITE, REMOTE, UNKNOWN, Job
 from ..text import html_to_text, parse_datetime
 from .base import Source, SourceResult, describe_error, enabled_entries, parse_each
@@ -35,7 +37,7 @@ class BambooHRSource(Source):
                 continue
             if not listed:
                 result.notes.append(f"{board['company']}: board has no open jobs")
-            result.jobs += parse_each(listed, lambda row, board=board: self._job(http, row, board, result.errors), result.errors,
+            result.jobs += parse_each(listed, partial(self._job, http, board=board, errors=result.errors), result.errors,
                                       f"{board['company']} ({token})")
         return result
 

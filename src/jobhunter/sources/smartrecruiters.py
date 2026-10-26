@@ -10,6 +10,7 @@ the UAE. Company ids are case-sensitive.
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from functools import partial
 
 from ..models import HYBRID, ONSITE, REMOTE, Job
 from ..text import html_to_text, parse_datetime, utcnow
@@ -42,9 +43,8 @@ class SmartRecruitersSource(Source):
                     continue
                 if not postings:
                     result.notes.append(f"{label}: board has no open jobs")
-                result.jobs += parse_each(
-                    postings, lambda raw, board=board, label=label: self._job(http, raw, board, cutoff, label, result.errors), result.errors,
-                    label)
+                job = partial(self._job, http, board=board, cutoff=cutoff, label=label, errors=result.errors)
+                result.jobs += parse_each(postings, job, result.errors, label)
         return result
 
     def _job(self, http, raw: dict, board: dict, cutoff: datetime, label: str, errors: list[str]) -> Job:
