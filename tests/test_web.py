@@ -7,6 +7,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from jobhunter.config import OutreachConfig, Paths
+from jobhunter.contacts import ContactFinder
+from jobhunter.hunter import HunterError
 from jobhunter.mailer import MailAccount
 from jobhunter.store import JobStore
 from jobhunter.web.app import Services, create_app
@@ -113,6 +115,36 @@ def test_track_contact_draft_send(client):
     assert client.services.sender_.sent[0]["To"] == "ana@acme.io"
     again = client.post("/api/jobs/1/send", json={"draft_version": app["draft_version"], "seq": 0}, headers=AUTH)
     assert again.status_code == 409 and len(client.services.sender_.sent) == 1
+
+
+def test_status_codes_say_what_went_wrong(client):
+    missing = client.get("/api/jobs/99")
+    assert missing.status_code == 404 and missing.json() == {"error": "no job #99"}
+    assert client.post("/api/jobs/99/stage", json={"stage": "saved"}, headers=AUTH).status_code == 404
+    client.put("/api/jobs/1/contact", json={"full_name": "Ana Ruiz", "email": "ana@acme.io"}, headers=AUTH)
+    edit = {"subject": "Python backend role", "body": "Hi Ana,\n\nI built RESTful APIs in Python.", "draft_version": 0}
+    assert client.patch("/api/jobs/1/application", json=edit, headers=AUTH).status_code == 200
+    stale = client.patch("/api/jobs/1/application", json=edit, headers=AUTH)  # the page still shows version 0
+    assert stale.status_code == 409 and "Reload" in stale.json()["error"]
+    version = client.get("/api/jobs/1").json()["application"]["draft_version"]
+    assert client.post("/api/jobs/1/send", json={"draft_version": version, "seq": 0}, headers=AUTH).status_code == 200
+
+    def gmail_down(account):
+        raise RuntimeError("Gmail refused the IMAP login")
+
+    client.services.inbox = gmail_down
+    down = client.post("/api/inbox/check", json={}, headers=AUTH)
+    assert down.status_code == 502 and down.json()["error"].startswith("Checking Gmail failed: RuntimeError")
+
+    class HunterDown:
+        def email_verifier(self, email):
+            raise HunterError(429, "too_many_requests", "slow down")
+
+    client.services.finder = lambda: (ContactFinder(client.services.config, HunterDown()), None)
+    contact_id = client.get("/api/jobs/1").json()["contact"]["id"]
+    down = client.post(f"/api/contacts/{contact_id}/verify", json={}, headers=AUTH)
+    assert down.status_code == 502 and down.json() == {"error": "Hunter 429 too_many_requests: slow down"}
+    assert client.post("/api/contacts/99/verify", json={}, headers=AUTH).status_code == 404
 
 
 def test_manual_contact_must_be_an_email(client):

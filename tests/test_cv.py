@@ -12,9 +12,9 @@ from fastapi.testclient import TestClient
 from jobhunter import tracking
 from jobhunter.config import OutreachConfig, Paths
 from jobhunter.cv import (
-    MAX_BULLET_WORDS, TAG_RULES, CvWriter, TailorError, check_bullet, check_headline, check_version, cv_headline, job_tags,
-    load_facts, plan_from, printed_title, render, restore_bold, role_label, save_version, scan, select, split_items,
-    tailor_for_job, tailored_of, version_of,
+    MAX_BULLET_WORDS, TAG_RULES, CvWriter, TailorError, build_pdf, check_bullet, check_headline, check_version,
+    cv_headline, job_tags, load_facts, plan_from, printed_title, render, restore_bold, role_label, save_version, scan,
+    select, split_items, tailor_for_job, tailored_of, version_of,
 )
 from jobhunter.llm import JsonModel
 from jobhunter.models import NEW
@@ -428,9 +428,10 @@ def cv_client(tmp_path, resume, filters):
     store_job(store, filters)
     store.close()
     paths = Paths(tmp_path)
-    app = create_app(paths, TOKEN, allowed_hosts=["testserver"],
-                     services=CvServices(OutreachConfig.load(paths.outreach_file)), now=lambda: NOW)
-    return TestClient(app)
+    services = CvServices(OutreachConfig.load(paths.outreach_file))
+    client = TestClient(create_app(paths, TOKEN, allowed_hosts=["testserver"], services=services, now=lambda: NOW))
+    client.services = services
+    return client
 
 
 def test_tailor_attaches_the_cv_and_the_page_can_show_it(cv_client):
@@ -445,6 +446,17 @@ def test_tailor_attaches_the_cv_and_the_page_can_show_it(cv_client):
     saved = cv_client.get("/api/cv/Shoumar_Backend_Acme_Sep2026.pdf?download=1")
     assert saved.status_code == 200 and saved.headers["content-disposition"].startswith("attachment")
     assert "Shoumar_Backend_Acme_Sep2026.pdf" in saved.headers["content-disposition"]
+
+
+def test_a_failed_model_or_build_py_is_a_bad_gateway(cv_client):
+    cv_client.services.cv_writer = lambda: (writer(), None)  # no answer: the model call fails
+    failed = cv_client.post("/api/jobs/1/tailor", json={}, headers=AUTH)
+    assert failed.status_code == 502 and failed.json()["error"].startswith("Tailoring failed: ")
+    cv_client.services.cv_writer = lambda: (writer(GOOD), None)
+    cv_client.services.build = build_pdf  # the stand-in build.py writes no PDF
+    failed = cv_client.post("/api/jobs/1/tailor", json={}, headers=AUTH)
+    assert failed.status_code == 502 and failed.json() == {"error": "build.py failed"}
+    assert cv_client.post("/api/jobs/9/tailor", json={}, headers=AUTH).status_code == 404
 
 
 def test_job_sites_can_fetch_a_cv_but_nothing_else(cv_client):

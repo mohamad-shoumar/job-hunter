@@ -31,7 +31,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .. import tracking
 from ..config import OutreachConfig, Paths
-from ..cover import CoverError, build_cover_writer, cover_for_job, cover_model, cover_of, letter_text
+from ..cover import build_cover_writer, cover_for_job, cover_model, cover_of, letter_text
 from ..cv import (
     TailorError, build_cv_writer, build_pdf, check_version, save_version, tailor_for_job, tailor_note, tailored_of,
     version_of,
@@ -40,8 +40,9 @@ from ..contacts import (
     ROLE_LABELS, ContactFinder, chosen_contact, clean_company_name, domain_from_links, job_company, rank_contacts,
     save_manual_contact, set_domain, set_job_board, skip_list_match, targets_for, verify_email,
 )
+from ..errors import AppError, BadRequest, Conflict, NotFound, UpstreamError
 from ..fitgrade import grade_of
-from ..hunter import Hunter, HunterError
+from ..hunter import Hunter
 from ..llm import anthropic_client, error_line, key_note
 from ..mailer import GmailInbox, MailAccount, SendError, SmtpSender, check_inbox, mail_account, outgoing, send_for_job
 from ..models import NEW, SAVED, STAGE_LABELS, STAGES
@@ -145,17 +146,9 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
                 return JSONResponse({"error": "send JSON"}, status_code=415)
         return await call_next(request)
 
-    @app.exception_handler(SendError)
-    async def send_error(request: Request, exc: SendError):
-        return JSONResponse({"error": str(exc), "confirm": exc.confirm}, status_code=409)
-
-    @app.exception_handler(tracking.TrackingError)
-    async def tracking_error(request: Request, exc: tracking.TrackingError):
-        return JSONResponse({"error": str(exc)}, status_code=400)
-
-    @app.exception_handler(HunterError)
-    async def hunter_error(request: Request, exc: HunterError):
-        return JSONResponse({"error": str(exc)}, status_code=502)
+    @app.exception_handler(AppError)
+    async def app_error(request: Request, exc: AppError):
+        return JSONResponse(exc.to_dict(), status_code=exc.http_status)
 
     def db():
         store = JobStore(paths.db_file, migrate=False, check_same_thread=False)
@@ -170,7 +163,7 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
     def job_or_404(store: JobStore, job_id: int) -> sqlite3.Row:
         row = store.get(job_id)
         if row is None:
-            raise tracking.TrackingError(f"no job #{job_id}")
+            raise NotFound(f"no job #{job_id}")
         return row
 
     # --- the page ------------------------------------------------------------
@@ -217,13 +210,13 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
     @app.get("/api/jobs")
     def jobs(view: str = "active", q: str = "", yoe: str = "", days: int = 0, store: JobStore = Depends(db)):
         if view not in JOB_VIEWS:
-            raise tracking.TrackingError(f"unknown view {view!r}")
+            raise BadRequest(f"unknown view {view!r}")
         if yoe and yoe not in YEARS:
-            raise tracking.TrackingError(f"unknown years filter {yoe!r}")
+            raise BadRequest(f"unknown years filter {yoe!r}")
         # Posted: the date the row shows (when the job was posted, or when it was found if the source
         # gives none), from local midnight; days=1 is today only.
         if days < 0:
-            raise tracking.TrackingError(f"days must be 0 (any time) or more, not {days}")
+            raise BadRequest(f"days must be 0 (any time) or more, not {days}")
         since = datetime.combine(local_day(now()) - timedelta(days=days - 1), time.min).astimezone() if days else None
         rows = job_list(store, view, q, yoe, since)
         return {"jobs": [_job_summary(store, row, config, now()) for row in rows]}
@@ -271,20 +264,20 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
             contact_id = int(body["contact_id"])
             company = job_company(store, store.get(job_id), t)
             if not contact_at(store, contact_id, company["key"]):
-                raise tracking.TrackingError("that contact is not at this company")
+                raise BadRequest("that contact is not at this company")
             set_application_contact(store, job_id, contact_id)
             reassemble(store, job_id, me, t, config)
         if "cv_file" in body:
             choice = str(body["cv_file"] or "")
             if choice not in ("", "none", *cv_options(config)):
-                raise tracking.TrackingError(f"no CV named {choice} in {config.cv_dir}")
+                raise BadRequest(f"no CV named {choice} in {config.cv_dir}")
             set_cv_file(store, job_id, choice or None)
             reassemble(store, job_id, me, t, config)
         if "subject" in body or "body" in body:
             app_row = get_application(store, job_id)
             if body.get("draft_version") is not None and int(body["draft_version"]) != app_row["draft_version"]:
-                raise tracking.TrackingError("The draft changed since this page loaded (the daily run or another "
-                                             "tab). Reload before editing.")
+                raise Conflict("The draft changed since this page loaded (the daily run or another tab). "
+                               "Reload before editing.")
             edit_draft(store, job_id, str(body.get("subject", app_row["subject"] or "")),
                        str(body.get("body", app_row["body"] or "")), me, t)
         store.commit()
@@ -296,7 +289,7 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
         job_or_404(store, job_id)
         t = now()
         if not (body.get("full_name") or "").strip() and not (body.get("email") or "").strip():
-            raise tracking.TrackingError("give a name or an email")
+            raise BadRequest("give a name or an email")
         save_manual_contact(store, job_id, str(body.get("full_name") or ""), str(body.get("email") or ""),
                             str(body.get("position") or ""), t)
         reassemble(store, job_id, profile(), t, config)
@@ -322,7 +315,7 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
         row = job_or_404(store, job_id)
         finder, note = services.finder()
         if finder is None:
-            raise tracking.TrackingError(note or "no lookup service configured")
+            raise BadRequest(note or "no lookup service configured")
         result = finder.lookup(store, row, now(), use_claude=bool(body.get("use_claude", True)),
                                force=bool(body.get("force")))
         store.commit()
@@ -334,7 +327,7 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
     def verify(contact_id: int, body: dict | None = Body(default=None), store: JobStore = Depends(db)):
         finder, note = services.finder()
         if finder is None or finder.hunter is None:
-            raise tracking.TrackingError("verifying needs HUNTER_API_KEY")
+            raise BadRequest("verifying needs HUNTER_API_KEY")
         status = verify_email(store, finder.hunter, contact_id)
         store.commit()
         return {"email_status": status}
@@ -344,8 +337,13 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
         job_or_404(store, job_id)
         writer, note = (None, None) if config.pitch_mode != "ai" else services.writer()
         if config.pitch_mode == "ai" and writer is None:
-            raise tracking.TrackingError(note or "drafting is off")
-        draft_for_job(store, job_id, writer, profile(), config, now(), force=True)
+            raise BadRequest(note or "drafting is off")
+        try:
+            draft_for_job(store, job_id, writer, profile(), config, now(), force=True)
+        except AppError:
+            raise
+        except Exception as exc:  # the model failed: say so on the page
+            raise UpstreamError(f"Drafting failed: {error_line(exc)}") from exc
         store.commit()
         return _job_detail(store, store.get(job_id), config, services, profile(), now())
 
@@ -354,14 +352,14 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
         job_or_404(store, job_id)
         writer, note = services.cv_writer()
         if writer is None:
-            raise tracking.TrackingError(note or "tailoring is off")
+            raise BadRequest(note or "tailoring is off")
         try:
             result = tailor_for_job(store, job_id, writer, paths.profile_file, config, now(), builder=services.build_pdf,
                                     replace_edits=bool((body or {}).get("replace_edits")))
-        except TailorError:
+        except AppError:
             raise
-        except Exception as exc:  # the model or build.py failed: say so on the page
-            raise TailorError(f"Tailoring failed: {error_line(exc)}") from exc
+        except Exception as exc:  # the model failed: say so on the page (build.py's own failures are a BuildError)
+            raise UpstreamError(f"Tailoring failed: {error_line(exc)}") from exc
         detail = _job_detail(store, store.get(job_id), config, services, profile(), now())
         detail["tailored"] = result
         return detail
@@ -388,10 +386,10 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
             raise TailorError("send the CV text as {\"text\": ...}")
         try:
             result = save_version(store, job_id, config, paths.profile_file, now(), text, builder=services.build_pdf)
-        except TailorError:
+        except AppError:
             raise
-        except Exception as exc:  # build.py failed: say so on the page
-            raise TailorError(f"Rebuilding the PDF failed: {error_line(exc)}") from exc
+        except Exception as exc:  # build.py could not run: say so on the page
+            raise UpstreamError(f"Rebuilding the PDF failed: {error_line(exc)}") from exc
         detail = _job_detail(store, store.get(job_id), config, services, profile(), now())
         detail["cv_saved"] = result
         return detail
@@ -401,13 +399,13 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
         job_or_404(store, job_id)
         writer, note = services.cover_writer()
         if writer is None:
-            raise tracking.TrackingError(note or "cover letters are off")
+            raise BadRequest(note or "cover letters are off")
         try:
             cover_for_job(store, job_id, writer, paths.profile_file, config, now())
-        except CoverError:
+        except AppError:
             raise
         except Exception as exc:  # the model failed, or the folder cannot be written: say so on the page
-            raise CoverError(f"Writing the cover letter failed: {error_line(exc)}") from exc
+            raise UpstreamError(f"Writing the cover letter failed: {error_line(exc)}") from exc
         return _job_detail(store, store.get(job_id), config, services, profile(), now())
 
     @app.get("/api/cv/{name}")
@@ -426,7 +424,7 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
         job_or_404(store, job_id)
         account = services.account()
         if account is None:
-            raise tracking.TrackingError("Gmail is not set up: add GMAIL_ADDRESS and GMAIL_APP_PASSWORD to .env")
+            raise BadRequest("Gmail is not set up: add GMAIL_ADDRESS and GMAIL_APP_PASSWORD to .env")
         me = profile()
         account = MailAccount(account.address, account.password, me.name)
         result = send_for_job(store, job_id, services.sender(account), account, me, config, now(),
@@ -441,10 +439,15 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
     def inbox_check(body: dict | None = Body(default=None), store: JobStore = Depends(db)):
         account = services.account()
         if account is None:
-            raise tracking.TrackingError("Gmail is not set up: add GMAIL_ADDRESS and GMAIL_APP_PASSWORD to .env")
-        inbox = services.inbox(account) if has_mail(store) else None
+            raise BadRequest("Gmail is not set up: add GMAIL_ADDRESS and GMAIL_APP_PASSWORD to .env")
+        inbox = None
         try:
+            inbox = services.inbox(account) if has_mail(store) else None
             result = check_inbox(store, account, config, now(), inbox=inbox)
+        except AppError:
+            raise
+        except Exception as exc:  # Gmail refused the login or the scan failed: say so on the page
+            raise UpstreamError(f"Checking Gmail failed: {error_line(exc)}") from exc
         finally:
             if inbox is not None:
                 inbox.close()

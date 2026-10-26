@@ -37,6 +37,7 @@ from . import tracking
 from .config import OutreachConfig, my_details
 from .contacts import clean_company_name, domain_from_links, job_company, skip_list_match
 from .cv import TAG_RULES, Role, camel, job_tags, parse_titles, printed_title
+from .errors import BadRequest
 from .extract import extract_skills
 from .grounding import YEAR_WORDS, capitalized_words, check_years, fact_has, number_context, unsupported_seniority
 from .llm import JsonModel, Usage, find_quote, json_model
@@ -75,7 +76,7 @@ PAST_WORK_ISSUE = "describes your past work; paragraph 2 does that. Say why this
 _NUMBER = re.compile(r"\d")
 
 
-class CoverError(tracking.TrackingError):
+class CoverError(BadRequest):
     """Shown to you as is."""
 
 

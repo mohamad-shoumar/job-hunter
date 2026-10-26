@@ -24,6 +24,7 @@ import sqlite3
 from datetime import datetime, timedelta
 
 from .config import OutreachConfig
+from .errors import BadRequest
 from .hunter import size_upper_bound
 from .models import CLOSED, NEW, REACHED_OUT, REPLIED, SAVED, SHORTLISTED, STAGE_LABELS, STAGES, VISA_LIST
 from .store import JobStore
@@ -53,7 +54,7 @@ SKIP_REASONS = {
 _BEFORE_REPLY = {NEW, SAVED, REACHED_OUT, CLOSED}
 
 
-class TrackingError(ValueError):
+class TrackingError(BadRequest):
     """A request that makes no sense for the job's current state. The message is shown to you."""
 
 

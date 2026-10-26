@@ -10,6 +10,7 @@ import pytest
 from jobhunter import tracking
 from jobhunter.config import OutreachConfig
 from jobhunter.contacts import save_manual_contact
+from jobhunter.errors import UpstreamError
 from jobhunter.mailer import (
     GmailInbox, InboxMessage, MailAccount, NotSent, SendError, Unsure, bounce_info, build_message, is_auto_reply,
     new_message_id, scan_inbox, send_for_job,
@@ -108,10 +109,10 @@ def test_a_changed_draft_is_not_sent(filters):
 def test_a_refused_send_can_be_retried_and_an_unclear_one_waits(filters):
     store = JobStore(":memory:")
     job_id = ready_job(store, filters)
-    with pytest.raises(SendError, match="Not sent"):
+    with pytest.raises(UpstreamError, match="Not sent"):  # Gmail failed: 502 on the page
         send(store, job_id, FakeSender(NotSent("Gmail refused the login")))
     assert get_application(store, job_id)["emailed_at"] is None
-    with pytest.raises(SendError, match="did not confirm"):
+    with pytest.raises(UpstreamError, match="did not confirm"):
         send(store, job_id, FakeSender(Unsure("timeout")))
     assert store.conn.execute("SELECT state FROM sent_mail ORDER BY id DESC").fetchone()[0] == "sending"
     with pytest.raises(SendError, match="already sent"):  # blocked until the inbox check decides
@@ -305,7 +306,7 @@ def test_your_reply_to_a_test_email_is_only_noted(filters):
 def test_an_unclear_send_is_settled_by_gmail_s_copy(filters):
     store = JobStore(":memory:")
     job_id = ready_job(store, filters)
-    with pytest.raises(SendError):
+    with pytest.raises(UpstreamError):
         send(store, job_id, FakeSender(Unsure("timeout")))
     mid = store.conn.execute("SELECT message_id FROM sent_mail").fetchone()[0]
     result = scan_inbox(store, FakeInbox([], threads={mid: "t1"}), ME, CONFIG, NOW + timedelta(minutes=1))
@@ -314,7 +315,7 @@ def test_an_unclear_send_is_settled_by_gmail_s_copy(filters):
 
     store = JobStore(":memory:")
     job_id = ready_job(store, filters)
-    with pytest.raises(SendError):
+    with pytest.raises(UpstreamError):
         send(store, job_id, FakeSender(Unsure("timeout")))
     result = scan_inbox(store, FakeInbox([]), ME, CONFIG, NOW + timedelta(minutes=30))
     assert "did not go out" in result.resolved[0]

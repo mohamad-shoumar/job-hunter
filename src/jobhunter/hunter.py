@@ -20,12 +20,16 @@ from dataclasses import dataclass
 
 import httpx
 
+from .errors import UpstreamError
+
 BASE = "https://api.hunter.io/v2"
 # Free plan: limit + offset must stay at or under 10.
 MAX_RESULTS = 10
 
 
-class HunterError(RuntimeError):
+class HunterError(UpstreamError):
+    """`status` is Hunter's own HTTP status (0: no answer); the app answers 502 either way."""
+
     def __init__(self, status: int, error_id: str, details: str):
         super().__init__(f"Hunter {status} {error_id}: {details}")
         self.status = status

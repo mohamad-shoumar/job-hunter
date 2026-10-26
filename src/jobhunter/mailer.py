@@ -45,6 +45,7 @@ from pathlib import Path
 from . import tracking
 from .config import OutreachConfig
 from .contacts import WEBMAIL, chosen_contact, clean_company_name
+from .errors import Conflict, UpstreamError
 from .pitch import cv_for, follow_up, to_html, to_plain
 from .profile import Profile
 from .store import JobStore
@@ -82,12 +83,15 @@ def mail_account(name: str = "") -> MailAccount | None:
     return MailAccount(address.lower(), password, name) if address and password else None
 
 
-class SendError(tracking.TrackingError):
+class SendError(Conflict):
     """Shown to you as is. `confirm` names what you must confirm to go ahead (guessed, same_company)."""
 
     def __init__(self, message: str, confirm: str | None = None):
         super().__init__(message)
         self.confirm = confirm
+
+    def to_dict(self) -> dict:
+        return {"error": str(self), "confirm": self.confirm}
 
 
 # --- building and sending --------------------------------------------------------
@@ -269,11 +273,11 @@ def send_for_job(store: JobStore, job_id: int, sender, account: MailAccount, pro
     except NotSent as exc:
         set_failed(store, row_id, str(exc))
         store.commit()
-        raise SendError(f"Not sent: {exc}") from None
+        raise UpstreamError(f"Not sent: {exc}") from None
     except Unsure as exc:
         set_error(store, row_id, f"unsure: {exc}")
         store.commit()
-        raise SendError("Gmail did not confirm the send. Check inbox in a minute: it will show whether it "
+        raise UpstreamError("Gmail did not confirm the send. Check inbox in a minute: it will show whether it "
                         "went out. Don't send again before that.") from None
     _mark_sent(store, row_id, now, config)
     store.commit()

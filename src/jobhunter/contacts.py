@@ -34,6 +34,7 @@ from urllib.parse import urlsplit
 
 from . import tracking
 from .config import OutreachConfig
+from .errors import NotFound
 from .hunter import Account, Hunter, HunterError, size_upper_bound
 from .identity import company_key
 from .llm import Usage, error_line, find_quote, forced_tool_choice, pages_read, plain
@@ -635,7 +636,9 @@ def _linkedin(value: str | None) -> str | None:
 def verify_email(store: JobStore, hunter: Hunter, contact_id: int) -> str:
     """Hunter Email Verifier on click (0.5 credit). Returns the new status."""
     contact = get_contact(store, contact_id)
-    if not contact or not contact["email"]:
+    if contact is None:
+        raise NotFound(f"no contact #{contact_id}")
+    if not contact["email"]:
         raise tracking.TrackingError("this contact has no email to verify")
     data = hunter.email_verifier(contact["email"])
     status = {"valid": "verified", "accept_all": "accept_all", "invalid": "invalid"}.get(data.get("status"),

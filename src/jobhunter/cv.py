@@ -53,6 +53,7 @@ from pathlib import Path
 from . import tracking
 from .config import OutreachConfig
 from .contacts import clean_company_name
+from .errors import BadRequest
 from .extract import extract_skills
 from .grounding import capitalized_words, fact_has, number_context, unsupported_seniority
 from .llm import JsonModel, Usage, json_model, key_note
@@ -106,8 +107,13 @@ _STOP = {
 _SUFFIXES = ("ations", "ation", "ating", "ated", "ates", "ings", "ing", "ers", "ed", "es", "er", "s")
 
 
-class TailorError(tracking.TrackingError):
+class TailorError(BadRequest):
     """Shown to you as is."""
+
+
+class BuildError(TailorError):
+    """build.py failed or did not finish. Still a TailorError, so `jobhunter rebuild-cv` prints it."""
+    http_status = 502
 
 
 # --- the facts: profile roles and skills, matched to resume.md ------------------------
@@ -690,11 +696,11 @@ def build_pdf(folder: Path, source: Path) -> tuple[Path, int]:
         done = subprocess.run([sys.executable, "build.py", str(source.relative_to(folder))], cwd=folder,
                               capture_output=True, text=True, timeout=180)
     except (OSError, subprocess.TimeoutExpired) as exc:
-        raise TailorError(f"build.py did not finish: {exc}") from exc
+        raise BuildError(f"build.py did not finish: {exc}") from exc
     wrote = re.search(r"Wrote (\S+\.pdf) \((\d+) pages?\)", done.stdout)
     if done.returncode != 0 or not wrote:
         tail = (done.stderr or done.stdout).strip().splitlines()[-1:]
-        raise TailorError("build.py failed" + (f": {tail[0][:300]}" if tail else ""))
+        raise BuildError("build.py failed" + (f": {tail[0][:300]}" if tail else ""))
     return folder / wrote.group(1), int(wrote.group(2))
 
 
