@@ -10,8 +10,9 @@ returns one job's page with its full description. No key. Checked 2026-10-21 (do
   sponsorship" in the keywords (the visa list).
 - About one request a second gets HTTP 429, so every request waits `pause` seconds first. That
   makes this the slowest source (a few minutes a run), and it is never fetched twice in a run.
-- LinkedIn's terms forbid automated access; the user chose to use it anyway (2026-10-21), at
-  this low volume. Only titles with one of `queries` get their page fetched and are kept.
+- LinkedIn's terms forbid automated access; it is used anyway, at this low volume (decision
+  2026-10-21, see docs/decisions.md). Only titles with one of `queries` get their page fetched
+  and are kept.
 """
 
 from __future__ import annotations

@@ -38,10 +38,11 @@ from .text import parse_datetime
 from .visa import read_posting
 
 # A 401(k) is a US-only retirement plan: a remote job that offers one is remote within the US,
-# whatever its location says. Rejected on sight (the user's call, 2026-10-19), even with "Worldwide"
-# or a can-hire AI check; Metabase's "Global Remote" posts, which offer one to US staff, are lost
-# too. A visa-list job is kept: it sponsors the move, and big companies list every country's
-# benefits ("retirement options (401(k)/pension)", Roku Cambridge). Not "$401k" or "401K-500K" (pay).
+# whatever its location says. Rejected on sight (decision 2026-10-19, see docs/decisions.md), even
+# with "Worldwide" or a can-hire AI check; Metabase's "Global Remote" posts, which offer one to US
+# staff, are lost too. A visa-list job is kept: it sponsors the move, and big companies list every
+# country's benefits ("retirement options (401(k)/pension)", Roku Cambridge). Not "$401k" or
+# "401K-500K" (pay).
 _US_BENEFITS = re.compile(r"(?<![\w$€£.,])401\s?\(?\s?k\s?\)?(?![\w\-–])", re.I)
 
 

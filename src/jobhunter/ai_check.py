@@ -20,8 +20,8 @@ DeepSeek and Claude Code, a page code fetched). Only a
 verified quote changes a job's status (see classify.apply_ai_check):
 `cannot_hire` rejects it, `can_hire` shortlists it as `likely`, and so does
 `sponsors_visa` when visa.read_posting also reads the quote as a visa offer (a
-work visa in any country: the user's call 2026-10-22). Anything else leaves it
-in needs_review with the finding attached.
+work visa in any country: decision 2026-10-22, see docs/decisions.md). Anything
+else leaves it in needs_review with the finding attached.
 
 Results are stored in jobs.ai_check_json, so `reclassify` keeps them, and a
 job is checked once unless asked again (`jobhunter check --recheck`).

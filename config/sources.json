@@ -1,7 +1,7 @@
 {
   "_about": "Where jobs come from. Each section maps to an adapter in src/jobhunter/sources/. Any entry or section can take \"enabled\": false. Keys starting with _ are comments.",
 
-  "_greenhouse_boards": "Removed 2026-09-27: these boards' remote roles were US/Canada or single-country only. The greenhouse adapter still exists; add a \"greenhouse_boards\" list back to use it for a company that hires internationally.",
+  "_greenhouse_boards": "No top-level greenhouse_boards list: the remote roles on the boards tried were US/Canada or single-country only. The greenhouse adapter still exists; add a \"greenhouse_boards\" list to use it for a company that hires internationally.",
 
   "watch_boards": {
     "_note": "After each run, the Greenhouse/Lever/Ashby board of every company with a shortlisted job is found (from the job's own links, else by trying slugs of its name and keeping a board only if it lists the job's title) and fetched from the next run on. Stored in the database, not here: `jobhunter boards` lists them, `jobhunter boards --remove kind:slug` drops one for good. Job sites, agencies and blocked companies are never watched. See src/jobhunter/boards.py.",
@@ -52,8 +52,8 @@
     { "company": "Percona", "board_token": "percona" },
     { "company": "TradingHub", "board_token": "TRADINGHUB" },
     { "company": "Wincent", "board_token": "wincent" },
-    { "company": "Circle.so", "board_token": "circle", "_note": "Moved from greenhouse 'circleso' (404). Verified: the Ashby 'circle' board is Circle.so." },
-    { "company": "Kraken", "board_token": "kraken.com", "_note": "Moved from lever 'kraken123' (empty board). Kraken's jobs are on Ashby now." },
+    { "company": "Circle.so", "board_token": "circle", "_note": "Verified: the Ashby 'circle' board is Circle.so (Greenhouse 'circleso' gives 404)." },
+    { "company": "Kraken", "board_token": "kraken.com", "_note": "Kraken's jobs are on Ashby (the Lever board 'kraken123' is empty)." },
     { "company": "Ziina", "board_token": "ziina" },
     { "company": "Qlub", "board_token": "qlub" },
     { "company": "Lean Technologies", "board_token": "LeanTech" },
@@ -125,7 +125,7 @@
     "countries": ["United Kingdom", "Netherlands", "Ireland", "Germany", "Spain", "Italy", "Finland"]
   },
   "serpapi": {
-    "_note": "Google Jobs (includes LinkedIn postings). Needs SERPAPI_API_KEY in .env; skipped without it. One credit per query page per run (the 21:00 run only). A query with no location searches the US market. 2026-10-19, from the stored results: the Gulf city search gave 15 of the 18 shortlisted and 5 of the 6 applied-to jobs; the six US 'remote' searches gave ~245 results, 4 shortlisted, 1 applied; the trading ones none. Now: each Gulf city every day (search words in turn), Beirut twice a day (a test found 10 jobs no other source had, 3 shortlisted), two remote searches. 7 credits/day, ~217/month (the Free plan has 250).",
+    "_note": "Google Jobs (includes LinkedIn postings). Needs SERPAPI_API_KEY in .env; skipped without it. One credit per query page per run (the 21:00 run only). A query with no location searches the US market. Searches: each Gulf city every day (search words in turn), Beirut twice a day and two remote searches; the Gulf and Beirut searches bring most of the shortlisted jobs, the US 'remote' ones few (checked 2026-10-19). 7 credits/day, ~217/month (the Free plan has 250).",
     "engine": "google_jobs",
     "queries": [
       "mid level backend engineer remote",
@@ -146,7 +146,7 @@
     ],
     "pages_per_query": 1
   },
-  "_remote_api": "Remotive was removed 2026-10-21: its free API returns only 10 jobs in total, whatever the parameters.",
+  "_remote_api": "Remotive is not fetched: its free API returns only 10 jobs in total, whatever the parameters.",
   "jobicy": {
     "_note": "Jobicy API: remote jobs with the region each company hires in ('Anywhere', 'EMEA', 'USA'). No key; credit Jobicy and send applications to its job URL (both links are the Jobicy page). Newest first, read until jobs older than lookback_hours. Only titles with one of `queries` are kept. Checked 2026-10-21 (docs/research/2026-10-21-market-size.md).",
     "enabled": true,
@@ -169,7 +169,7 @@
                 "automation engineer", "ai automation", "applied ai", "founding engineer", "llm"]
   },
   "linkedin": {
-    "_note": "LinkedIn's logged-out job search (src/jobhunter/sources/linkedin.py). Logged out, only keywords, location and the posted-within window work (no remote or level filter), so searches are by place: the UAE and Qatar (relocation), Lebanon, and UK/NL jobs that mention visa sponsorship (visa list). Each request waits `pause` seconds (about 1/s gets HTTP 429); only titles with one of `queries` get their page read. LinkedIn's terms forbid automated access: used anyway at this low volume, the user's call (2026-10-21). The 2026-10-21 research found UAE fits missing from the DB (Core42/G42, Open Innovation AI, ADG, Al-Futtaim).",
+    "_note": "LinkedIn's logged-out job search (src/jobhunter/sources/linkedin.py). Logged out, only keywords, location and the posted-within window work (no remote or level filter), so searches are by place: the UAE and Qatar (relocation), Lebanon, and UK/NL jobs that mention visa sponsorship (visa list). Each request waits `pause` seconds (about 1/s gets HTTP 429); only titles with one of `queries` get their page read. LinkedIn's terms forbid automated access: used anyway at this low volume (decision 2026-10-21, see docs/decisions.md). Research: docs/research/2026-10-21-market-size.md.",
     "enabled": true,
     "hours": 24,
     "max_pages": 4,
@@ -195,7 +195,7 @@
     ]
   },
   "himalayas": {
-    "_note": "country=LB makes Himalayas return jobs that list Lebanon or list no countries. No countries is treated as unknown, not worldwide. 2026-10-19: the best source (most applied-to jobs) searched only Python/backend words; added the profile's other target roles.",
+    "_note": "country=LB makes Himalayas return jobs that list Lebanon or list no countries. No countries is treated as unknown, not worldwide. It searches all the profile's target roles, not only Python/backend words: it is the source with the most applied-to jobs (checked 2026-10-19).",
     "enabled": true,
     "limit": 100,
     "country": "LB",

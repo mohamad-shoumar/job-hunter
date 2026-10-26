@@ -9,9 +9,9 @@ Verdicts:
 The rules only reject on evidence they can quote back. A location that fits,
 narrowed somewhere else ("Worldwide" in the location field, "must be based in
 the US" in the text), is rejected, quoting both: the narrower rule is the one
-that applies (the user's call, 2026-10-22). A restriction the posting doubts
-("Remote - Europe (UTC-1 to UTC+3)") stays `unclear`. `unclear` jobs are the
-ones an LLM or a human should look at.
+that applies (decision 2026-10-22, see docs/decisions.md). A restriction the
+posting doubts ("Remote - Europe (UTC-1 to UTC+3)") stays `unclear`. `unclear`
+jobs are the ones an LLM or a human should look at.
 
 "Remote" alone never counts as international: it is `unclear`.
 """

@@ -35,7 +35,8 @@ IRRELEVANT = "rejected"
 CAN_HIRE = "can_hire"
 CANNOT_HIRE = "cannot_hire"
 UNKNOWN_HIRE = "unknown"
-# Not remote from Lebanon, but the company sponsors a work visa to move for it (any country: the user's call 2026-10-22).
+# Not remote from Lebanon, but the company sponsors a work visa to move for it, in any country
+# (decision 2026-10-22, see docs/decisions.md).
 SPONSORS_VISA = "sponsors_visa"
 
 # Final status, which decides where a job shows up
