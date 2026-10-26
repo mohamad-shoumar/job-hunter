@@ -1,5 +1,5 @@
-"""Command line: `jobhunter run | serve | contacts | inbox | check | report | reclassify | show | stats | boards |
-sources | sponsors`."""
+"""Command line: `jobhunter run | serve | contacts | tailor | rebuild-cv | cover | inbox | check | dates | grade |
+report | reclassify | show | stats | boards | sources | sponsors`. docs/usage.md has the manual."""
 
 from __future__ import annotations
 
@@ -655,8 +655,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--to", dest="to_date", type=_date, metavar="YYYY-MM-DD", help="last day of the range (default: today)")
     p.add_argument("--days", type=int, metavar="N", help="the last N days, today included (--days 7 = this week)")
     p.add_argument("--no-report", action="store_true", help="store and classify only")
-    p.add_argument("--no-ai", action="store_true", help="no Claude calls: skip the AI web check and email drafts")
-    p.add_argument("--no-outreach", action="store_true", help="skip contact lookups, drafts and the inbox check")
+    p.add_argument("--no-ai", action="store_true",
+                   help="no model calls: skip posting dates, the AI check, the fit grade, CVs, cover letters and "
+                   "AI-written email lines")
+    p.add_argument("--no-outreach", action="store_true",
+                   help="skip contact lookups, drafts, CVs, cover letters and the inbox check")
     p.set_defaults(func=cmd_run)
 
     p = sub.add_parser("serve", help="the local web app: jobs, who to contact, email drafts, sending, tracking")
