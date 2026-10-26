@@ -128,16 +128,17 @@ def test_the_daily_run_watches_and_then_fetches_the_board(tmp_path, filters):
     http = FakeHttp({himalayas.SEARCH: lambda params: {"jobs": [raw]} if params["page"] == 1 else {"jobs": []},
                      greenhouse.API.format(token="fingerprint"): board})
     config = {**WATCH, "himalayas": {"queries": ["backend"], "limit": 20}}
-    summary, reports = pipeline.run(Paths(tmp_path), config, filters, http=http, now=NOW, ai=False, outreach=False)
+    summary, reports = pipeline.run(Paths(tmp_path), config, filters,
+                                    pipeline.RunOptions(http=http, now=NOW, ai=False, outreach=False))
     assert summary.new_by_status[SHORTLISTED] == 1
-    assert [a["board"] for a in summary.boards["added"]] == ["greenhouse:fingerprint"]
+    assert [a["board"] for a in summary.boards.added] == ["greenhouse:fingerprint"]
     assert "**Boards now watched**" in reports[0].read_text()
     assert "greenhouse" not in summary.sources
 
-    summary2, _ = pipeline.run(Paths(tmp_path), config, filters, http=http, now=NOW + timedelta(days=1),
-                               ai=False, outreach=False)
+    summary2, _ = pipeline.run(Paths(tmp_path), config, filters,
+                               pipeline.RunOptions(http=http, now=NOW + timedelta(days=1), ai=False, outreach=False))
     assert summary2.sources["greenhouse"].fetched == 2  # the board's own jobs, fetched like a configured board
-    assert summary2.boards["added"] == []
+    assert summary2.boards.added == []
 
 
 def test_the_boards_command_lists_and_removes(tmp_path, capsys, filters):

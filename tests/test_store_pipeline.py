@@ -3,11 +3,17 @@
 import contextlib
 import json
 from datetime import timedelta
+from types import SimpleNamespace
 
+import pytest
+
+from jobhunter import boards, pipeline
 from jobhunter import http as http_module
-from jobhunter import pipeline
+from jobhunter.ai_check import CheckRun
 from jobhunter.config import Filters, Paths
+from jobhunter.fitgrade import GradeRun
 from jobhunter.models import NEEDS_REVIEW, REJECTED, SHORTLISTED
+from jobhunter.posted_date import DateRun
 from jobhunter.report import write_report
 from jobhunter.sources import Source, SourceResult
 from jobhunter.sources import greenhouse, himalayas
@@ -225,7 +231,7 @@ def test_end_to_end_run(tmp_path, filters):
         himalayas.SEARCH: lambda params: fixture_json("himalayas_search.json") if params["page"] == 1 else {"jobs": []},
     })
     paths = Paths(tmp_path)
-    summary, reports = pipeline.run(paths, config, filters, http=http, now=NOW)
+    summary, reports = pipeline.run(paths, config, filters, pipeline.RunOptions(http=http, now=NOW))
     assert summary.sources["greenhouse"].fetched == 2 and summary.sources["himalayas"].fetched == 3
     assert summary.new == 5
     assert [p.name for p in reports] == [f"{TODAY}.md"]
@@ -236,7 +242,7 @@ def test_end_to_end_run(tmp_path, filters):
     assert "| greenhouse | 2 | 2 | 0 |" in text
 
     tomorrow = NOW + timedelta(days=1)
-    summary2, reports2 = pipeline.run(paths, config, filters, http=http, now=tomorrow)
+    summary2, reports2 = pipeline.run(paths, config, filters, pipeline.RunOptions(http=http, now=tomorrow))
     assert summary2.new == 0
     assert "## Shortlisted (0)" in reports2[0].read_text()
     runs = JobStore(paths.db_file).conn.execute("SELECT stats_json FROM runs ORDER BY id").fetchall()
@@ -253,8 +259,8 @@ def test_range_run_writes_one_file_per_day(tmp_path, filters):
 
     http = FakeHttp({himalayas.SEARCH: himalayas_page})
     start, end = pipeline.local_day(NOW - timedelta(days=30)), pipeline.local_day(NOW)
-    _, reports = pipeline.run(Paths(tmp_path), {"himalayas": {"queries": ["backend"]}}, filters, http=http, now=NOW,
-                              date_range=(start, end))
+    _, reports = pipeline.run(Paths(tmp_path), {"himalayas": {"queries": ["backend"]}}, filters,
+                              pipeline.RunOptions(http=http, now=NOW, date_range=(start, end)))
     assert len(reports) == 31 and reports[0].name == f"{start}.md" and reports[-1].name == f"{end}.md"
     assert seen_params[0]["page"] == 1
     written = [p for p in reports if "— Miris" in p.read_text()]
@@ -373,10 +379,40 @@ def test_a_failing_outreach_step_still_writes_the_reports(tmp_path, filters, mon
     (tmp_path / "config").mkdir()
     http = FakeHttp({greenhouse.API.format(token="gitlab"): fixture_json("greenhouse_gitlab.json")})
     summary, reports = pipeline.run(Paths(tmp_path), {"greenhouse_boards": [{"company": "GitLab", "board_token": "gitlab"}]},
-                                    filters, http=http, now=NOW)
+                                    filters, pipeline.RunOptions(http=http, now=NOW))
     assert reports and reports[0].exists()
     assert summary.outreach["errors"] == ["outreach: ValueError: bad config/outreach.json"]
     assert "outreach: ValueError" in reports[0].read_text()
+
+
+FAKE_MODEL = SimpleNamespace(label="fake-model", config=SimpleNamespace(lookback_days=1))
+
+
+@pytest.mark.parametrize("module, step, field, label, result_type, options", [
+    (pipeline, "date_check_days", "date_check", "posting dates", DateRun, {"date_finder": FAKE_MODEL}),
+    (pipeline, "ai_check_days", "ai_check", "AI check", CheckRun, {"ai_checker": FAKE_MODEL}),
+    (pipeline, "grade_recent", "fit_grade", "fit grade", GradeRun, {"fit_grader": FAKE_MODEL}),
+    (boards, "watch_shortlisted", "boards", "boards", boards.WatchRun, {}),
+], ids=["dates", "ai_check", "fit_grade", "boards"])
+def test_a_failing_optional_step_is_recorded_as_its_own_result_with_an_error(
+        tmp_path, filters, monkeypatch, module, step, field, label, result_type, options):
+    def broken(*args, **kwargs):
+        raise ValueError("boom")
+
+    monkeypatch.setattr(module, step, broken)
+    (tmp_path / "config").mkdir()
+    http = FakeHttp({greenhouse.API.format(token="gitlab"): fixture_json("greenhouse_gitlab.json")})
+    config = {"greenhouse_boards": [{"company": "GitLab", "board_token": "gitlab"}]}
+    if field == "boards":
+        config["watch_boards"] = {"enabled": True}
+    summary, reports = pipeline.run(Paths(tmp_path), config, filters,
+                                    pipeline.RunOptions(http=http, now=NOW, outreach=False, **options))
+    result = getattr(summary, field)
+    assert isinstance(result, result_type) and result.errors == [f"{label}: ValueError: boom"]
+    assert getattr(result, "model", "fake-model") == "fake-model"  # the report names the model it would have used
+    # The run went on: its stats keep the step's usual keys, and the reports show the error.
+    assert JobStore(Paths(tmp_path).db_file).last_run_stats()[field] == result.to_dict()
+    assert reports and f"{label}: ValueError: boom" in reports[0].read_text()
 
 
 def test_the_outreach_step_runs_without_any_keys(tmp_path, filters):
@@ -427,8 +463,8 @@ def test_skip_leaves_a_source_out_of_the_run(tmp_path, filters):
         "himalayas": {"queries": ["backend"], "limit": 20},
     }
     http = FakeHttp({greenhouse.API.format(token="gitlab"): fixture_json("greenhouse_gitlab.json")})
-    summary, _ = pipeline.run(Paths(tmp_path), config, filters, skip={"himalayas", "serpapi"}, http=http, now=NOW,
-                              ai=False, outreach=False)
+    summary, _ = pipeline.run(Paths(tmp_path), config, filters, pipeline.RunOptions(
+        skip={"himalayas", "serpapi"}, http=http, now=NOW, ai=False, outreach=False))
     assert set(summary.sources) == {"greenhouse"} and summary.new == 2
     assert "--skip: no enabled source named serpapi" in summary.config_notes
 

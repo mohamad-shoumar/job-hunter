@@ -160,15 +160,15 @@ def test_the_daily_run_grades_new_jobs_and_reports_them(tmp_path, filters):
     (tmp_path / "profile" / "master_profile.md").write_text(PROFILE.read_text())
     http = FakeHttp({himalayas.SEARCH: lambda p: fixture_json("himalayas_search.json") if p["page"] == 1 else {"jobs": []}})
     model = FakeModel()
-    summary, reports = pipeline.run(Paths(tmp_path), {"himalayas": {"queries": ["backend"]}}, filters, http=http,
-                                    now=NOW, fit_grader=grader(model), outreach=False)
+    summary, reports = pipeline.run(Paths(tmp_path), {"himalayas": {"queries": ["backend"]}}, filters,
+                                    pipeline.RunOptions(http=http, now=NOW, fit_grader=grader(model), outreach=False))
     shown = sum(n for status, n in summary.new_by_status.items() if status != "rejected")
-    assert shown and summary.fit_grade["graded"] == shown == len(model.messages)
+    assert shown and summary.fit_grade.graded == shown == len(model.messages)
     assert "**Fit grades** (deepseek-v4-flash, learning from 0 applied, 0 skipped):" in reports[0].read_text()
 
     # Graded once: the next run does not pay again.
-    pipeline.run(Paths(tmp_path), {"himalayas": {"queries": ["backend"]}}, filters, http=http, now=NOW,
-                 fit_grader=grader(model), outreach=False)
+    pipeline.run(Paths(tmp_path), {"himalayas": {"queries": ["backend"]}}, filters,
+                 pipeline.RunOptions(http=http, now=NOW, fit_grader=grader(model), outreach=False))
     assert len(model.messages) == shown
 
 
@@ -176,6 +176,6 @@ def test_no_ai_flag_skips_the_grades(tmp_path, filters):
     (tmp_path / "config").mkdir()
     http = FakeHttp({himalayas.SEARCH: lambda p: fixture_json("himalayas_search.json") if p["page"] == 1 else {"jobs": []}})
     model = FakeModel()
-    summary, _ = pipeline.run(Paths(tmp_path), {"himalayas": {"queries": ["backend"]}}, filters, http=http,
-                              now=NOW, ai=False, fit_grader=grader(model), outreach=False)
+    options = pipeline.RunOptions(http=http, now=NOW, ai=False, fit_grader=grader(model), outreach=False)
+    summary, _ = pipeline.run(Paths(tmp_path), {"himalayas": {"queries": ["backend"]}}, filters, options)
     assert model.messages == [] and summary.fit_grade is None

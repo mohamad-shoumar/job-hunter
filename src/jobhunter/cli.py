@@ -77,10 +77,9 @@ def cmd_run(args) -> int:
     only = {s.strip() for s in args.sources.split(",")} if args.sources else None
     skip = {s.strip() for s in args.skip.split(",")} if args.skip else None
     date_range = _date_range(args)
-    summary, report_paths = pipeline.run(
-        paths, sources_config, filters, only=only, skip=skip, report=not args.no_report, date_range=date_range, ai=not args.no_ai,
-        outreach=not args.no_outreach,
-    )
+    options = pipeline.RunOptions(only=only, skip=skip, report=not args.no_report, date_range=date_range,
+                                  ai=not args.no_ai, outreach=not args.no_outreach)
+    summary, report_paths = pipeline.run(paths, sources_config, filters, options)
     for name, stats in sorted(summary.sources.items()):
         flag = f"  ({len(stats.errors)} errors)" if stats.errors else ""
         print(f"{name:16} {stats.fetched:5} listings  {stats.new:4} new{flag}")
@@ -88,16 +87,16 @@ def cmd_run(args) -> int:
     print(f"\n{summary.new} new jobs" + (f": {breakdown}" if breakdown else "") + "\n")
     if summary.date_check:
         dc = summary.date_check
-        found = ", ".join(f"{n} {v}" for v, n in dc["found"].items()) or "none"
-        print(f"Posting dates: {dc['checked']} undated jobs looked up ({found})")
-        for line in dc["notes"] + dc["errors"]:
+        found = ", ".join(f"{n} {v}" for v, n in dc.found.items()) or "none"
+        print(f"Posting dates: {dc.checked} undated jobs looked up ({found})")
+        for line in dc.notes + dc.errors:
             print(f"  {line}")
         print()
     if summary.ai_check:
         ai = summary.ai_check
-        verdicts = ", ".join(f"{n} {v}" for v, n in ai["verdicts"].items()) or "none"
-        print(f"AI check: {ai['checked']} jobs ({verdicts}), about ${ai['cost_usd']:.2f}")
-        for line in ai["notes"] + ai["errors"]:
+        verdicts = ", ".join(f"{n} {v}" for v, n in ai.verdicts.items()) or "none"
+        print(f"AI check: {ai.checked} jobs ({verdicts}), about ${ai.cost_usd:.2f}")
+        for line in ai.notes + ai.errors:
             print(f"  {line}")
         print()
     if summary.outreach:
@@ -118,11 +117,11 @@ def cmd_run(args) -> int:
         for line in o["notes"] + o["errors"]:
             print(f"  {line}")
         print("Open `jobhunter serve` to see contacts and send emails.\n")
-    if summary.boards and (summary.boards["added"] or summary.boards["errors"]):
-        print(f"Boards now watched: {len(summary.boards['added'])}")
-        for added in summary.boards["added"]:
+    if summary.boards and (summary.boards.added or summary.boards.errors):
+        print(f"Boards now watched: {len(summary.boards.added)}")
+        for added in summary.boards.added:
             print(f"  {added['board']} ({added['company']}): {added['reason']}")
-        for line in summary.boards["errors"]:
+        for line in summary.boards.errors:
             print(f"  {line}")
         print()
     store = JobStore(paths.db_file)

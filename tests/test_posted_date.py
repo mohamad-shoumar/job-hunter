@@ -132,9 +132,9 @@ def test_daily_run_looks_up_dates_before_the_ai_check(tmp_path, filters):
     store.set_report_date([job_id], pipeline.local_day(NOW).isoformat())
     store.commit()
     store.close()
-    summary, _ = pipeline.run(paths, {}, filters, http=FakeHttp({}), now=NOW, outreach=False,
-                              date_finder=finder(FakeHttp({PAGE: JSON_LD})))
-    assert summary.date_check["checked"] == 1 and summary.date_check["found"] == {"found by page": 1}
+    summary, _ = pipeline.run(paths, {}, filters, pipeline.RunOptions(
+        http=FakeHttp({}), now=NOW, outreach=False, date_finder=finder(FakeHttp({PAGE: JSON_LD}))))
+    assert summary.date_check.checked == 1 and summary.date_check.found == {"found by page": 1}
     store = JobStore(paths.db_file)
     assert store.get(job_id)["status"] == SHORTLISTED
 

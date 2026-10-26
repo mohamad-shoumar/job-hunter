@@ -16,20 +16,23 @@ from __future__ import annotations
 import logging
 import time as clock
 from collections import Counter
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
 from datetime import date, datetime, time, timedelta
+from functools import partial
 from pathlib import Path
 
 from . import boards, sponsors
-from .ai_check import AiChecker, build_checker, check_jobs
+from .ai_check import AiChecker, CheckRun, build_checker, check_jobs
+from .boards import WatchRun
 from .classify import classify
 from .config import Filters, OutreachConfig
 from .extract import enrich
-from .fitgrade import FitGrader, build_grader, grade_jobs, to_grade
+from .fitgrade import FitGrader, GradeRun, build_grader, grade_jobs, to_grade
 from .http import Http, wait_for_network
 from .models import NEEDS_REVIEW, UNCLEAR, Job
-from .posted_date import DateFinder, build_finder, find_dates
+from .posted_date import DateFinder, DateRun, build_finder, find_dates
 from .outreach import run_outreach
 from .report import write_report
 from .sources import Source, SourceResult, build_sources
@@ -49,6 +52,29 @@ class SourceStats:
 
 
 @dataclass
+class RunOptions:
+    """What one run does. ai=False skips every model call; ai_checker, date_finder and fit_grader override the ones
+    built from config/ai_check.json and config/fit_grade.json.
+
+    outreach=False skips contacts, drafts and the inbox check (outreach.py). `only` fetches just those sources;
+    `skip` leaves those out (the morning run skips serpapi, whose credits last only for one run a day). A run given
+    no `http` makes its own and waits for the network first; `now` is for tests.
+    """
+
+    only: set[str] | None = None
+    skip: set[str] | None = None
+    report: bool = True
+    date_range: tuple[date, date] | None = None
+    ai: bool = True
+    outreach: bool = True
+    ai_checker: AiChecker | None = None
+    date_finder: DateFinder | None = None
+    fit_grader: FitGrader | None = None
+    http: Http | None = None
+    now: datetime | None = None
+
+
+@dataclass
 class RunSummary:
     run_id: int
     started_at: str
@@ -56,11 +82,12 @@ class RunSummary:
     new_by_status: Counter = field(default_factory=Counter)
     reject_codes: Counter = field(default_factory=Counter)
     config_notes: list[str] = field(default_factory=list)
-    ai_check: dict | None = None
-    date_check: dict | None = None
-    fit_grade: dict | None = None
+    # The optional steps' results, None when a step did not run. run_outreach returns a plain dict.
+    ai_check: CheckRun | None = None
+    date_check: DateRun | None = None
+    fit_grade: GradeRun | None = None
     outreach: dict | None = None
-    boards: dict | None = None
+    boards: WatchRun | None = None
     # Job ids this run touched (new or seen again), and the new ones. Not saved.
     seen_ids: set[int] = field(default_factory=set)
     new_ids: list[int] = field(default_factory=list)
@@ -81,12 +108,16 @@ class RunSummary:
             "new_by_status": dict(self.new_by_status),
             "reject_codes": dict(self.reject_codes),
             "config_notes": self.config_notes,
-            "ai_check": self.ai_check,
-            "date_check": self.date_check,
-            "fit_grade": self.fit_grade,
+            "ai_check": _as_dict(self.ai_check),
+            "date_check": _as_dict(self.date_check),
+            "fit_grade": _as_dict(self.fit_grade),
             "outreach": self.outreach,
-            "boards": self.boards,
+            "boards": _as_dict(self.boards),
         }
+
+
+def _as_dict(result) -> dict | None:
+    return None if result is None else result.to_dict()
 
 
 # Error lines that mean the request never reached the site (describe_error names the httpx class).
@@ -217,10 +248,11 @@ def assign_range(store: JobStore, summary: RunSummary, filters: Filters, now: da
 
 
 def date_check_days(store: JobStore, finder: DateFinder, days: list[str], filters: Filters,
-                    now: datetime, summary: RunSummary) -> set[str]:
+                    now: datetime) -> DateRun:
     """Look up when the undated needs_review jobs filed under `days` were posted, newest first, up to the cap.
 
-    Before the AI check, so one that turns out too old is rejected without it. Returns the changed report days."""
+    Before the AI check, so one that turns out too old is rejected without it. Its changed_days are the report days
+    whose jobs changed status."""
     waiting = [row for day in days for row in store.jobs_for_report(day)
                if row["status"] == NEEDS_REVIEW and not row["posted_at"] and not row["date_check_json"]]
     waiting.sort(key=lambda r: (r["first_seen"], r["id"]), reverse=True)
@@ -228,15 +260,14 @@ def date_check_days(store: JobStore, finder: DateFinder, days: list[str], filter
     result = find_dates(store, finder, waiting[:limit], filters, now)
     if len(waiting) > limit:
         result.notes.append(f"{len(waiting) - limit} more left for the next run or `jobhunter dates`")
-    summary.date_check = result.to_dict()
-    return result.changed_days
+    return result
 
 
 def ai_check_days(store: JobStore, checker: AiChecker, days: list[str], filters: Filters,
-                  now: datetime, summary: RunSummary) -> set[str]:
+                  now: datetime) -> CheckRun:
     """AI-check the unchecked needs_review jobs filed under `days`, newest first, up to the per-run cap.
 
-    Returns the report days whose jobs changed status, so their files are written again."""
+    Its changed_days are the report days whose jobs changed status, so their files are written again."""
     waiting = [row for day in days for row in store.jobs_for_report(day)
                if row["status"] == NEEDS_REVIEW and row["eligibility"] == UNCLEAR and not row["ai_check_json"]]
     waiting.sort(key=lambda r: (r["posted_at"] or r["first_seen"], r["id"]), reverse=True)
@@ -244,8 +275,17 @@ def ai_check_days(store: JobStore, checker: AiChecker, days: list[str], filters:
     result = check_jobs(store, checker, waiting[:limit], filters, now)
     if len(waiting) > limit:
         result.notes.append(f"{len(waiting) - limit} more left for the next run or `jobhunter check`")
-    summary.ai_check = result.to_dict()
-    return result.changed_days
+    return result
+
+
+def grade_recent(store: JobStore, grader: FitGrader, profile_file: Path, now: datetime) -> GradeRun:
+    """Fit-grade the ungraded shown jobs of the last lookback_days, newest first, up to the per-run cap."""
+    rows = to_grade(store, now, grader.config.lookback_days)
+    limit = grader.config.max_jobs_per_run
+    result = grade_jobs(store, grader, rows[:limit], profile_file, now)
+    if len(rows) > limit:
+        result.notes.append(f"{len(rows) - limit} more left for the next run or `jobhunter grade`")
+    return result
 
 
 def refresh_sponsors(root_paths, filters: Filters, http: Http, now: datetime, summary: RunSummary) -> None:
@@ -259,118 +299,128 @@ def refresh_sponsors(root_paths, filters: Filters, http: Http, now: datetime, su
         filters.visa.registers = sponsors.Registers.load(folder)
 
 
-def run(root_paths, sources_config: dict, filters: Filters, only: set[str] | None = None,
-        skip: set[str] | None = None, report: bool = True, http: Http | None = None, now: datetime | None = None,
-        date_range: tuple[date, date] | None = None, ai: bool = True,
-        ai_checker: AiChecker | None = None, outreach: bool = True,
-        fit_grader: FitGrader | None = None, date_finder: DateFinder | None = None) -> tuple[RunSummary, list[Path]]:
-    """ai=False skips every model call. ai_checker, date_finder and fit_grader override the ones built from
-    config/ai_check.json and config/fit_grade.json.
+def _model(given, build, config_file: Path, notes: list[str]):
+    """`given` (a test's fake), else the one built from `config_file`; a note says why it is off."""
+    if given is not None:
+        return given
+    built, note = build(config_file)
+    if note:
+        notes.append(note)
+    return built
 
-    outreach=False skips contacts, drafts and the inbox check (outreach.py). `skip` leaves those sources out
-    (the morning run skips serpapi, whose credits last only for one run a day).
-    """
-    now = now or utcnow()
+
+def _chosen(sources: list[Source], only: set[str] | None, skip: set[str] | None, notes: list[str]) -> list[Source]:
+    """The sources `only` names (an unknown name stops the run), minus the ones `skip` names."""
+    if only:
+        unknown = only - {s.name for s in sources}
+        if unknown:
+            raise SystemExit(f"unknown or disabled source(s): {', '.join(sorted(unknown))}")
+        sources = [s for s in sources if s.name in only]
+    if skip:
+        # A note, not an error: the scheduled morning run must not fail when serpapi is turned off.
+        unknown = skip - {s.name for s in sources}
+        if unknown:
+            notes.append(f"--skip: no enabled source named {', '.join(sorted(unknown))}")
+        sources = [s for s in sources if s.name not in skip]
+    return sources
+
+
+def _wait_for_network(notes: list[str]) -> None:
+    """The scheduled runs start as the Mac wakes: wait for the network, with a note when that took a while."""
+    waited = wait_for_network()
+    if waited is None:
+        notes.append("no network after 5 minutes of waiting; fetching anyway")
+    elif waited >= 1:
+        notes.append(f"waited {waited:.0f}s for the network before fetching")
+
+
+def _outreach_failed(errors: list[str]) -> dict:
+    """What a crashed outreach step records: run_outreach returns a plain dict, not a result type."""
+    return {"contacts": None, "drafts": [], "inbox": None, "notes": [], "errors": errors}
+
+
+def _step(label: str, work: Callable, failed: Callable):
+    """Run one optional step, work(). A crash is logged and becomes failed(errors=[line]): the step's own result
+    type with one error line, so stats_json keeps the step's keys and the run goes on to write the reports."""
+    try:
+        return work()
+    except Exception as exc:  # e.g. a broken config/outreach.json: the reports still get written
+        log.exception("%s step failed", label)
+        return failed(errors=[f"{label}: {describe_error(exc)}"])
+
+
+def run(root_paths, sources_config: dict, filters: Filters,
+        options: RunOptions | None = None) -> tuple[RunSummary, list[Path]]:
+    """Fetch every source, store and classify, run the optional steps, then write the reports. See RunOptions."""
+    opts = options or RunOptions()
+    now = opts.now or utcnow()
     sources, config_notes = build_sources(sources_config)
-    if ai and ai_checker is None:
-        ai_checker, note = build_checker(root_paths.ai_check_file)
-        if note:
-            config_notes.append(note)
-    if ai and date_finder is None:
-        date_finder, note = build_finder(root_paths.ai_check_file)
-        if note:
-            config_notes.append(note)
-    if ai and fit_grader is None:
-        fit_grader, note = build_grader(root_paths.fit_grade_file)
-        if note:
-            config_notes.append(note)
+    ai_checker = date_finder = fit_grader = None
+    if opts.ai:
+        ai_checker = _model(opts.ai_checker, build_checker, root_paths.ai_check_file, config_notes)
+        date_finder = _model(opts.date_finder, build_finder, root_paths.ai_check_file, config_notes)
+        fit_grader = _model(opts.fit_grader, build_grader, root_paths.fit_grade_file, config_notes)
     watch = boards.WatchConfig.from_sources(sources_config)
 
     store = JobStore(root_paths.db_file)
-    own_http = http is None
-    http = http or Http()
+    own_http = opts.http is None
+    http = opts.http or Http()
     try:
         if watch.enabled:
             boards.add_watched_sources(sources, store, sources_config)
-        if only:
-            unknown = only - {s.name for s in sources}
-            if unknown:
-                raise SystemExit(f"unknown or disabled source(s): {', '.join(sorted(unknown))}")
-            sources = [s for s in sources if s.name in only]
-        if skip:
-            # A note, not an error: the scheduled morning run must not fail when serpapi is turned off.
-            unknown = skip - {s.name for s in sources}
-            if unknown:
-                config_notes.append(f"--skip: no enabled source named {', '.join(sorted(unknown))}")
-            sources = [s for s in sources if s.name not in skip]
-        if date_range:
-            since = datetime.combine(date_range[0], time.min).astimezone()  # local midnight
+        sources = _chosen(sources, opts.only, opts.skip, config_notes)
+        if opts.date_range:
+            since = datetime.combine(opts.date_range[0], time.min).astimezone()  # local midnight
             for source in sources:
                 source.since = since
         run_id = store.start_run(now)
         summary = RunSummary(run_id=run_id, started_at=iso(now), config_notes=config_notes)
         if own_http:
-            waited = wait_for_network()
-            if waited is None:
-                config_notes.append("no network after 5 minutes of waiting; fetching anyway")
-            elif waited >= 1:
-                config_notes.append(f"waited {waited:.0f}s for the network before fetching")
-        if filters.visa and only is None:
+            _wait_for_network(config_notes)
+        if filters.visa and opts.only is None:
             refresh_sponsors(root_paths, filters, http, now, summary)
         log.info("fetching %d sources: %s", len(sources), ", ".join(s.name for s in sources))
         results = fetch_all(sources, http)
         ingest(store, results, filters, run_id, now, summary)
-        if date_range:
-            days = assign_range(store, summary, filters, now, *date_range)
+        if opts.date_range:
+            days = assign_range(store, summary, filters, now, *opts.date_range)
         else:
             days = assign_daily(store, summary, now)
         # Earlier days whose jobs the look-backs below changed: their files are written again too.
         touched: set[str] = set()
-        if ai and date_finder:
-            date_days = days if date_range else recent_days(now, date_finder.config.lookback_days)
-            touched |= date_check_days(store, date_finder, date_days, filters, now, summary)
-        if ai and ai_checker:
+        if date_finder:
+            date_days = days if opts.date_range else recent_days(now, date_finder.config.lookback_days)
+            summary.date_check = _step("posting dates",
+                                       lambda: date_check_days(store, date_finder, date_days, filters, now),
+                                       partial(DateRun, model=date_finder.label))
+            touched |= summary.date_check.changed_days
+        if ai_checker:
             # A daily run also looks back, so jobs over one day's cap are checked on the next days.
-            check_days = days if date_range else recent_days(now, ai_checker.config.lookback_days)
-            touched |= ai_check_days(store, ai_checker, check_days, filters, now, summary)
-        if ai and fit_grader and not date_range:
+            check_days = days if opts.date_range else recent_days(now, ai_checker.config.lookback_days)
+            summary.ai_check = _step("AI check", lambda: ai_check_days(store, ai_checker, check_days, filters, now),
+                                     partial(CheckRun, model=ai_checker.label))
+            touched |= summary.ai_check.changed_days
+        if fit_grader and not opts.date_range:
             # After the AI check (it can move a job to the shortlist), before the CVs (made best grade first).
-            try:
-                rows = to_grade(store, now, fit_grader.config.lookback_days)
-                result = grade_jobs(store, fit_grader, rows[:fit_grader.config.max_jobs_per_run],
-                                    root_paths.profile_file, now)
-                if len(rows) > fit_grader.config.max_jobs_per_run:
-                    result.notes.append(f"{len(rows) - fit_grader.config.max_jobs_per_run} more left for the next "
-                                        "run or `jobhunter grade`")
-                summary.fit_grade = result.to_dict()
-                touched |= result.changed_days
-            except Exception as exc:  # grades only sort: the run goes on without them
-                log.exception("fit grade step failed")
-                summary.fit_grade = {"graded": 0, "grades": {}, "errors": [f"fit grade: {describe_error(exc)}"],
-                                     "notes": [], "cost_usd": 0, "model": fit_grader.label, "examples": ""}
+            summary.fit_grade = _step("fit grade",
+                                      lambda: grade_recent(store, fit_grader, root_paths.profile_file, now),
+                                      partial(GradeRun, model=fit_grader.label))
+            touched |= summary.fit_grade.changed_days
         if watch.enabled:
             # After the AI check, so a job it shortlisted counts too. New boards are fetched from the next run.
-            try:
-                summary.boards = boards.watch_shortlisted(
-                    store, http, sources_config, filters, OutreachConfig.load(root_paths.outreach_file), now, watch,
-                ).to_dict()
-            except Exception as exc:
-                log.exception("watch boards step failed")
-                summary.boards = {"added": [], "probed": 0, "notes": [], "errors": [f"boards: {describe_error(exc)}"]}
-        if outreach:
+            summary.boards = _step("boards", lambda: boards.watch_shortlisted(
+                store, http, sources_config, filters, OutreachConfig.load(root_paths.outreach_file), now, watch,
+            ), WatchRun)
+        if opts.outreach:
             # Date-range runs never spend lookup credits: they would use up the month.
-            try:
-                summary.outreach = run_outreach(store, root_paths, summary.new_ids, now, ai=ai,
-                                                lookups=date_range is None)
-            except Exception as exc:  # e.g. a broken config/outreach.json: the reports still get written
-                log.exception("outreach step failed")
-                summary.outreach = {"contacts": None, "drafts": [], "inbox": None, "notes": [],
-                                    "errors": [f"outreach: {describe_error(exc)}"]}
+            summary.outreach = _step("outreach", lambda: run_outreach(
+                store, root_paths, summary.new_ids, now, ai=opts.ai, lookups=opts.date_range is None,
+            ), _outreach_failed)
         store.finish_run(run_id, summary.to_dict(), utcnow())
         paths = [
             write_report(store, root_paths.reports_dir, day, summary.to_dict(), now, filters.max_posting_age_days)
             for day in sorted(set(days) | touched)
-        ] if report else []
+        ] if opts.report else []
         return summary, paths
     finally:
         store.close()

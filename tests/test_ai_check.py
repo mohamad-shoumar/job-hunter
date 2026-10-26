@@ -213,19 +213,19 @@ def test_daily_run_checks_new_needs_review_jobs_and_reports_them(tmp_path, filte
     (tmp_path / "config").mkdir()
     http = FakeHttp({himalayas.SEARCH: lambda p: fixture_json("himalayas_search.json") if p["page"] == 1 else {"jobs": []}})
     client = FakeClient(response(fetched(), verdict()))
-    summary, reports = pipeline.run(Paths(tmp_path), {"himalayas": {"queries": ["backend"]}}, filters, http=http,
-                                    now=NOW, ai_checker=checker(client))
+    summary, reports = pipeline.run(Paths(tmp_path), {"himalayas": {"queries": ["backend"]}}, filters,
+                                    pipeline.RunOptions(http=http, now=NOW, ai_checker=checker(client)))
     assert len(client.calls) == 1  # only Miris needs review; the Node.js and Java roles are rejected by title
     assert "Company: Miris" in client.calls[0]["messages"][0]["content"]
-    assert summary.ai_check["checked"] == 1 and summary.ai_check["verdicts"] == {CANNOT_HIRE: 1}
+    assert summary.ai_check.checked == 1 and summary.ai_check.verdicts == {CANNOT_HIRE: 1}
     text = reports[0].read_text()
     ai_group = text.split("### AI check: cannot hire from Lebanon (1)")[1]
     assert "Backend Engineer (Senior+)" in ai_group.split("###")[0]
     assert "**AI check** (claude-opus-5-5): 1 checked (1 cannot hire), about $0.10" in text
 
     # Already checked: a second run does not pay for it again.
-    pipeline.run(Paths(tmp_path), {"himalayas": {"queries": ["backend"]}}, filters, http=http, now=NOW,
-                 ai_checker=checker(client))
+    pipeline.run(Paths(tmp_path), {"himalayas": {"queries": ["backend"]}}, filters,
+                 pipeline.RunOptions(http=http, now=NOW, ai_checker=checker(client)))
     assert len(client.calls) == 1
 
 
@@ -233,8 +233,8 @@ def test_no_ai_flag_skips_the_check(tmp_path, filters):
     (tmp_path / "config").mkdir()
     http = FakeHttp({himalayas.SEARCH: lambda p: fixture_json("himalayas_search.json") if p["page"] == 1 else {"jobs": []}})
     client = FakeClient(response(fetched(), verdict()))
-    summary, _ = pipeline.run(Paths(tmp_path), {"himalayas": {"queries": ["backend"]}}, filters, http=http,
-                              now=NOW, ai=False, ai_checker=checker(client))
+    summary, _ = pipeline.run(Paths(tmp_path), {"himalayas": {"queries": ["backend"]}}, filters,
+                              pipeline.RunOptions(http=http, now=NOW, ai=False, ai_checker=checker(client)))
     assert client.calls == [] and summary.ai_check is None
 
 
@@ -252,9 +252,9 @@ def test_daily_run_also_checks_the_last_days_leftovers(tmp_path, filters):
     store.close()
     http = FakeHttp({himalayas.SEARCH: {"jobs": []}})
     client = FakeClient(response(fetched(), verdict()))
-    summary, reports = pipeline.run(paths, {"himalayas": {"queries": ["backend"]}}, filters, http=http, now=NOW,
-                                    ai_checker=checker(client, lookback_days=7))
-    assert summary.ai_check["checked"] == 1
+    options = pipeline.RunOptions(http=http, now=NOW, ai_checker=checker(client, lookback_days=7))
+    summary, reports = pipeline.run(paths, {"himalayas": {"queries": ["backend"]}}, filters, options)
+    assert summary.ai_check.checked == 1
     assert "Company: Yesterday Co" in client.calls[0]["messages"][0]["content"]
     # Its status changed, so yesterday's file is written again, next to today's.
     day_before = (today - pipeline.timedelta(days=1)).isoformat()
