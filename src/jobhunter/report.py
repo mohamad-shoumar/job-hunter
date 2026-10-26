@@ -60,7 +60,8 @@ def _cell(text) -> str:
     return " ".join(str(text or "").split()).replace("|", "\\|")
 
 
-def _salary(row: sqlite3.Row) -> str | None:
+def salary_text(row: sqlite3.Row) -> str | None:
+    """A job's pay as the report and the app show it: "USD 90k–120k/year", else the posting's own words."""
     low, high = row["salary_min"], row["salary_max"]
     if low or high:
         def fmt(v):
@@ -91,7 +92,7 @@ def _job_block(n: int, row: sqlite3.Row, sightings: list[sqlite3.Row], prepared:
     details = [row["remote_status"]]
     if row["employment_type"]:
         details.append(row["employment_type"].replace("_", "-"))
-    salary = _salary(row)
+    salary = salary_text(row)
     if salary:
         details.append(salary)
     if row["required_yoe"]:

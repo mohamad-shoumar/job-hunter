@@ -15,13 +15,14 @@ HR and recruiters get hr_ask_text as the question instead ("From your side,
 what quality stands out the most for this role at <company>?"). The question
 asks for nothing: no call, interview or referral.
 
-With pitch_mode "ai", the model writes the sentence after "I just applied for
-the <title> role." instead, and the checks below apply to it.
+With pitch_mode "ai", the model (pitch_model, through llm.json_model) writes
+the sentence after "I just applied for the <title> role." instead, and the
+checks below apply to it.
 
 The model gets the profile's experience, skills and education as numbered
 facts (never the phone or salary lines) and says which facts it used. Then
-plain code checks the line against profile/master_profile.md, the only
-source of facts about you (see CLAUDE.md):
+plain code (check_draft, with grounding.py) checks the line against
+profile/master_profile.md, the only source of facts about you (see CLAUDE.md):
 
   - every number is in a cited fact, next to the same word
     ("800+ concurrent jobs" passes; "5 engineers" passes, "5 years" does not);
@@ -40,157 +41,30 @@ import json
 import logging
 import re
 import sqlite3
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
 from . import tracking
-from .config import OutreachConfig, my_details
+from .config import OutreachConfig
 from .contacts import ROLE_LABELS, chosen_contact, clean_company_name
 from .extract import extract_skills
-from .llm import Usage, model_params
+from .grounding import (
+    SENIORITY, YEAR_WORDS, capitalized_words, check_years, digits, fact_has, number_context, stem, word_list,
+)
+from .llm import JsonModel, Usage, json_model
+from .profile import Profile
 from .store import JobStore
 from .text import iso
 
 log = logging.getLogger(__name__)
 
-# Profile sections the email may draw on. Basics (phone), logistics (salary) never.
-_FACT_SECTIONS = ("Summary of experience", "Experience", "Skills (confirmed)", "Education")
-_NUMBER_WORDS = {
-    "one": "1", "two": "2", "three": "3", "four": "4", "five": "5", "six": "6", "seven": "7", "eight": "8",
-    "nine": "9", "ten": "10", "eleven": "11", "twelve": "12", "twenty": "20", "fifty": "50", "hundred": "100",
-}
-_NUMBER_RE = re.compile(r"(?<![\w.])(\d+(?:[.,]\d+)?)\s*(\+|%|k\b|x\b)?", re.I)
-_SENIORITY = ("senior", "staff", "principal", "architect", "head", "manager", "cto", "director", "vp", "chief", "lead")
 MAX_AI_WORDS = 25
 # Words a subject may use besides the job title, the company and profile words.
 _PLAIN_WORDS = {"role", "with", "from", "years", "year", "your", "about", "remote"}
 
 
-# --- the profile ----------------------------------------------------------------
-
-
-@dataclass
-class Profile:
-    name: str
-    first_name: str
-    linkedin: str | None
-    github: str | None
-    facts: list[str]
-    skills: set[str] = field(default_factory=set)
-    phone: str | None = None
-    city: str | None = None
-    # "About 3.3 years of software engineering" -> 3.3; the pitch may claim at most the whole part.
-    years: float | None = None
-
-    @property
-    def facts_text(self) -> str:
-        return "\n".join(self.facts)
-
-
-def _strip_notes(line: str) -> str:
-    return re.sub(r"\s*\((?:Confirmed by me|mohamad answering)[^)]*\)\.?", "", line).strip()
-
-
-_TAGS = re.compile(r"^\[([a-z][a-z, ]*)\]\s*")
-
-
-def split_tags(text: str) -> tuple[frozenset[str], str]:
-    """'[fullstack, lead] Built ...' -> ({'fullstack', 'lead'}, 'Built ...'). A bullet with no tag is core."""
-    m = _TAGS.match(text)
-    if not m:
-        return frozenset({"core"}), text
-    return frozenset(t.strip() for t in m.group(1).split(",") if t.strip()), text[m.end():].strip()
-
-
-def load_profile(path: Path) -> Profile:
-    text = path.read_text()
-    basics = my_details(text)
-    sections = re.split(r"^## ", text, flags=re.M)
-    facts: list[str] = []
-    for section in sections:
-        title, _, body = section.partition("\n")
-        if title.strip() not in _FACT_SECTIONS:
-            continue
-        role = ""
-        for raw in body.splitlines():
-            line = _strip_notes(raw.strip())
-            if not line or "TODO" in line:
-                continue
-            if line.startswith("### "):
-                header = " ".join(line[4:].split())
-                role = header.split("        ")[0]
-                facts.append(f"Role: {header}")
-            elif line.startswith("- "):
-                text = split_tags(line[2:])[1]
-                facts.append(f"{role}: {text}" if role and title.strip() == "Experience" else text)
-    name = basics.get("Name", "").strip()
-    profile = Profile(
-        name=name, first_name=name.split()[0] if name else "", linkedin=_link(basics.get("LinkedIn")),
-        github=_link(basics.get("GitHub")), facts=facts,
-    )
-    profile.phone = _link(basics.get("Phone"))
-    profile.city = (_link(basics.get("Location")) or "").split(",")[0].strip() or None
-    profile.skills = set(extract_skills(profile.facts_text))
-    m = re.search(r"\bAbout (\d+(?:\.\d+)?) years\b", profile.facts_text)
-    profile.years = float(m.group(1)) if m else None
-    if re.search(r"\bdistributed\b", profile.facts_text, re.I):  # stated as "distributed/backend systems"
-        profile.skills.add("distributed systems")
-    return profile
-
-
-def _link(value: str | None) -> str | None:
-    value = (value or "").strip()
-    return None if not value or "TODO" in value else value
-
-
 # --- the fact guard ---------------------------------------------------------------
-
-
-def _digits(text: str) -> str:
-    return re.sub(r"\b(" + "|".join(_NUMBER_WORDS) + r")\b", lambda m: _NUMBER_WORDS[m.group(1).lower()], text,
-                  flags=re.I)
-
-
-def _words(text: str) -> list[str]:
-    return re.findall(r"[a-z0-9]+", text.lower())
-
-
-def _stem(word: str) -> str:
-    return word[:-1] if word.endswith("s") and len(word) > 3 else word
-
-
-def _number_context(text: str) -> list[tuple[str, str, str | None]]:
-    """(number, its suffix, the word right after it): "800+ concurrent" -> ("800", "+", "concurrent")."""
-    digits = _digits(text)
-    found = []
-    for m in _NUMBER_RE.finditer(digits):
-        after = _words(digits[m.end():])
-        found.append((m.group(1).replace(",", ""), m.group(2) or "", after[0] if after else None))
-    return found
-
-
-def _fact_has(number: str, word: str | None, fact: str) -> bool:
-    """The fact has this number with `word` among the next four words ("800+ concurrent Python jobs")."""
-    for m in _NUMBER_RE.finditer(_digits(fact)):
-        if m.group(1).replace(",", "") != number:
-            continue
-        after = {_stem(w) for w in _words(_digits(fact)[m.end():])[:4]}
-        if word is None or _stem(word) in after:
-            return True
-    return False
-
-
-def _capitalized_words(text: str) -> list[str]:
-    """Capitalized words that do not start a sentence: likely names of tools or companies.
-
-    Only the sentence's first word is skipped, so in "I used Workato" the name still counts.
-    """
-    words = []
-    for sentence in re.split(r"(?<=[.!?])\s+", text):
-        sentence = sentence.lstrip("\"'“‘(")
-        words += [m.group(0) for m in re.finditer(r"\b[A-Z][\w.#+-]*[\w#+]", sentence) if m.start() > 0]
-    return words
 
 
 def check_draft(subject: str, hook: str, pitch: str, evidence_ids: list[int], profile: Profile, posting: str,
@@ -200,18 +74,17 @@ def check_draft(subject: str, hook: str, pitch: str, evidence_ids: list[int], pr
     problems: list[str] = []
     warnings: list[str] = []
     cited = [profile.facts[i - 1] for i in evidence_ids if 1 <= i <= len(profile.facts)] or profile.facts
-    for number, suffix, word in _number_context(f"{pitch} {subject}"):
-        if word in ("year", "years", "yr", "yrs"):
-            if profile.years is None or float(number) > int(profile.years):
-                problems.append(f'claims {number}{suffix} years; the profile has about '
-                                f'{profile.years if profile.years is not None else "no stated"} years')
+    for number, suffix, word in number_context(f"{pitch} {subject}"):
+        if word in YEAR_WORDS:
+            if problem := check_years(number, suffix, profile.years):
+                problems.append(problem)
             continue
-        if not any(_fact_has(number, word, fact) for fact in cited):
+        if not any(fact_has(number, word, fact) for fact in cited):
             problems.append(f'"{number}{suffix}{" " + word if word else ""}" is not in the profile facts it cites')
     for skill in extract_skills(pitch):
         if skill not in profile.skills:
             problems.append(f'names "{skill}", which is not in your profile')
-    if one_fact and _number_context(pitch):
+    if one_fact and number_context(pitch):
         real = [i for i in evidence_ids if 1 <= i <= len(profile.facts)]
         if len(real) != 1:
             problems.append("the line must come from exactly one fact, so its number belongs to what it describes")
@@ -223,26 +96,26 @@ def check_draft(subject: str, hook: str, pitch: str, evidence_ids: list[int], pr
     for skill in extract_skills(f"{subject} {hook}"):
         if skill not in profile.skills and skill not in job_skills:
             problems.append(f'names "{skill}", which is in neither your profile nor the posting')
-    facts_words = set(_words(profile.facts_text))
-    facts_stems = {_stem(w) for w in facts_words}
-    title_words = {_stem(w) for w in _words(" ".join([posting.split("\n", 1)[0], profile.name, *names]))}
-    for word in _words(subject):
-        if len(word) > 3 and not word.isdigit() and _stem(word) not in facts_stems | title_words | _PLAIN_WORDS:
+    facts_words = set(word_list(profile.facts_text))
+    facts_stems = {stem(w) for w in facts_words}
+    title_words = {stem(w) for w in word_list(" ".join([posting.split("\n", 1)[0], profile.name, *names]))}
+    for word in word_list(subject):
+        if len(word) > 3 and not word.isdigit() and stem(word) not in facts_stems | title_words | _PLAIN_WORDS:
             problems.append(f'the subject says "{word}", which is not in your profile')
-    for word in _SENIORITY:
+    for word in SENIORITY:
         if re.search(rf"\b{word}\b", pitch, re.I) and word not in facts_words:
             problems.append(f'says "{word}", which is not in your profile')
-    posting_words = set(_words(_digits(posting)))
-    for number, _, _ in _number_context(hook):
+    posting_words = set(word_list(digits(posting)))
+    for number, _, _ in number_context(hook):
         if number.replace(".", "") not in posting_words:
             problems.append(f'the number "{number}" in the hook is not in the posting')
     known = " ".join([profile.facts_text, posting, profile.name, *names]).lower()
-    for token in _capitalized_words(pitch):
+    for token in capitalized_words(pitch):
         if token.lower() not in known and token not in ("I", "I'm", "I've"):
             warnings.append(f'"{token}" is not in your profile or the posting; check it')
-    words = len(_words(pitch))
-    if words > MAX_AI_WORDS:
-        warnings.append(f"the proof line is {words} words; keep it under {MAX_AI_WORDS}")
+    count = len(word_list(pitch))
+    if count > MAX_AI_WORDS:
+        warnings.append(f"the proof line is {count} words; keep it under {MAX_AI_WORDS}")
     return problems, warnings
 
 
@@ -305,6 +178,8 @@ SCHEMA = {
     "additionalProperties": False,
 }
 
+EXAMPLE = json.dumps({"pitch": "...", "evidence_ids": [1, 2]})
+
 
 @dataclass
 class Draft:
@@ -322,23 +197,8 @@ class Draft:
 class PitchWriter:
     subject_template = "{title} - {name}"
 
-    def __init__(self, client, model: str):
-        self.client = client
+    def __init__(self, model: JsonModel):
         self.model = model
-
-    def _ask(self, system: str, messages: list[dict], usage: Usage) -> dict:
-        params = model_params(self.model)
-        output_config = {**params.pop("output_config", {}), "format": {"type": "json_schema", "schema": SCHEMA}}
-        response = self.client.messages.create(model=self.model, max_tokens=1024, system=system, messages=messages,
-                                               output_config=output_config, **params)
-        usage.add(response.usage)
-        text = next((b.text if not isinstance(b, dict) else b["text"] for b in response.content
-                     if (b.get("type") if isinstance(b, dict) else b.type) == "text"), "{}")
-        try:
-            data = json.loads(text)
-        except ValueError:
-            data = {}
-        return data
 
     def write(self, profile: Profile, job: sqlite3.Row, contact: sqlite3.Row | None) -> Draft:
         role = _field(contact, "role")
@@ -364,7 +224,7 @@ class PitchWriter:
         warnings: list[str] = []
         attempts = 0
         for attempts in (1, 2):
-            data = self._ask(system, messages, usage)
+            data = self.model.ask(system, messages, SCHEMA, usage, EXAMPLE, max_tokens=1024)
             problems, warnings = check_draft(
                 subject, hook, str(data.get("pitch") or ""),
                 [int(i) for i in data.get("evidence_ids") or [] if isinstance(i, int)], profile, posting,
@@ -384,8 +244,8 @@ class PitchWriter:
             hook=hook,
             pitch=" ".join(str(data.get("pitch") or "").split()),
             evidence_ids=[i for i in data.get("evidence_ids") or [] if isinstance(i, int)],
-            problems=problems, warnings=warnings, model=self.model, cost_usd=usage.cost(self.model) or 0.0,
-            attempts=attempts,
+            problems=problems, warnings=warnings, model=self.model.model,
+            cost_usd=usage.cost(self.model.model) or 0.0, attempts=attempts,
         )
 
 
@@ -521,7 +381,7 @@ def follow_up(seq: int, subject: str, contact: sqlite3.Row | None, company: str,
 
 
 def word_count(text: str) -> int:
-    return len(_words(text))
+    return len(word_list(text))
 
 
 # --- storing drafts -------------------------------------------------------------------
@@ -629,52 +489,7 @@ def draft_for_job(store: JobStore, job_id: int, writer: PitchWriter | None, prof
     return "drafted with problems" if draft.problems else "drafted"
 
 
-DEEPSEEK_URL = "https://api.deepseek.com/chat/completions"
-_JSON_NOTE = """
-
-Answer with one JSON object only, exactly these keys:
-{"pitch": "...", "evidence_ids": [1, 2]}"""
-
-
-class DeepSeekPitchWriter(PitchWriter):
-    """The same writer and fact guard, on DeepSeek's OpenAI-format API (JSON mode, thinking off)."""
-
-    def __init__(self, api_key: str, model: str, http=None):
-        import httpx
-
-        super().__init__(None, model)
-        self._key = api_key
-        self._http = http or httpx.Client(timeout=90)
-
-    def _ask(self, system: str, messages: list[dict], usage: Usage) -> dict:
-        body = {
-            "model": self.model, "max_tokens": 1024,
-            "messages": [{"role": "system", "content": system + _JSON_NOTE}, *messages],
-            "response_format": {"type": "json_object"}, "thinking": {"type": "disabled"},
-        }
-        response = self._http.post(DEEPSEEK_URL, json=body, headers={"Authorization": f"Bearer {self._key}"})
-        response.raise_for_status()  # the key is in a header, never in the error text
-        data = response.json()
-        tokens = data.get("usage") or {}
-        usage.add({"input_tokens": tokens.get("prompt_tokens"), "output_tokens": tokens.get("completion_tokens")})
-        try:
-            return json.loads(data["choices"][0]["message"]["content"] or "{}")
-        except (KeyError, IndexError, ValueError):
-            return {}
-
-
 def build_writer(config: OutreachConfig, claude=None) -> tuple[PitchWriter | None, str | None]:
-    """DeepSeek when pitch_model is a deepseek model, else Claude."""
-    import os
-
-    if config.pitch_model.startswith("deepseek"):
-        key = os.environ.get("DEEPSEEK_API_KEY")
-        if not key:
-            return None, "email drafts skipped: set DEEPSEEK_API_KEY in .env (pitch_model is DeepSeek)"
-        return DeepSeekPitchWriter(key, config.pitch_model), None
-    from .llm import anthropic_client
-
-    client = claude or anthropic_client()
-    if client is None:
-        return None, "email drafts skipped: set ANTHROPIC_API_KEY in .env"
-    return PitchWriter(client, config.pitch_model), None
+    """(the writer for pitch_model: Claude, DeepSeek or Claude Code, None), or (None, why email drafts are off)."""
+    model, note = json_model(config.pitch_model, "Email drafts", claude=claude)
+    return (PitchWriter(model), None) if model else (None, note)

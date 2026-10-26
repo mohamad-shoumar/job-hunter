@@ -29,7 +29,7 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from .ai_check import JOB_DESCRIPTION, AiCheckConfig, _for_quotes, fetch_page, job_links
+from .ai_check import JOB_DESCRIPTION, AiCheckConfig, fetch_page, for_quotes, job_links
 from .classify import classify, recheck_age
 from .config import Filters
 from .llm import CLAUDE_CODE, JsonModel, Usage, error_line, find_quote, json_model
@@ -189,7 +189,7 @@ class DateFinder:
             stated_url = f"https://www.linkedin.com{m.group(1)}"
         pages = [(JOB_DESCRIPTION, job.description or "")]
         if stated_url.startswith("http") and (page := fetch_page(stated_url, self.http)):
-            pages += _for_quotes(stated_url, page)
+            pages += for_quotes(stated_url, page)
         found_at = find_quote(quote, pages, stated_url)
         posted = date_in(quote, now) if found_at else None
         if found_at is None:

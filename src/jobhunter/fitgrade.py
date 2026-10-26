@@ -28,10 +28,9 @@ from dataclasses import dataclass, field, fields
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from .cv import _sections
 from .extract import find_required_yoe
 from .llm import JsonModel, Usage, error_line, json_model
-from .pitch import load_profile
+from .profile import load_profile, sections
 from .store import JobStore
 from .text import iso
 from .tracking import SKIP_REASONS
@@ -138,7 +137,7 @@ def load_examples(store: JobStore, config: FitGradeConfig) -> Examples:
 def profile_summary(profile_path: Path) -> str:
     """The profile's facts and target roles. load_profile leaves out the Basics (contact details)."""
     profile = load_profile(profile_path)
-    targets = " ".join(_sections(profile_path.read_text()).get("Target roles", "").split())
+    targets = " ".join(sections(profile_path.read_text()).get("Target roles", "").split())
     lines = [f"Target roles: {targets}"] if targets and "TODO" not in targets else []
     return "\n".join(lines + [f"- {fact}" for fact in profile.facts])
 

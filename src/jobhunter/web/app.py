@@ -42,11 +42,12 @@ from ..contacts import (
 )
 from ..fitgrade import grade_of
 from ..hunter import Hunter, HunterError
-from ..llm import CLAUDE_CODE, anthropic_client, error_line, key_note
+from ..llm import anthropic_client, error_line, key_note
 from ..mailer import GmailInbox, MailAccount, SendError, SmtpSender, check_inbox, mail_account, outgoing, send_for_job
 from ..pipeline import local_day
-from ..pitch import PitchWriter, build_writer, cv_for, cv_options, draft_for_job, edit_draft, load_profile, reassemble, word_count
-from ..report import _salary
+from ..pitch import PitchWriter, build_writer, cv_for, cv_options, draft_for_job, edit_draft, reassemble, word_count
+from ..profile import load_profile
+from ..report import salary_text
 from ..store import JobStore
 from ..text import iso, parse_datetime, utcnow
 
@@ -61,6 +62,8 @@ class Services:
 
     The Hunter and Claude clients are made once and shared; a ContactFinder
     (which remembers "Hunter is out of credits" for one run) is new per request.
+    The writers get the shared Claude client and use it only when their model is
+    a Claude one (llm.json_model decides).
     """
 
     def __init__(self, config: OutreachConfig):
@@ -71,9 +74,12 @@ class Services:
     def _clients(self):
         if self._hunter is None and os.environ.get("HUNTER_API_KEY"):
             self._hunter = Hunter(os.environ["HUNTER_API_KEY"])
+        return self._hunter, self._claude_client()
+
+    def _claude_client(self):
         if self._claude is None:
             self._claude = anthropic_client()
-        return self._hunter, self._claude
+        return self._claude
 
     def finder(self) -> tuple[ContactFinder | None, str | None]:
         hunter, claude = self._clients()
@@ -82,18 +88,13 @@ class Services:
         return ContactFinder(self.config, hunter, claude), None
 
     def writer(self) -> tuple[PitchWriter | None, str | None]:
-        if self.config.pitch_model.startswith("deepseek"):
-            return build_writer(self.config)
-        _, claude = self._clients()
-        return build_writer(self.config, claude=claude)
+        return build_writer(self.config, claude=self._claude_client())
 
     def cv_writer(self):
-        claude = None if self.config.cv_model.startswith("deepseek") else self._clients()[1]
-        return build_cv_writer(self.config, claude=claude)
+        return build_cv_writer(self.config, claude=self._claude_client())
 
     def cover_writer(self):
-        claude = None if cover_model(self.config).startswith(("deepseek", CLAUDE_CODE)) else self._clients()[1]
-        return build_cover_writer(self.config, claude=claude)
+        return build_cover_writer(self.config, claude=self._claude_client())
 
     def build_pdf(self, folder: Path, source: Path) -> tuple[Path, int]:
         return build_pdf(folder, source)
@@ -508,7 +509,7 @@ def _job_summary(store: JobStore, row: sqlite3.Row, config: OutreachConfig, now:
     return {
         "id": row["id"], "title": row["title"], "company": company, "status": row["status"],
         "eligibility": row["eligibility"], "reason": reasons[0] if reasons else "", "fit": row["fit_score"],
-        "required_yoe": row["required_yoe"], "salary": _salary(row), "posted_at": row["posted_at"], "first_seen": row["first_seen"],
+        "required_yoe": row["required_yoe"], "salary": salary_text(row), "posted_at": row["posted_at"], "first_seen": row["first_seen"],
         "report_date": row["report_date"], "source": row["source"],
         "apply_url": row["application_url"] or row["source_url"],
         "stage": row["stage"] or "new", "closed_reason": row["closed_reason"], "skip_reason": row["skip_reason"],
@@ -556,7 +557,7 @@ def _job_detail(store: JobStore, row: sqlite3.Row, config: OutreachConfig, servi
             "id": row["id"], "title": row["title"], "company": company["name"], "status": row["status"],
             "eligibility": row["eligibility"], "eligibility_reasons": _reasons(row, "eligibility_reasons_json"),
             "relevance": row["relevance"], "relevance_reasons": _reasons(row, "relevance_reasons_json"),
-            "fit": row["fit_score"], "skills": _reasons(row, "skills_json"), "salary": _salary(row),
+            "fit": row["fit_score"], "skills": _reasons(row, "skills_json"), "salary": salary_text(row),
             "remote_status": row["remote_status"], "location": row["location_raw"],
             "employment_type": row["employment_type"], "required_yoe": row["required_yoe"],
             "posted_at": row["posted_at"], "first_seen": row["first_seen"], "report_date": row["report_date"],

@@ -1,4 +1,4 @@
-"""The email: profile facts, the fact guard, the writer (through a fake client), and stored drafts."""
+"""The email: the fact guard, the writer (through a fake model), and stored drafts."""
 
 import json
 from types import SimpleNamespace
@@ -8,10 +8,12 @@ import pytest
 from jobhunter import tracking
 from jobhunter.config import OutreachConfig
 from jobhunter.contacts import save_manual_contact
+from jobhunter.llm import JsonModel
 from jobhunter.pitch import (
-    PitchWriter, assemble, check_draft, cv_for, draft_for_job, edit_draft, follow_up, load_profile, reassemble,
+    PitchWriter, assemble, build_writer, check_draft, cv_for, draft_for_job, edit_draft, follow_up, reassemble,
     subject_for, to_html, to_plain,
 )
+from jobhunter.profile import load_profile
 from jobhunter.store import JobStore
 
 from .conftest import FIXTURES, NOW, store_job
@@ -24,14 +26,6 @@ CONFIG = OutreachConfig(pitch_mode="ai")  # the AI-writer tests
 def check(pitch, hook="I saw your Backend Engineer posting.", evidence=(), subject="Backend role at Acme"):
     return check_draft(subject, hook, pitch, list(evidence), PROFILE, POSTING, {"django", "kafka"},
                        ["Acme"])
-
-
-def test_profile_facts_leave_out_contact_details_and_salary():
-    text = PROFILE.facts_text
-    assert "800+ concurrent Python jobs" in text and "team of 5 engineers" in text
-    assert "7788" not in text and "4200" not in text and "me@example.com" not in text and "TODO" not in text
-    assert PROFILE.years == 3.3
-    assert PROFILE.linkedin == "linkedin.com/in/example" and "kafka" not in PROFILE.skills
 
 
 def test_real_facts_pass():
@@ -133,10 +127,12 @@ def test_follow_ups_reply_in_the_thread_and_claim_nothing_new():
     assert follow_up(2, "Re: x", None, "Acme", "Backend Engineer", PROFILE)[0] == "Re: x"
 
 
-# --- the writer, through a fake client -------------------------------------------------
+# --- the writer, through a fake model -------------------------------------------------
 
 
 class FakeClient:
+    """Anthropic's client as a JsonModel calls it: one JSON answer per call, in order."""
+
     def __init__(self, *answers):
         self.answers = list(answers)
         self.calls = []
@@ -158,14 +154,20 @@ def acme(store, filters):
     return store_job(store, filters, description="We build APIs with Python and Django.")
 
 
+def writer(client, model="claude-sonnet-5"):
+    return PitchWriter(JsonModel(model, claude=client))
+
+
 def test_a_bad_draft_is_retried_with_the_reasons(filters):
     store = JobStore(":memory:")
     job_id = acme(store, filters)
     client = FakeClient(BAD, GOOD)
-    draft = PitchWriter(client, "claude-sonnet-5").write(PROFILE, store.get(job_id), None)
+    draft = writer(client).write(PROFILE, store.get(job_id), None)
     assert draft.problems == [] and draft.attempts == 2 and draft.pitch == GOOD["pitch"]
+    assert draft.model == "claude-sonnet-5" and draft.cost_usd > 0
     first = client.calls[0]
     assert first["thinking"] == {"type": "disabled"} and first["output_config"]["format"]["type"] == "json_schema"
+    assert first["max_tokens"] == 1024
     assert "claims 5 years" in client.calls[1]["messages"][-1]["content"]
     assert "ONE line" in first["system"] and draft.subject == "Senior Backend Engineer - Mohamad Shoumar"
     assert "7788" not in first["messages"][0]["content"]  # the phone number never reaches the model
@@ -174,7 +176,7 @@ def test_a_bad_draft_is_retried_with_the_reasons(filters):
 def test_a_draft_that_stays_bad_is_blocked(filters):
     store = JobStore(":memory:")
     job_id = acme(store, filters)
-    draft_for_job(store, job_id, PitchWriter(FakeClient(BAD, BAD), "claude-sonnet-5"), PROFILE, CONFIG, NOW)
+    draft_for_job(store, job_id, writer(FakeClient(BAD, BAD)), PROFILE, CONFIG, NOW)
     app = tracking.get_application(store, job_id)
     assert app["draft_blocked"] == 1 and any("claims 5 years" in w for w in tracking.warnings_of(app))
     assert app["stage"] == tracking.NEW  # a draft alone does not move the job
@@ -183,20 +185,19 @@ def test_a_draft_that_stays_bad_is_blocked(filters):
 def test_opus_5_5_gets_low_effort_instead_of_disabled_thinking(filters):
     store = JobStore(":memory:")
     client = FakeClient(GOOD)
-    PitchWriter(client, "claude-opus-5-5").write(PROFILE, store.get(acme(store, filters)), None)
+    writer(client, "claude-opus-5-5").write(PROFILE, store.get(acme(store, filters)), None)
     assert "thinking" not in client.calls[0] and client.calls[0]["output_config"]["effort"] == "low"
 
 
 def test_your_edits_are_kept_and_unblock_sending(filters):
     store = JobStore(":memory:")
     job_id = acme(store, filters)
-    draft_for_job(store, job_id, PitchWriter(FakeClient(BAD, BAD), "claude-sonnet-5"), PROFILE, CONFIG, NOW)
+    draft_for_job(store, job_id, writer(FakeClient(BAD, BAD)), PROFILE, CONFIG, NOW)
     edit_draft(store, job_id, "Backend role", "Hi,\n\nI saw you're hiring a senior backend engineer. "
                "I built RESTful APIs in Python.\n\nCould I send you my CV?\n\nMohamad Shoumar", PROFILE, NOW)
     app = tracking.get_application(store, job_id)
     assert app["draft_edited"] == 1 and app["draft_blocked"] == 0 and tracking.warnings_of(app) == []
-    assert draft_for_job(store, job_id, PitchWriter(FakeClient(GOOD), "claude-sonnet-5"), PROFILE, CONFIG, NOW) \
-        == "kept your edited draft"
+    assert draft_for_job(store, job_id, writer(FakeClient(GOOD)), PROFILE, CONFIG, NOW) == "kept your edited draft"
     edit_draft(store, job_id, "Backend role", "Hi,\n\nAs a senior engineer I built APIs.", PROFILE, NOW)
     assert tracking.warnings_of(tracking.get_application(store, job_id)) == ['says "senior", which is not in your profile']
 
@@ -211,10 +212,8 @@ def test_a_new_contact_rebuilds_an_unedited_draft(filters):
     assert tracking.get_application(store, job_id)["body"].startswith("Hi Ana,")
 
 
-def test_deepseek_writes_drafts_through_the_same_guard(filters, monkeypatch):
+def test_deepseek_writes_drafts_through_the_same_guard(filters):
     import httpx
-
-    from jobhunter.pitch import DeepSeekPitchWriter, build_writer
 
     seen = []
     answers = [BAD, GOOD]
@@ -225,15 +224,27 @@ def test_deepseek_writes_drafts_through_the_same_guard(filters, monkeypatch):
                                          "usage": {"prompt_tokens": 2500, "completion_tokens": 120}})
 
     store = JobStore(":memory:")
-    writer = DeepSeekPitchWriter("ds-key", "deepseek-flash", http=httpx.Client(transport=httpx.MockTransport(handler)))
-    draft = writer.write(PROFILE, store.get(acme(store, filters)), None)
-    assert draft.problems == [] and draft.attempts == 2 and draft.cost_usd > 0
+    http = httpx.Client(transport=httpx.MockTransport(handler))
+    draft = PitchWriter(JsonModel("deepseek-flash", deepseek_key="ds-key", http=http)).write(PROFILE, store.get(acme(store, filters)), None)
+    assert draft.problems == [] and draft.attempts == 2 and draft.cost_usd > 0 and draft.model == "deepseek-flash"
     body = json.loads(seen[0].content)
     assert body["response_format"] == {"type": "json_object"} and body["thinking"] == {"type": "disabled"}
+    assert body["max_tokens"] == 1024
+    # JSON mode needs an example of the answer in the prompt.
+    assert body["messages"][0]["content"].endswith('{"pitch": "...", "evidence_ids": [1, 2]}')
     assert seen[0].headers["Authorization"] == "Bearer ds-key" and "ds-key" not in str(seen[0].url)
-    assert build_writer(OutreachConfig(pitch_model="deepseek-flash"))[0] is None  # no key: off, with a note
+
+
+def test_the_writer_follows_pitch_model_and_says_which_key_is_missing(monkeypatch):
+    writer_, note = build_writer(OutreachConfig(pitch_model="deepseek-flash"))
+    assert writer_ is None and "DEEPSEEK_API_KEY in .env" in note
+    writer_, note = build_writer(OutreachConfig(pitch_model="claude-sonnet-5"))
+    assert writer_ is None and "ANTHROPIC_API_KEY in .env" in note
+    writer_, note = build_writer(OutreachConfig(pitch_model="claude-code"))
+    assert writer_ is None and "Claude Code CLI" in note  # conftest: no `claude` here
     monkeypatch.setenv("DEEPSEEK_API_KEY", "x")
-    assert isinstance(build_writer(OutreachConfig(pitch_model="deepseek-flash"))[0], DeepSeekPitchWriter)
+    writer_, note = build_writer(OutreachConfig(pitch_model="deepseek-flash"))
+    assert isinstance(writer_, PitchWriter) and writer_.model.model == "deepseek-flash" and note is None
 
 
 def test_the_subject_claims_nothing_new():

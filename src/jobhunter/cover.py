@@ -36,12 +36,12 @@ from pathlib import Path
 from . import tracking
 from .config import OutreachConfig, my_details
 from .contacts import clean_company_name, domain_from_links, job_company, skip_list_match
-from .cv import TAG_RULES, Role, _camel, _sections, job_tags, parse_titles, printed_title
+from .cv import TAG_RULES, Role, camel, job_tags, parse_titles, printed_title
 from .extract import extract_skills
+from .grounding import YEAR_WORDS, capitalized_words, check_years, fact_has, number_context, unsupported_seniority
 from .llm import JsonModel, Usage, find_quote, json_model
-from .pitch import (
-    _SENIORITY, _capitalized_words, _fact_has, _number_context, _strip_notes, role_family, short_title, split_tags,
-)
+from .pitch import role_family, short_title
+from .profile import sections, skills_in, split_tags, strip_notes, years_in
 from .store import JobStore
 from .text import iso
 
@@ -53,7 +53,6 @@ MAX_WORDS = 65
 MIN_SENTENCES, MAX_SENTENCES = 2, 3
 GUIDELINES_FILE = Path(__file__).resolve().parents[2] / "config" / "cover_letter_guidelines.md"
 _FIRST_PERSON = re.compile(r"\b(?:I|I'm|I've|I'd|I'll|my|me|mine|myself)\b", re.I)
-_YEARS = {"year", "years", "yr", "yrs"}
 _OFFSET = re.compile(r"\b(?:UTC|GMT)\s?[+\-−]\s?\d{1,2}(?::\d\d)?", re.I)
 _CALENDAR = {"january", "february", "march", "april", "may", "june", "july", "august", "september", "october",
              "november", "december", "monday", "tuesday", "wednesday", "thursday", "friday"}
@@ -95,27 +94,20 @@ class LetterFacts:
         return "\n".join(self.facts)
 
 
-def _skills_of(text: str) -> set[str]:
-    found = set(extract_skills(text))
-    if re.search(r"\bdistributed\b", text, re.I):  # stated as "distributed/backend systems"
-        found.add("distributed systems")
-    return found
-
-
 def _bullets(body: str) -> list[str]:
-    lines = [_strip_notes(raw.strip()[2:]) for raw in body.splitlines() if raw.strip().startswith("- ")]
+    lines = [strip_notes(raw.strip()[2:]) for raw in body.splitlines() if raw.strip().startswith("- ")]
     return [line for line in lines if line and "TODO" not in line]
 
 
 def load_letter_facts(profile_path: Path, tags) -> LetterFacts:
     """The facts a letter for a job with these tags may use, in the profile's order."""
     text = profile_path.read_text()
-    sections = _sections(text)
+    by_title = sections(text)
     wanted = set(tags) | {"core"}
-    facts = _bullets(sections.get("Summary of experience", ""))
+    facts = _bullets(by_title.get("Summary of experience", ""))
     roles: list[tuple[Role, str]] = []  # (role, employer)
     paragraphs: list[list[str]] = [[]]
-    for raw in sections.get("Experience", "").splitlines():
+    for raw in by_title.get("Experience", "").splitlines():
         line = raw.strip()
         if line.startswith("### "):
             head, *rest = re.split(r"\s{2,}", line[4:].strip())
@@ -128,7 +120,7 @@ def load_letter_facts(profile_path: Path, tags) -> LetterFacts:
         elif line.lower().startswith("printed title:"):
             roles[-1][0].titles = parse_titles(line.split(":", 1)[1])
         elif line.startswith("- "):
-            bullet_tags, bullet = split_tags(_strip_notes(line[2:]))
+            bullet_tags, bullet = split_tags(strip_notes(line[2:]))
             if bullet and "TODO" not in bullet:
                 roles[-1][0].bullets.append(bullet)
                 roles[-1][0].tags.append(bullet_tags)
@@ -139,17 +131,16 @@ def load_letter_facts(profile_path: Path, tags) -> LetterFacts:
         where = f"{title} at {employer}" if employer else title
         facts += [f"{where} ({role.dates}): {b}" for b, t in zip(role.bullets, role.tags) if t & wanted]
     for lines in paragraphs:
-        joined = _strip_notes(" ".join(lines))
+        joined = strip_notes(" ".join(lines))
         if joined and "TODO" not in joined and "answering" not in joined:
             facts.append(joined)
     for name in ("Skills (confirmed)", "Projects", "Education", "Certifications"):
-        facts += _bullets(sections.get(name, ""))
+        facts += _bullets(by_title.get(name, ""))
 
     basics = my_details(text)
     joined = "\n".join(facts)
-    years = re.search(r"\bAbout (\d+(?:\.\d+)?) years\b", joined)
     return LetterFacts(
-        facts=facts, skills=_skills_of(joined), years=float(years.group(1)) if years else None,
+        facts=facts, skills=skills_in(joined), years=years_in(joined),
         name=basics.get("Name", ""),
         employers=list(dict.fromkeys(e for _, employer in roles if (e := re.sub(r"\s*\(.*?\)", "", employer).strip()))),
     )
@@ -269,13 +260,12 @@ def check_sentence(text: str, facts: LetterFacts, job: JobText) -> list[str]:
     about_me = bool(_FIRST_PERSON.search(bare))
     problems: list[str] = []
     # "one" is mostly not a number in prose ("one of", "no one").
-    for number, suffix, word in _number_context(re.sub(r"\bone\b", "a", bare, flags=re.I)):
-        if word in _YEARS and about_me:
-            if facts.years is None or float(number) > int(facts.years):
-                problems.append(f"claims {number}{suffix} years; the profile has about "
-                                f"{facts.years if facts.years is not None else 'no stated'} years")
+    for number, suffix, word in number_context(re.sub(r"\bone\b", "a", bare, flags=re.I)):
+        if word in YEAR_WORDS and about_me:
+            if problem := check_years(number, suffix, facts.years):
+                problems.append(problem)
             continue
-        if any(_fact_has(number, word, s) for s in facts.facts) or _fact_has(number, word, job.posting):
+        if any(fact_has(number, word, s) for s in facts.facts) or fact_has(number, word, job.posting):
             continue
         problems.append(f'"{number}{suffix}{" " + word if word else ""}" is in neither your facts nor the posting '
                         "or the company's pages")
@@ -285,15 +275,13 @@ def check_sentence(text: str, facts: LetterFacts, job: JobText) -> list[str]:
         elif not about_me and skill not in facts.skills and skill not in job.skills:
             problems.append(f'names "{skill}", which is in neither your facts nor the posting')
     if about_me:
-        for word in _SENIORITY:
-            if re.search(rf"\b{word}\b", bare, re.I) and not re.search(rf"\b{word}\b", facts.text, re.I):
-                problems.append(f'says "{word}", which your facts do not')
+        problems += [f'says "{word}", which your facts do not' for word in unsupported_seniority(bare, facts.text)]
     said = job.posting.lower() + (f"\n{facts.text.lower()}" if about_me else "")
     for kind in dict.fromkeys(m.group(0).lower() for m in _COMPANY_KIND.finditer(bare)):
         if not re.search(_kind_pattern(kind), said):
             problems.append(f'says "{kind}", which the posting and the company\'s pages do not')
     known = f"{facts.text}\n{job.posting}".lower()
-    for token in dict.fromkeys(_capitalized_words(text)):
+    for token in dict.fromkeys(capitalized_words(text)):
         low = token.lower()
         if low in known or low.split("-")[0] in known or low in _CALENDAR or any(low in n.lower() for n in job.names) or _OFFSET.fullmatch(token):
             continue
@@ -602,7 +590,7 @@ def _words_of(text: str) -> int:
 
 def _new_name(folder: Path, last_name: str, company: str, now: datetime) -> str:
     """Doe_CoverLetter_Acme_Oct2026.md, with _2, _3... when that name is taken (never overwrite one by hand)."""
-    base = f"{last_name or 'Me'}_CoverLetter_{_camel(company)[:30] or 'Company'}_{now:%b%Y}"
+    base = f"{last_name or 'Me'}_CoverLetter_{camel(company)[:30] or 'Company'}_{now:%b%Y}"
     name, n = f"{base}.md", 1
     while (folder / name).exists():
         n += 1

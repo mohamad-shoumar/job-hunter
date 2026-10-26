@@ -44,8 +44,9 @@ from pathlib import Path
 
 from . import tracking
 from .config import OutreachConfig
-from .contacts import _WEBMAIL, chosen_contact, clean_company_name
-from .pitch import Profile, cv_for, follow_up, to_html, to_plain
+from .contacts import WEBMAIL, chosen_contact, clean_company_name
+from .pitch import cv_for, follow_up, to_html, to_plain
+from .profile import Profile
 from .store import JobStore
 from .text import iso, parse_datetime
 
@@ -504,7 +505,7 @@ def scan_inbox(store: JobStore, inbox: GmailInbox, account: MailAccount, config:
     domains: dict[str, sqlite3.Row] = {}
     for row in ours.values():
         d = _domain(row["to_addr"])
-        if row["kind"] != "test" and d and d not in _WEBMAIL and d != _domain(account.address):
+        if row["kind"] != "test" and d and d not in WEBMAIL and d != _domain(account.address):
             domains.setdefault(d, row)
     # 3. New mail since the last check.
     if store.get_kv("imap_uidvalidity") != inbox.uidvalidity:

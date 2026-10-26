@@ -32,7 +32,8 @@ from .fitgrade import sort_grade
 from .llm import error_line
 from .mailer import check_inbox, mail_account
 from .models import SHORTLISTED
-from .pitch import build_writer, cv_for, default_cv, draft_for_job, load_profile
+from .pitch import build_writer, cv_for, default_cv, draft_for_job
+from .profile import load_profile
 from .store import JobStore
 from . import tracking
 

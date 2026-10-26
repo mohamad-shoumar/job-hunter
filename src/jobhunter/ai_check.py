@@ -307,7 +307,8 @@ def fetch_page(url: str, http) -> tuple[str, str] | None:
     return text.strip(), html.unescape(raw)
 
 
-def _for_quotes(url: str, page: tuple[str, str]) -> list[tuple[str, str]]:
+def for_quotes(url: str, page: tuple[str, str]) -> list[tuple[str, str]]:
+    """What `find_quote` searches on one page from fetch_page: its readable text, then its HTML when that differs."""
     text, raw = page
     return [(url, text)] + ([(url, raw)] if raw != text else [])
 
@@ -366,7 +367,7 @@ class PagesChecker:
                                 ANSWER_EXAMPLE, max_tokens=1024)
         pages = [(JOB_DESCRIPTION, job.description or "")]
         for url, page in fetched.items():
-            pages += _for_quotes(url, page)
+            pages += for_quotes(url, page)
         return _result(answer, pages, self.config.model, now, usage)
 
 
@@ -391,7 +392,7 @@ class WebChecker:
         stated_url = str(answer.get("source_url") or "").strip()
         pages = [(JOB_DESCRIPTION, job.description or "")]
         if stated_url.startswith("http") and (page := fetch_page(stated_url, self.http)):
-            pages += _for_quotes(stated_url, page)
+            pages += for_quotes(stated_url, page)
         return _result(answer, pages, self.config.web_model, now, usage)
 
 

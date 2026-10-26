@@ -54,11 +54,10 @@ from . import tracking
 from .config import OutreachConfig
 from .contacts import clean_company_name
 from .extract import extract_skills
+from .grounding import capitalized_words, fact_has, number_context, unsupported_seniority
 from .llm import JsonModel, Usage, json_model, key_note
-from .pitch import (
-    _SENIORITY, Profile, _capitalized_words, _fact_has, _number_context, _strip_notes, cv_for, load_profile,
-    role_family, split_tags,
-)
+from .pitch import cv_for, role_family
+from .profile import Profile, load_profile, sections, split_tags, strip_notes
 from .store import JobStore
 from .text import iso
 
@@ -150,21 +149,13 @@ def split_items(row: str) -> list[str]:
     return [x.strip() for x in items if x.strip()]
 
 
-def _sections(text: str) -> dict[str, str]:
-    sections = {}
-    for part in re.split(r"^## ", text, flags=re.M)[1:]:
-        title, _, body = part.partition("\n")
-        sections[title.strip()] = body
-    return sections
-
-
 def load_facts(profile_path: Path) -> tuple[list[Role], dict[str, list[str]], list[str]]:
     """(roles newest first, skills rows by label, allowed headlines) from the profile."""
     text = profile_path.read_text()
-    sections = _sections(text)
+    by_title = sections(text)
     roles: list[Role] = []
-    for raw in sections.get("Experience", "").splitlines():
-        line = _strip_notes(raw.strip())
+    for raw in by_title.get("Experience", "").splitlines():
+        line = strip_notes(raw.strip())
         if line.startswith("### "):
             head, *rest = re.split(r"\s{2,}", line[4:].strip())
             roles.append(Role(f"R{len(roles) + 1}", head.split(" — ")[0].strip(), rest[0] if rest else "", []))
@@ -175,13 +166,13 @@ def load_facts(profile_path: Path) -> tuple[list[Role], dict[str, list[str]], li
             roles[-1].bullets.append(bullet)
             roles[-1].tags.append(tags)
     skills = {}
-    for raw in sections.get("Skills (confirmed)", "").splitlines():
+    for raw in by_title.get("Skills (confirmed)", "").splitlines():
         m = re.match(r"- ([^:]+): (.+)$", raw.strip())
         if m and "TODO" not in m.group(2):
             skills[m.group(1).strip()] = split_items(m.group(2))
     headlines = []
     m = re.search(r"^- Headline: (.+)$", text, re.M)
-    for part in ([m.group(1)] if m else []) + re.split(r"[·\n]", sections.get("Target roles", "")):
+    for part in ([m.group(1)] if m else []) + re.split(r"[·\n]", by_title.get("Target roles", "")):
         part = part.strip()
         if part and "TODO" not in part and part not in headlines:
             headlines.append(part)
@@ -306,17 +297,15 @@ def check_bullet(text: str, sources: list[str]) -> list[str]:
         return ["it is empty"]
     cited = " ".join(sources)
     problems = []
-    for number, suffix, word in _number_context(text):
-        if not any(_fact_has(number, word, s) for s in sources):
+    for number, suffix, word in number_context(text):
+        if not any(fact_has(number, word, s) for s in sources):
             problems.append(f'"{number}{suffix}{" " + word if word else ""}" is not in the bullet it rewords')
     cited_skills = set(extract_skills(cited))
     problems += [f'names "{s}", which the bullet it rewords does not' for s in extract_skills(text)
                  if s not in cited_skills]
-    for word in _SENIORITY:
-        if re.search(rf"\b{word}\b", text, re.I) and not re.search(rf"\b{word}\b", cited, re.I):
-            problems.append(f'says "{word}", which the bullet it rewords does not')
+    problems += [f'says "{word}", which the bullet it rewords does not' for word in unsupported_seniority(text, cited)]
     cited_words = set(re.findall(r"[a-z0-9#+]+", cited.lower()))
-    for token in dict.fromkeys(_capitalized_words(text)):
+    for token in dict.fromkeys(capitalized_words(text)):
         if not extract_skills(token) and not _knows(token, cited_words):  # skills were checked above
             problems.append(f'names "{token}", which the bullet it rewords does not')
     roots = {_root(w) for w in re.findall(r"[a-z0-9]+", cited.lower())}
@@ -711,7 +700,8 @@ def build_pdf(folder: Path, source: Path) -> tuple[Path, int]:
 _ROLE_NOISE = {"engineer", "engineering", "developer", "programmer", "remote", "ii", "iii", "iv"}
 
 
-def _camel(text: str) -> str:
+def camel(text: str) -> str:
+    """'Acme labs, Inc.' -> 'AcmeLabsInc': one word for a file name (CVs here, cover letters in cover.py)."""
     return "".join(w[:1].upper() + w[1:] for w in re.split(r"[^A-Za-z0-9]+", text) if w)
 
 
@@ -719,12 +709,12 @@ def role_label(title: str) -> str:
     """'Senior Backend Engineer (Python)' -> 'Backend', like build.py's `new Backend Stripe`."""
     words = [w for w in re.findall(r"[A-Za-z0-9]+", role_family(re.split(r"[,/]", title)[0]))
              if w.lower() not in _ROLE_NOISE]
-    return _camel(" ".join(words[:2])) or "Engineer"
+    return camel(" ".join(words[:2])) or "Engineer"
 
 
 def _new_stem(folder: Path, title: str, company: str, now: datetime) -> str:
     """Backend_Acme_Sep2026, with _2, _3... when that name is taken (never overwrite a CV made by hand)."""
-    base = f"{role_label(title)}_{_camel(company)[:30] or 'Company'}_{now:%b%Y}"
+    base = f"{role_label(title)}_{camel(company)[:30] or 'Company'}_{now:%b%Y}"
     taken = {p.stem for p in (folder / "versions").glob("*.md")} | {p.stem for p in (folder / "output").glob("*.pdf")}
     stem, n = base, 1
     while stem in taken or any(t.endswith(f"_{stem}") for t in taken):

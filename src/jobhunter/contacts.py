@@ -83,8 +83,9 @@ _NOT_COMPANY = {
 }
 _TWO_PART_TLDS = {"co.uk", "com.au", "co.il", "com.br", "co.jp", "co.nz", "co.za", "com.mx", "com.sg", "com.tr",
                   "co.in", "com.cn", "org.uk", "ac.uk", "com.lb", "com.ar", "co.kr"}
-_WEBMAIL = {"gmail.com", "googlemail.com", "outlook.com", "hotmail.com", "yahoo.com", "icloud.com", "proton.me",
-            "protonmail.com", "aol.com", "live.com", "me.com", "gmx.com", "gmx.de", "mail.com", "yandex.com"}
+# Free email providers: never a company's domain (mailer.py matches replies by domain, so it skips them too).
+WEBMAIL = {"gmail.com", "googlemail.com", "outlook.com", "hotmail.com", "yahoo.com", "icloud.com", "proton.me",
+           "protonmail.com", "aol.com", "live.com", "me.com", "gmx.com", "gmx.de", "mail.com", "yandex.com"}
 _GENERIC_WORDS = {
     "labs", "lab", "group", "global", "software", "technologies", "technology", "tech", "digital", "solutions",
     "systems", "app", "apps", "the", "and", "studio", "studios", "media", "health", "capital", "partners",
@@ -177,7 +178,7 @@ def domain_from_links(name: str, texts: list[str]) -> str | None:
         if not domain or "." not in domain or domain in seen:
             continue
         seen.append(domain)
-        if domain in _NOT_COMPANY or domain in _WEBMAIL or any(domain.endswith("." + d) for d in _NOT_COMPANY):
+        if domain in _NOT_COMPANY or domain in WEBMAIL or any(domain.endswith("." + d) for d in _NOT_COMPANY):
             continue
         if _names_match(domain.split(".")[0], key):
             return domain

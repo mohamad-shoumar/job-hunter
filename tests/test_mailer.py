@@ -14,7 +14,8 @@ from jobhunter.mailer import (
     GmailInbox, InboxMessage, MailAccount, NotSent, SendError, Unsure, bounce_info, build_message, is_auto_reply,
     new_message_id, scan_inbox, send_for_job,
 )
-from jobhunter.pitch import edit_draft, load_profile
+from jobhunter.pitch import edit_draft
+from jobhunter.profile import load_profile
 from jobhunter.store import JobStore
 from jobhunter.text import iso
 
