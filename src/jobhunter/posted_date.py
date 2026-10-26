@@ -26,7 +26,7 @@ import re
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field, replace
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from .ai_check import JOB_DESCRIPTION, AiCheckConfig, fetch_page, for_quotes, job_links
@@ -119,7 +119,7 @@ def date_in(quote: str, now: datetime) -> datetime | None:
 
 def _day(year: int, month: int, day: int) -> datetime | None:
     try:  # noon UTC, so the date stays the same in Beirut
-        return datetime(year, month, day, 12, tzinfo=timezone.utc)
+        return datetime(year, month, day, 12, tzinfo=UTC)
     except ValueError:
         return None
 

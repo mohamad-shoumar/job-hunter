@@ -30,7 +30,7 @@ import os
 import sqlite3
 from datetime import datetime, time, timedelta
 from pathlib import Path
-from typing import Callable
+from collections.abc import Callable
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError

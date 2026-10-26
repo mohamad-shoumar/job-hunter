@@ -43,7 +43,7 @@ class SmartRecruitersSource(Source):
                 if not postings:
                     result.notes.append(f"{label}: board has no open jobs")
                 result.jobs += parse_each(
-                    postings, lambda raw: self._job(http, raw, board, cutoff, label, result.errors), result.errors,
+                    postings, lambda raw, board=board, label=label: self._job(http, raw, board, cutoff, label, result.errors), result.errors,
                     label)
         return result
 

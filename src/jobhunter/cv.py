@@ -606,7 +606,7 @@ class CvWriter:
         messages: list[dict] = [{"role": "user", "content": _prompt(job, company, roles, skills, headlines)}]
         usage = Usage()
         plan, attempt = None, 0
-        for attempt in (1, 2):
+        for attempt in (1, 2):  # noqa: B007 - returned after the loop as the number of tries
             answer = self.model.ask(SYSTEM, messages, SCHEMA, usage, EXAMPLE)
             plan = plan_from(answer, roles, skills, headlines, profile)
             if not plan.problems:

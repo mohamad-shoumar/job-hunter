@@ -35,7 +35,7 @@ class BambooHRSource(Source):
                 continue
             if not listed:
                 result.notes.append(f"{board['company']}: board has no open jobs")
-            result.jobs += parse_each(listed, lambda row: self._job(http, row, board, result.errors), result.errors,
+            result.jobs += parse_each(listed, lambda row, board=board: self._job(http, row, board, result.errors), result.errors,
                                       f"{board['company']} ({token})")
         return result
 

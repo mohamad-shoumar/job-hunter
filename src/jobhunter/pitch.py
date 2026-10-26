@@ -225,7 +225,7 @@ class PitchWriter:
         problems: list[str] = []
         warnings: list[str] = []
         attempts = 0
-        for attempts in (1, 2):
+        for attempts in (1, 2):  # noqa: B007 - saved after the loop as the number of tries
             data = self.model.ask(system, messages, SCHEMA, usage, EXAMPLE, max_tokens=1024)
             problems, warnings = check_draft(
                 subject, hook, str(data.get("pitch") or ""),
@@ -392,7 +392,7 @@ def word_count(text: str) -> int:
 def save_draft(store: JobStore, job_id: int, draft: Draft, contact: sqlite3.Row | None, profile: Profile,
                now: datetime, config: OutreachConfig | None = None) -> sqlite3.Row:
     job = store.get(job_id)
-    app = tracking.ensure_application(store, job_id, now)
+    tracking.ensure_application(store, job_id, now)
     company, _ = clean_company_name(job["company"])
     body = assemble(draft.pitch, contact, company, job["title"], profile, ask_for(contact, config))
     meta = {"model": draft.model, "cost_usd": draft.cost_usd, "evidence_ids": draft.evidence_ids,

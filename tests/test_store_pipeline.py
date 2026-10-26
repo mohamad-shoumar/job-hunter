@@ -313,7 +313,6 @@ def test_reclassify_lets_the_web_app_save_while_it_runs(tmp_path, filters, monke
     # It used to hold the write lock for the whole run (minutes), so Skip in
     # the web app failed with "database is locked".
     import shutil
-    import sqlite3
 
     from jobhunter import cli, tracking
 

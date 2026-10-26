@@ -1,6 +1,6 @@
 """Stages, the timeline, follow-up dates, ghosting and the Today view."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 
 import pytest
 
@@ -23,10 +23,10 @@ def store():
 
 
 def test_business_days_skip_the_weekend():
-    friday = datetime(2026, 9, 25, 9, tzinfo=timezone.utc)
+    friday = datetime(2026, 9, 25, 9, tzinfo=UTC)
     assert friday.weekday() == 4
     assert tracking.add_business_days(friday, 1).weekday() == 0  # Monday
-    assert tracking.add_business_days(friday, 4) == datetime(2026, 10, 1, 9, tzinfo=timezone.utc)  # Thursday
+    assert tracking.add_business_days(friday, 4) == datetime(2026, 10, 1, 9, tzinfo=UTC)  # Thursday
 
 
 def test_a_new_row_is_silent_and_stage_changes_are_logged(store, filters):

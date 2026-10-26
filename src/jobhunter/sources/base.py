@@ -66,7 +66,7 @@ class BoardSource(Source):
                 continue
             if not postings:
                 result.notes.append(f"{board['company']}: board has no open jobs")
-            result.jobs += parse_each(postings, lambda raw: self.parse(raw, board), result.errors, label)
+            result.jobs += parse_each(postings, lambda raw, board=board: self.parse(raw, board), result.errors, label)
         return result
 
     def label(self, board: dict) -> str:

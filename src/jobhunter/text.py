@@ -5,7 +5,7 @@ from __future__ import annotations
 import html
 import re
 import unicodedata
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from email.utils import parsedate_to_datetime
 from html.parser import HTMLParser
 
@@ -119,7 +119,7 @@ def has_phrase(normalized_text: str, normalized_phrase: str) -> bool:
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc).replace(microsecond=0)
+    return datetime.now(UTC).replace(microsecond=0)
 
 
 def parse_datetime(value) -> datetime | None:
@@ -131,7 +131,7 @@ def parse_datetime(value) -> datetime | None:
             ts = float(value)
             if ts > 1e12:  # milliseconds
                 ts /= 1000
-            dt = datetime.fromtimestamp(ts, tz=timezone.utc)
+            dt = datetime.fromtimestamp(ts, tz=UTC)
         else:
             s = str(value).strip()
             try:
@@ -141,8 +141,8 @@ def parse_datetime(value) -> datetime | None:
     except (ValueError, TypeError, OverflowError, IndexError):
         return None
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc).replace(microsecond=0)
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC).replace(microsecond=0)
 
 
 _RELATIVE_AGE = re.compile(r"(\d+)\+?\s*(minute|hour|day|week|month)s?\s+ago", re.I)
@@ -160,4 +160,4 @@ def parse_relative_age(value: str | None, now: datetime) -> datetime | None:
 
 
 def iso(dt: datetime | None) -> str | None:
-    return dt.astimezone(timezone.utc).replace(microsecond=0).isoformat() if dt else None
+    return dt.astimezone(UTC).replace(microsecond=0).isoformat() if dt else None

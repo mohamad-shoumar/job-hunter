@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import shutil
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 
 import pytest
@@ -12,7 +12,7 @@ from jobhunter.models import REMOTE, Job
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = Path(__file__).parent / "fixtures"
-NOW = datetime(2026, 9, 25, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 9, 25, 12, 0, tzinfo=UTC)
 # Your profile (not in git, so a fresh copy has none) and the made-up example that is: tests check their shape only.
 YOUR_PROFILES = [
     pytest.param(path, id=path.name, marks=pytest.mark.skipif(not path.exists(), reason=f"no {path.name} (not in git)"))

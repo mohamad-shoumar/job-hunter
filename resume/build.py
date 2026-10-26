@@ -27,7 +27,6 @@ import csv
 import html
 import os
 import re
-import shutil
 import subprocess
 import sys
 from datetime import date
@@ -103,7 +102,7 @@ def link(url):
 
 def owner_last_name(lines):
     """The last word of MY_NAME, else of the file's "# Name" line: the start of each PDF's name."""
-    name = my_details().get("name") or next((l.strip()[2:] for l in lines if l.strip().startswith("# ")), "")
+    name = my_details().get("name") or next((line.strip()[2:] for line in lines if line.strip().startswith("# ")), "")
     return re.sub(r"[^A-Za-z0-9-]", "", (name.split() or [""])[-1]) or "Resume"
 
 

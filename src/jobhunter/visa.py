@@ -133,7 +133,7 @@ class VisaRules:
         countries = [Country(code, c.get("name", code.upper()),
                              [w for w in (normalize_words(p) for p in c.get("places", [])) if w])
                      for code, c in data["countries"].items() if not code.startswith("_")]
-        return cls(countries=countries, languages=[l.lower() for l in data.get("languages", [])],
+        return cls(countries=countries, languages=[lang.lower() for lang in data.get("languages", [])],
                    refresh_days=int(data.get("refresh_days", 7)))
 
     @property
@@ -227,7 +227,7 @@ def language_needed(job: Job, languages: list[str]) -> str | None:
     if not languages:
         return None
     text = job.description or ""
-    names = "|".join(re.escape(l) for l in languages) + "|deutsch|nederlands|español|espanol|italiano|suomi"
+    names = "|".join(re.escape(lang) for lang in languages) + "|deutsch|nederlands|español|espanol|italiano|suomi"
     asks = re.compile(
         # "Fluent German", "fluency in Dutch", "You speak German at C1", "Native or bilingual-level French"
         rf"\b(?:fluent|fluency|fluently|native|proficient|proficiency|speak|speaks|speaking|bilingual)\b[^.\n]{{0,30}}?"

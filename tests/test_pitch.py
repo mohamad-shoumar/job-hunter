@@ -12,7 +12,7 @@ from jobhunter.llm import JsonModel
 from jobhunter.models import NEW
 from jobhunter.pitch import (
     PitchWriter, assemble, build_writer, check_draft, cv_for, draft_for_job, edit_draft, follow_up, reassemble,
-    subject_for, to_html, to_plain,
+    to_html, to_plain,
 )
 from jobhunter.profile import load_profile
 from jobhunter.store import JobStore

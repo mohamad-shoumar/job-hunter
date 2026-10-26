@@ -1,7 +1,7 @@
 """Adapters against trimmed real responses (tests/fixtures), through a fake HTTP client."""
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 
 import httpx
 
@@ -91,9 +91,9 @@ def test_himalayas_daily_stops_at_the_limit():
 
 
 def test_himalayas_range_pages_until_it_passes_the_start():
-    from datetime import datetime, timezone
+    from datetime import datetime
 
-    newest = int(datetime(2026, 9, 27, tzinfo=timezone.utc).timestamp())
+    newest = int(datetime(2026, 9, 27, tzinfo=UTC).timestamp())
     pages = []
 
     def respond(params):
@@ -101,7 +101,7 @@ def test_himalayas_range_pages_until_it_passes_the_start():
         return _himalayas_page(newest - (params["page"] - 1) * 20 * 3600)  # 20 hours per page
 
     source = himalayas.HimalayasSource(["backend"], limit=40)
-    source.since = datetime(2026, 9, 23, tzinfo=timezone.utc)  # 96 hours back; page 5 covers hours 80-99
+    source.since = datetime(2026, 9, 23, tzinfo=UTC)  # 96 hours back; page 5 covers hours 80-99
     result = source.fetch(FakeHttp({himalayas.SEARCH: respond}))
     assert pages == [1, 2, 3, 4, 5]
     assert min(j.posted_at for j in result.jobs) < source.since  # reached past the start
@@ -117,12 +117,12 @@ def test_hackernews_range_reads_every_overlapping_thread():
     ]}
     thread = {"children": [{"id": 1, "text": "Acme | Backend Engineer | REMOTE<p>x", "created_at": "2026-09-02T00:00:00Z"}]}
     routes = {hackernews.SEARCH: hits, hackernews.ITEM.format(id="9"): thread, hackernews.ITEM.format(id="7"): thread}
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     daily = hackernews.HackerNewsSource().fetch(FakeHttp(routes))
     assert [n for n in daily.notes if n.startswith("thread")] == ["thread: Ask HN: Who is hiring? (September 2026)"]
     ranged = hackernews.HackerNewsSource()
-    ranged.since = datetime(2026, 8, 28, tzinfo=timezone.utc)
+    ranged.since = datetime(2026, 8, 28, tzinfo=UTC)
     notes = [n for n in ranged.fetch(FakeHttp(routes)).notes if n.startswith("thread")]
     assert notes == ["thread: Ask HN: Who is hiring? (September 2026)", "thread: Ask HN: Who is hiring? (August 2026)"]
 
@@ -417,7 +417,7 @@ def test_arbeitnow_country_from_the_site_and_twice_escaped_descriptions():
 
 
 def test_arbeitnow_keeps_wanted_titles_and_stops_at_the_look_back():
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from jobhunter.sources import arbeitnow
 
@@ -434,7 +434,7 @@ def test_arbeitnow_keeps_wanted_titles_and_stops_at_the_look_back():
     url = arbeitnow.API.format(site="https://www.arbeitnow.com")
     source = arbeitnow.ArbeitnowSource([{"site": "https://www.arbeitnow.com", "visa_sponsorship": True}],
                                        ["backend", "python", "software"], max_pages=5)
-    source.since = datetime(2026, 10, 1, tzinfo=timezone.utc)
+    source.since = datetime(2026, 10, 1, tzinfo=UTC)
     result = source.fetch(FakeHttp({url: respond}))
     assert [p["page"] for p in pages] == [1, 2] and pages[0]["visa_sponsorship"] == "true"
     titles = {j.title for j in result.jobs}
@@ -478,7 +478,7 @@ def test_jobicy_keeps_target_titles_and_its_hiring_region():
 
 
 def test_euremotejobs_reads_the_job_page_of_target_titles_only(monkeypatch):
-    monkeypatch.setattr(euremotejobs, "utcnow", lambda: datetime(2026, 10, 21, 12, tzinfo=timezone.utc))
+    monkeypatch.setattr(euremotejobs, "utcnow", lambda: datetime(2026, 10, 21, 12, tzinfo=UTC))
     listing = fixture_json("euremotejobs_listings.json")
     page = fixture_text("euremotejobs_job.html")
     http = FakeHttp({euremotejobs.LISTINGS: listing,
@@ -497,7 +497,7 @@ def test_euremotejobs_reads_the_job_page_of_target_titles_only(monkeypatch):
 
 
 def test_linkedin_fetches_pages_of_target_titles_only(monkeypatch):
-    monkeypatch.setattr(linkedin, "utcnow", lambda: datetime(2026, 10, 21, 12, tzinfo=timezone.utc))
+    monkeypatch.setattr(linkedin, "utcnow", lambda: datetime(2026, 10, 21, 12, tzinfo=UTC))
     posting = linkedin.POSTING.format(id="4478986376")
     http = FakeHttp({linkedin.SEARCH: fixture_text("linkedin_search.html"), posting: fixture_text("linkedin_job.html")})
     source = linkedin.LinkedInSource([{"keywords": "backend engineer", "location": "United Arab Emirates"}],

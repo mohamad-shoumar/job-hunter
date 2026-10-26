@@ -32,7 +32,6 @@ import logging
 import os
 import re
 import smtplib
-import socket
 import sqlite3
 import ssl
 from dataclasses import dataclass, field
@@ -149,7 +148,7 @@ class SmtpSender:
             except (smtplib.SMTPRecipientsRefused, smtplib.SMTPSenderRefused, smtplib.SMTPDataError,
                     smtplib.SMTPHeloError, smtplib.SMTPNotSupportedError) as exc:
                 raise NotSent(f"Gmail refused it ({type(exc).__name__})") from None
-            except (smtplib.SMTPServerDisconnected, socket.timeout, TimeoutError, OSError) as exc:
+            except (smtplib.SMTPServerDisconnected, TimeoutError, OSError) as exc:
                 raise Unsure(type(exc).__name__) from None
             if refused:
                 raise NotSent(f"Gmail refused {', '.join(refused)}")

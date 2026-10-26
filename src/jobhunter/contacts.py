@@ -193,14 +193,15 @@ def split_name(full_name: str) -> tuple[str, str]:
 
 def guess_email(first: str, last: str, domain: str, pattern: str | None, small: bool) -> str | None:
     """From Hunter's known pattern for the domain, else first@ (small companies) or first.last@."""
-    f, l = _name_part(first), _name_part(last)
-    if not f or not domain:
+    given, family = _name_part(first), _name_part(last)
+    if not given or not domain:
         return None
     if not pattern:
-        pattern = "{first}" if small or not l else "{first}.{last}"
-    if ("{last}" in pattern or "{l}" in pattern) and not l:
+        pattern = "{first}" if small or not family else "{first}.{last}"
+    if ("{last}" in pattern or "{l}" in pattern) and not family:
         pattern = "{first}"
-    local = pattern.replace("{first}", f).replace("{last}", l).replace("{f}", f[:1]).replace("{l}", l[:1])
+    local = (pattern.replace("{first}", given).replace("{last}", family)
+             .replace("{f}", given[:1]).replace("{l}", family[:1]))
     return f"{local}@{domain}"
 
 
@@ -518,7 +519,7 @@ class ContactFinder:
         try:
             self._run(store, job, company, now, use_claude, result)
             state = "done"
-        except Exception as exc:  # noqa: BLE001 - one company's failure never stops the others
+        except Exception as exc:  # one company's failure never stops the others
             log.warning("contact lookup for %s failed: %s", name, error_line(exc))
             result.status, result.note, state = "error", error_line(exc), "failed"
         after = self.account(refresh=True) if before else None

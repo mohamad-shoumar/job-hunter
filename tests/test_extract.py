@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 
 import pytest
 
@@ -124,7 +124,7 @@ def test_normalize_words():
 
 
 def test_parse_datetime_formats():
-    utc = timezone.utc
+    utc = UTC
     assert parse_datetime(1790320924) == datetime(2026, 9, 25, 7, 22, 4, tzinfo=utc)
     assert parse_datetime(1605753685375) == datetime(2020, 11, 19, 2, 41, 25, tzinfo=utc)
     assert parse_datetime("2026-07-24T09:08:01.643+00:00") == datetime(2026, 7, 24, 9, 8, 1, tzinfo=utc)

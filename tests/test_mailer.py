@@ -22,7 +22,7 @@ from jobhunter.store import JobStore
 from jobhunter.store.applications import events_for, get_application
 from jobhunter.text import iso
 
-from .conftest import FIXTURES, NOW, ROOT, store_job
+from .conftest import FIXTURES, NOW, store_job
 
 PROFILE = load_profile(FIXTURES / "profile" / "master_profile.md")
 ME = MailAccount("me@gmail.com", "app-password", "Mohamad Shoumar")

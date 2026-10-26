@@ -62,7 +62,7 @@ def run_outreach(store: JobStore, paths: Paths, new_ids: list[int], now: datetim
                 run = find_contacts(store, finder, new_shortlisted, now, limit, use_claude=use_claude)
                 summary["contacts"] = run.to_dict()
                 ready = run.found_job_ids
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.exception("contact lookup failed")
             summary["errors"].append(f"contacts: {error_line(exc)}")
 
@@ -81,9 +81,9 @@ def run_outreach(store: JobStore, paths: Paths, new_ids: list[int], now: datetim
                     try:
                         status = draft_for_job(store, job_id, writer, profile, config, now)
                         summary["drafts"].append(f"#{job_id}: {status}")
-                    except Exception as exc:  # noqa: BLE001
+                    except Exception as exc:
                         summary["errors"].append(f"draft #{job_id}: {error_line(exc)}")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.exception("drafting failed")
             summary["errors"].append(f"drafts: {error_line(exc)}")
 
@@ -118,7 +118,7 @@ def run_outreach(store: JobStore, paths: Paths, new_ids: list[int], now: datetim
             store.commit()
             if ghosted:
                 summary["notes"].append(f"{len(ghosted)} closed as ghosted")
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.exception("inbox check failed")
         summary["errors"].append(f"inbox: {error_line(exc)}")
     return summary
@@ -157,8 +157,8 @@ def prepare(summary: dict, key: str, label: str, rows: list, done, limit: int, b
         for row in todo[:limit]:
             try:
                 summary[key].append(f"#{row['id']}: {make(writer, row['id'])}")
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 summary["errors"].append(f"{label} #{row['id']}: {error_line(exc)}")
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.exception("%s step failed", label)
         summary["errors"].append(f"{key}: {error_line(exc)}")

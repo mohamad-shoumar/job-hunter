@@ -71,7 +71,7 @@ class LinkedInSource(Source):
     def fetch(self, http) -> SourceResult:
         result = SourceResult(self.name)
         now = utcnow()
-        seconds = int(((now - self.since).total_seconds() if self.since else self.hours * 3600))
+        seconds = int((now - self.since).total_seconds() if self.since else self.hours * 3600)
         cards: dict[str, dict] = {}
         for search in self.searches:
             label = f'"{search["keywords"]}" in {search["location"]}'

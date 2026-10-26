@@ -23,7 +23,6 @@ from jobhunter.models import (
     ELIGIBLE,
     LIKELY,
     NEEDS_REVIEW,
-    NOT_ELIGIBLE,
     REJECTED,
     SHORTLISTED,
     UNCLEAR,
