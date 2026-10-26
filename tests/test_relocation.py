@@ -5,13 +5,13 @@ from jobhunter.config import Filters
 from jobhunter.extract import enrich
 from jobhunter.models import HYBRID, ONSITE, REJECTED, REMOTE, SHORTLISTED
 
-from .conftest import NOW, ROOT, make_job
+from .conftest import FIXTURES, NOW, make_job
 
 
 @pytest.fixture
 def floor_filters(monkeypatch):
     monkeypatch.setenv("RELOCATION_MIN_MONTHLY_USD", "4200")
-    return Filters.load(ROOT / "config" / "filters.json")
+    return Filters.load(FIXTURES / "filters.json")
 
 
 def _classify(filters, **overrides):

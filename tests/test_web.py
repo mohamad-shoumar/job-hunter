@@ -38,6 +38,7 @@ class FakeServices(Services):
 
 @pytest.fixture
 def home(tmp_path, filters):
+    # The shipped config/ on purpose: the app needs a whole project folder (outreach, sources, cover guidelines).
     shutil.copytree(ROOT / "config", tmp_path / "config")
     shutil.copytree(FIXTURES / "profile", tmp_path / "profile")
     store = JobStore(tmp_path / "data" / "jobs.sqlite")

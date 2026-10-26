@@ -416,6 +416,7 @@ class CvServices(FakeServices):
 
 @pytest.fixture
 def cv_client(tmp_path, resume, filters):
+    # The shipped config/ on purpose: the app needs a whole project folder (outreach, sources, cover guidelines).
     shutil.copytree(ROOT / "config", tmp_path / "config")
     shutil.copytree(FIXTURES / "profile", tmp_path / "profile")
     settings = json.loads((tmp_path / "config" / "outreach.json").read_text())

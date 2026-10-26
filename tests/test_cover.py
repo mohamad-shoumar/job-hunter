@@ -287,6 +287,7 @@ def test_relative_folders_are_inside_the_project_and_letters_are_not_automatic(t
     assert config.cv_dir == str(tmp_path.resolve() / "resume" / "output")
     assert config.cover_model == "" and config.auto_cover is False and config.cover_paragraph == ""
     assert config.cover_guidelines == str(tmp_path.resolve() / "config" / "cover_letter_guidelines.md")
+    # The shipped file on purpose: letters only on request, by Claude Code, are your settled choices (2026-10-20).
     shipped = OutreachConfig.load(ROOT / "config" / "outreach.json")
     assert shipped.auto_cover is False and shipped.cover_model == "claude-code" and shipped.cover_paragraph
 
@@ -338,6 +339,7 @@ class CoverServices(FakeServices):
 
 @pytest.fixture
 def cover_client(tmp_path, filters):
+    # The shipped config/ on purpose: the app needs a whole project folder (outreach, sources, cover guidelines).
     shutil.copytree(ROOT / "config", tmp_path / "config")
     shutil.copytree(FIXTURES / "profile", tmp_path / "profile")
     store = JobStore(tmp_path / "data" / "jobs.sqlite")

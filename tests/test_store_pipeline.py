@@ -315,6 +315,7 @@ def test_reclassify_leaves_tracking_alone(tmp_path, filters):
 
     from .conftest import ROOT, store_job
 
+    # The shipped config/ on purpose: the CLI needs a whole project folder.
     shutil.copytree(ROOT / "config", tmp_path / "config")
     store = JobStore(tmp_path / "data" / "jobs.sqlite")
     job_id = store_job(store, filters)
@@ -337,6 +338,7 @@ def test_reclassify_lets_the_web_app_save_while_it_runs(tmp_path, filters, monke
 
     from .conftest import ROOT, store_job
 
+    # The shipped config/ on purpose: the CLI needs a whole project folder.
     shutil.copytree(ROOT / "config", tmp_path / "config")
     db = tmp_path / "data" / "jobs.sqlite"
     store = JobStore(db)

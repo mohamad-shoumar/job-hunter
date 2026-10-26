@@ -1,0 +1,163 @@
+{
+  "_about": "Deterministic job filters. Title keywords match whole words on a normalized title: lowercase, no accents, 'back-end'/'back end' -> 'backend', 'full-stack' -> 'fullstack', 'front-end' -> 'frontend', 'Sr.' -> 'senior', plurals of engineer/developer folded. After editing, run `jobhunter reclassify` to re-apply to stored jobs.",
+
+  "_max_posting_age_days": "Two weeks, for every source, company careers pages and the visa list included (only a --from/--to date range asks for older jobs): watched boards read whole careers pages, which keep postings up for months. Measured from posting to when the job was found.",
+  "max_posting_age_days": 14,
+  "reject_if_required_yoe_at_least": 6,
+  "stretch_yoe_at_least": 5,
+  "dedupe_window_days": 60,
+
+  "_blocked_companies": "Companies you never want shortlisted again. Rejected before any other rule, with the reason quoted. Matched on the normalized company name (Inc, Ltd, .com etc. ignored).",
+  "blocked_companies": [
+    {"name": "Tailscale", "why": "roles need residence in Canada, the US or the UK"},
+    {"name": "Reddit", "why": "remote roles are US-only"},
+    {"name": "WorkHero", "why": "international engineering roles closed; the rest are US-only"}
+  ],
+
+  "_agencies": "Staffing agencies and talent marketplaces: they repost other companies' jobs, sell vetted developers or pay per task. Rejected (code agency) with what matched: a name below, a whole word in the company name, or a phrase in the posting. not_agencies: real companies a name word would catch. Checked against the stored jobs 2026-10-10: 'our clients', 'talent pool' and 'talent network' are left out because real companies (Zscaler, Percona, GitLab) use them.",
+  "agencies": {
+    "names": [
+      "Jobs for Humanity", "EWOR", "Xperteez Technology", "G2i", "micro1", "Turing", "Proxify", "Alignerr",
+      "Toptal", "remote quest jobs", "remotepromsp", "TechBiz Global", "Talent Journey", "XKTalent Inc. - Rimutee",
+      "Arc.dev", "Crossover", "Andela", "Mercor", "Outlier", "DataAnnotation", "BairesDev", "Lemon.io", "Gun.io",
+      "Braintrust", "Revelo", "Terminal.io", "Hired", "Jobgether", "ZeinCrew", "Vermillion Analytics",
+      "SupportYourApp", "Qureos", "OpenTrain AI", "Vetto", "A.Team", "Remotebase", "RemoteHub", "Workana",
+      "DistantJob", "Akkodis", "Opinov8", "Growe Talents", "EasySoftGroup", "SynergisticIT", "Ampcus",
+      "Embedded Shishya", "Oxford Knight", "Allshore Talent", "Careerswift"
+    ],
+    "name_words": [
+      "talent", "talents", "recruiter", "recruiters", "recruiting", "recruitment", "staffing",
+      "headhunter", "headhunters", "headhunting", "outsourcing", "hiring solutions", "talent platform"
+    ],
+    "description_phrases": [
+      "on behalf of our client", "on behalf of a client", "on behalf of my client", "a client of ours",
+      "our client is a", "our client is an", "our client is looking", "our client is seeking", "our client is hiring",
+      "my client is", "paid per task", "join our talent network and", "we connect top developers",
+      "we match top developers", "top 3% of"
+    ],
+    "not_agencies": []
+  },
+
+  "_relocation": "Countries you would move to. A job there may be on-site or hybrid (elsewhere only remote counts); 'Remote (UAE)' counts too, since it means living there. Rejected only when the posting wants nationals or people already there (title_local_only, local_only; quoted), or pays under RELOCATION_MIN_MONTHLY_USD in .env. sponsor: the sentence is quoted as a good sign. ask_about: quoted as a note, not a rejection. Matched as whole words, any case. From research 2026-10-10 (docs/research).",
+  "relocation": {
+    "countries": "the UAE or Qatar",
+    "places": [
+      "United Arab Emirates", "UAE", "U.A.E", "Emirates", "Dubai", "Abu Dhabi", "Sharjah", "Ajman", "Ras Al Khaimah",
+      "Al Ain", "Qatar", "Doha", "Lusail"
+    ],
+    "title_local_only": [
+      "UAE National", "UAE Nationals", "Emirati", "Emiratis", "Qatari", "Qataris", "National only", "Nationals only"
+    ],
+    "local_only": [
+      "UAE nationals only", "open to UAE nationals", "for UAE nationals", "Emirati nationals only", "Emiratis only",
+      "Emirati candidates only", "Qatari nationals only", "open to Qatari nationals", "for Qatari nationals",
+      "Qataris only", "children of Qatari mothers", "family book", "UAE residents only", "Qatar residents only",
+      "currently residing in the UAE", "currently residing in UAE", "currently based in the UAE",
+      "currently based in UAE", "currently residing in Qatar", "currently based in Qatar", "must be in the UAE",
+      "must be residing in the UAE", "must be residing in Qatar", "transferable visa", "transferrable visa",
+      "transferable residence visa", "own visa", "own sponsorship", "visa holders only", "valid UAE residence visa",
+      "valid Qatar residence permit", "no visa sponsorship", "no sponsorship", "do not sponsor", "does not sponsor",
+      "not able to sponsor", "unable to sponsor", "cannot sponsor", "will not sponsor", "not offer visa sponsorship",
+      "visa sponsorship is not available", "sponsorship is not available", "local hire only", "local candidates only",
+      "locals only", "NOC from current employer"
+    ],
+    "sponsor": [
+      "visa sponsorship", "visa provided", "visa will be provided", "employment visa provided", "we sponsor", "will sponsor",
+      "relocation package", "relocation support", "relocation assistance", "relocation allowance",
+      "relocation bonus", "relocate to Dubai", "relocate to Abu Dhabi", "relocate to Doha", "relocation to Dubai",
+      "relocation to Abu Dhabi", "relocation to Doha", "open to international candidates", "candidates from abroad",
+      "international applicants"
+    ],
+    "ask_about": [
+      "immediate joiner", "immediate joiners", "join immediately", "available immediately", "immediately available",
+      "join within 2 weeks", "local candidates preferred", "preference for local", "preference will be given",
+      "priority to UAE nationals", "UAE nationals preferred", "Emiratis preferred", "visit visa"
+    ]
+  },
+
+  "_visa_list": "Countries you would move to on a work visa. A target role there (on-site, hybrid, or remote for people living there) goes to the separate visa list (status visa_list) only with evidence the employer sponsors visas, quoted: the posting offers one, a Hacker News header says VISA, or the company is on that country's government sponsor list (uk, nl, ie: data/sponsors/, `jobhunter sponsors --update`, refreshed by the daily run every refresh_days). Rejected, quoted: the posting refuses or wants a right to work you don't have (no_sponsor), asks for or is written in one of `languages` (language_required: your profile lists Arabic and English only), or says nothing (no_visa_evidence). The phrases are in src/jobhunter/visa.py. Places in a location that also names a US state, the US or Canada are skipped ('Dublin, OH'); 'Cambridge' (MA), 'Wales' (New South Wales) and 'England' (New England) are left out; London, UK and United Kingdom cover them. Researched 2026-10-13 (docs/research).",
+  "visa_list": {
+    "refresh_days": 7,
+    "languages": ["german", "dutch", "finnish", "spanish", "italian", "french"],
+    "countries": {
+      "nl": {"name": "the Netherlands", "places": [
+        "Netherlands", "The Netherlands", "Holland", "Nederland", "Amsterdam", "Rotterdam", "The Hague", "Den Haag",
+        "Utrecht", "Eindhoven", "Delft", "Leiden", "Groningen", "Haarlem", "Amstelveen", "Hoofddorp", "Schiphol"]},
+      "de": {"name": "Germany", "places": [
+        "Germany", "Deutschland", "Berlin", "Munich", "München", "Hamburg", "Frankfurt", "Cologne", "Köln",
+        "Stuttgart", "Düsseldorf", "Leipzig", "Karlsruhe", "Dresden", "Hannover", "Nuremberg", "Nürnberg", "Bonn"]},
+      "fi": {"name": "Finland", "places": ["Finland", "Suomi", "Helsinki", "Espoo", "Tampere", "Oulu", "Turku", "Vantaa"]},
+      "uk": {"name": "the UK", "places": [
+        "United Kingdom", "UK", "U.K.", "Great Britain", "Scotland", "Northern Ireland",
+        "London", "Manchester", "Edinburgh", "Bristol", "Leeds", "Glasgow", "Belfast", "Oxford", "Reading",
+        "Brighton", "Newcastle upon Tyne", "Sheffield", "Nottingham", "Liverpool"]},
+      "ie": {"name": "Ireland", "places": ["Ireland", "Republic of Ireland", "Dublin", "Cork", "Galway", "Limerick"]},
+      "es": {"name": "Spain", "places": [
+        "Spain", "España", "Madrid", "Barcelona", "Valencia", "Malaga", "Málaga", "Seville", "Sevilla", "Bilbao"]},
+      "it": {"name": "Italy", "places": ["Italy", "Italia", "Milan", "Milano", "Rome", "Roma", "Turin", "Torino", "Bologna", "Florence"]}
+    }
+  },
+
+  "_title_include": "A title must contain at least one of these, or be an AI engineering role: 'AI', 'LLM', 'GenAI' or 'Agentic' followed within three words by engineer/developer ('AI Harness Engineer'; relevance.py). Lead titles (Technical Lead, Engineering Lead) are left out on purpose: when they state years, most ask for 5+ (checked 2026-10-19).",
+  "title_include": [
+    "platform engineer", "web engineer", "automation developer", "distributed systems engineer", "microservices engineer",
+    "backend", "software engineer", "software engineering", "software developer", "software development engineer", "web developer",
+    "python", "fastapi", "django", "flask",
+    "ai engineer", "applied ai", "ai ml engineer", "llm engineer", "genai engineer", "generative ai engineer",
+    "ai developer", "ai automation", "automation engineer", "ai application engineer", "ai agent engineer",
+    "agent engineer", "agents engineer", "ai platform engineer",
+    "forward deployed", "solutions engineer", "solution engineer",
+    "fullstack",
+    "api engineer", "api developer", "integration engineer", "integrations engineer",
+    "founding engineer", "product engineer",
+    "trading systems", "trading engineer", "trading developer", "algorithmic trading",
+    "quant developer", "quantitative developer"
+  ],
+
+  "_junior_only": "AI and forward-deployed roles you apply to only at junior level (the user's call 2026-10-20; backend, software and solutions roles keep the years rules above). A title is one when it has a word from `roles` or is an AI engineering role (relevance.py), unless it also names one of `unless_title_names` ('Senior Python / AI Backend Engineer' is a backend role). Rejected (code junior_only), quoted: a word from `title_words` in the title, or a stated years ask at or above reject_if_required_yoe_at_least. The years can be in any field ('3+ years of software, 1+ with LLMs' counts as 3). No years stated is kept.",
+  "junior_only": {
+    "roles": [
+      "forward deployed", "applied ai", "ai engineer", "ai developer", "ai automation", "agent engineer",
+      "agents engineer", "llm engineer", "genai engineer", "ai platform engineer"
+    ],
+    "unless_title_names": ["backend", "fullstack"],
+    "title_words": ["senior", "lead"],
+    "reject_if_required_yoe_at_least": 3
+  },
+
+  "_title_exclude": "Seniority and job-function words. Any of these rejects the title, with no exceptions.",
+  "title_exclude": [
+    "manager", "director", "vp", "vice president", "head of", "chief", "cto",
+    "intern", "internship", "working student", "apprentice", "trainee",
+    "staff", "principal", "distinguished", "architect",
+    "embedded", "firmware", "hardware", "fpga",
+    "sre", "site reliability", "security engineer", "network",
+    "salesforce", "sap", "servicenow", "wordpress", "shopify", "magento", "unity", "unreal",
+    "support", "sales", "recruiter", "marketing",
+    "trainer", "annotator", "annotation", "labeling", "tutor"
+  ],
+
+  "_title_exclude_single_role": "Specialties. Rejected, unless the title also names a target role: 'Frontend / Backend Engineer' passes.",
+  "title_exclude_single_role": [
+    "frontend", "ios", "android", "mobile", "designer", "ux",
+    "qa", "quality assurance", "quality engineer", "test", "tester", "sdet", "devops"
+  ],
+
+  "_title_exclude_unless_python": "A role built on another language. Rejected unless the title also says Python.",
+  "title_exclude_unless_python": [
+    "java", "dotnet", "csharp", "php", "laravel", "symfony", "ruby", "rails", "golang", "go",
+    "rust", "cpp", "scala", "kotlin", "elixir", "erlang", "clojure", "haskell", "swift",
+    "spring", "abap", "cobol", "perl", "delphi", "flutter", "react native", "angular", "vue"
+  ],
+
+  "_fit_weights": "Points per skill found in the posting, based on profile/master_profile.md. Only used to sort the report.",
+  "fit_weights": {
+    "python": 3, "fastapi": 3, "django": 2, "flask": 1, "sqlalchemy": 1, "celery": 1, "pydantic": 1, "asyncio": 1,
+    "postgresql": 2, "sql": 1, "mongodb": 1, "redis": 1, "kafka": 1,
+    "aws": 2, "serverless": 2, "docker": 1, "kubernetes": 1, "datadog": 1, "grafana": 1,
+    "rest api": 1, "microservices": 1, "distributed systems": 2,
+    "llm": 2, "rag": 1, "langchain": 1, "langgraph": 1, "ai agents": 2,
+    "trading": 2, "backtesting": 2, "crypto": 1,
+    "react": 1, "nodejs": 1, "typescript": 1, "javascript": 1
+  }
+}

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -79,8 +80,17 @@ def no_real_keys(monkeypatch):
 
 @pytest.fixture
 def filters() -> Filters:
-    """The real config/filters.json, so tests fail if the shipped config breaks."""
-    return Filters.load(ROOT / "config" / "filters.json")
+    """A frozen copy of config/filters.json, so editing a preference there (years cap, blocked companies,
+    agencies...) never breaks a rule test. Add a key here when a rule needs one. test_config.py checks
+    that the real file still loads."""
+    return Filters.load(FIXTURES / "filters.json")
+
+
+def copy_config(home: Path) -> None:
+    """A project folder's config/: the shipped files, with the frozen filters the `filters` fixture uses,
+    so the CLI and the web app judge jobs by the same rules as the tests that stored them."""
+    shutil.copytree(ROOT / "config", home / "config")
+    shutil.copy(FIXTURES / "filters.json", home / "config" / "filters.json")
 
 
 def make_job(**overrides) -> Job:

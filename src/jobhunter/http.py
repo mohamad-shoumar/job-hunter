@@ -35,10 +35,13 @@ def wait_for_network(host: str = "api.github.com", timeout: float = 300.0, step:
 
 
 class Http:
-    def __init__(self, timeout: float = 30.0, retries: int = 2, user_agent: str = DEFAULT_USER_AGENT):
+    def __init__(self, timeout: float = 30.0, retries: int = 2, user_agent: str = DEFAULT_USER_AGENT,
+                 transport: httpx.BaseTransport | None = None):
+        """`transport` is for tests (httpx.MockTransport); None is the real network."""
         self.retries = retries
         self._client = httpx.Client(
             timeout=timeout,
+            transport=transport,
             follow_redirects=True,
             headers={
                 "User-Agent": user_agent,

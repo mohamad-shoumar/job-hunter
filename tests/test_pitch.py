@@ -14,7 +14,7 @@ from jobhunter.pitch import (
 )
 from jobhunter.store import JobStore
 
-from .conftest import FIXTURES, NOW, ROOT, store_job
+from .conftest import FIXTURES, NOW, store_job
 
 PROFILE = load_profile(FIXTURES / "profile" / "master_profile.md")
 POSTING = "Backend Engineer\nWe use Django and Kafka. 5+ years required. A team of 12."
@@ -67,7 +67,13 @@ def test_unknown_tool_names_are_a_soft_warning():
     assert problems == [] and warnings == ['"Snowflake" is not in your profile or the posting; check it']
 
 
-FIXED = OutreachConfig.load(ROOT / "config" / "outreach.json")
+# Today's email from config/outreach.json, frozen, so rewording yours there never breaks these tests.
+FIXED = OutreachConfig(
+    pitch_mode="fixed", subject_template="{title} - {name}", cv_dir=str(FIXTURES / "no_cvs"),
+    pitch_text="I led my team's move to AI-first engineering, with 115+ AI workflows running in production.",
+    ask_text="Once this role is filled, what's the first thing you'd want that person to get right?",
+    hr_ask_text="From your side, what quality stands out the most for this role at {company}?",
+)
 
 
 def test_the_email_is_your_template(filters):
