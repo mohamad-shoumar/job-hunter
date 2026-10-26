@@ -23,7 +23,7 @@ from urllib.parse import urlsplit
 
 from ..models import ONSITE, REMOTE, Job
 from ..text import html_to_text, normalize_words, parse_datetime, utcnow
-from .base import Source, SourceResult, describe_error, enabled_entries, section_enabled
+from .base import Source, SourceResult, describe_error, enabled_entries, parse_each, section_enabled
 
 API = "{site}/api/job-board-api"
 COUNTRY_BY_DOMAIN = {
@@ -64,7 +64,7 @@ class ArbeitnowSource(Source):
                     result.errors.append(f"{site['site']} page {page}: {describe_error(exc)}")
                     break
                 raw_jobs = data.get("data") or []
-                jobs = [parse_job(raw) for raw in raw_jobs]
+                jobs = parse_each(raw_jobs, parse_job, result.errors, f"{site['site']} page {page}", key="slug")
                 wanted = [j for j in jobs if self.wanted(j.title)]
                 result.jobs.extend(wanted)
                 kept += len(wanted)

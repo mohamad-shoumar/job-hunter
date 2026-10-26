@@ -13,7 +13,7 @@ from datetime import timedelta
 
 from ..models import REMOTE, Job
 from ..text import html_to_text, normalize_words, parse_datetime, utcnow
-from .base import Source, SourceResult, describe_error, section_enabled
+from .base import Source, SourceResult, describe_error, parse_each, section_enabled
 
 API = "https://jobicy.com/api/v2/remote-jobs"
 
@@ -44,11 +44,12 @@ class JobicySource(Source):
             except Exception as exc:
                 result.errors.append(f"page {page}: {describe_error(exc)}")
                 break
-            jobs = [parse_job(raw) for raw in data.get("jobs") or []]
+            raw_jobs = data.get("jobs") or []
+            jobs = parse_each(raw_jobs, parse_job, result.errors, f"page {page}")
             result.jobs.extend(j for j in jobs if self.wanted(j.title))
             oldest = min((j.posted_at for j in jobs if j.posted_at), default=None)
             cursor = data.get("nextCursor")
-            if not jobs or not data.get("hasMore") or not cursor or (oldest and oldest < stop_at):
+            if not raw_jobs or not data.get("hasMore") or not cursor or (oldest and oldest < stop_at):
                 break
         return result
 

@@ -7,30 +7,19 @@ import html
 from ..extract import remote_status_from_location
 from ..models import Job
 from ..text import html_to_text, parse_datetime
-from .base import Source, SourceResult, describe_error, enabled_entries
+from .base import BoardSource, enabled_entries
 
 API = "https://boards-api.greenhouse.io/v1/boards/{token}/jobs"
 
 
-class GreenhouseSource(Source):
+class GreenhouseSource(BoardSource):
     name = "greenhouse"
 
-    def __init__(self, boards: list[dict]):
-        self.boards = boards
+    def postings(self, http, board: dict) -> list[dict]:
+        return http.get_json(API.format(token=board["board_token"]), params={"content": "true"}).get("jobs") or []
 
-    def fetch(self, http) -> SourceResult:
-        result = SourceResult(self.name)
-        for board in self.boards:
-            try:
-                data = http.get_json(API.format(token=board["board_token"]), params={"content": "true"})
-            except Exception as exc:
-                result.errors.append(f"{board['company']} ({board['board_token']}): {describe_error(exc)}")
-                continue
-            jobs = data.get("jobs") or []
-            if not jobs:
-                result.notes.append(f"{board['company']}: board has no open jobs")
-            result.jobs.extend(parse_job(raw, board) for raw in jobs)
-        return result
+    def parse(self, raw: dict, board: dict) -> Job:
+        return parse_job(raw, board)
 
 
 def parse_job(raw: dict, board: dict) -> Job:

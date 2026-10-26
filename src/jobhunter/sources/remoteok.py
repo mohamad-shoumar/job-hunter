@@ -10,7 +10,7 @@ from __future__ import annotations
 from ..identity import find_ats_url
 from ..models import REMOTE, Job
 from ..text import fix_mojibake, has_phrase, html_to_text, normalize_words, parse_datetime
-from .base import Source, SourceResult, describe_error, section_enabled
+from .base import Source, SourceResult, describe_error, parse_each, section_enabled
 
 API = "https://remoteok.com/api"
 
@@ -32,7 +32,7 @@ class RemoteOkSource(Source):
         listings = [x for x in data if isinstance(x, dict) and x.get("id")]  # item 0 is the legal notice
         if self.queries:
             listings = [x for x in listings if self._wanted(x)]
-        result.jobs.extend(parse_job(raw) for raw in listings[: self.limit])
+        result.jobs += parse_each(listings[: self.limit], parse_job, result.errors)
         return result
 
     def _wanted(self, raw: dict) -> bool:

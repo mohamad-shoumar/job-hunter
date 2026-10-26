@@ -13,7 +13,7 @@ import re
 from ..identity import find_ats_url
 from ..models import REMOTE, Job
 from ..text import html_to_text, parse_datetime
-from .base import Source, SourceResult, describe_error, section_enabled
+from .base import Source, SourceResult, describe_error, parse_each, section_enabled
 from .feeds import parse_feed_items
 
 DEFAULT_FEEDS = [
@@ -34,15 +34,15 @@ class WeWorkRemotelySource(Source):
     def fetch(self, http) -> SourceResult:
         result = SourceResult(self.name)
         for feed in self.feeds:
+            if len(result.jobs) >= self.limit:
+                break
             try:
                 items = parse_feed_items(http.get_text(feed))
             except Exception as exc:
                 result.errors.append(f"{feed}: {describe_error(exc)}")
                 continue
-            for item in items:
-                if len(result.jobs) >= self.limit:
-                    return result
-                result.jobs.append(parse_item(item))
+            result.jobs += parse_each(items[: self.limit - len(result.jobs)], parse_item, result.errors, feed,
+                                      key="guid")
         return result
 
 

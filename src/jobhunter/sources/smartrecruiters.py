@@ -9,11 +9,11 @@ the UAE. Company ids are case-sensitive.
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from ..models import HYBRID, ONSITE, REMOTE, Job
 from ..text import html_to_text, parse_datetime, utcnow
-from .base import Source, SourceResult, describe_error, enabled_entries
+from .base import Source, SourceResult, describe_error, enabled_entries, parse_each
 
 API = "https://api.smartrecruiters.com/v1/companies/{id}/postings"
 PAGE = 100
@@ -42,16 +42,22 @@ class SmartRecruitersSource(Source):
                     continue
                 if not postings:
                     result.notes.append(f"{label}: board has no open jobs")
-                for raw in postings:
-                    detail = {}
-                    posted = parse_datetime(raw.get("releasedDate"))
-                    if not posted or posted >= cutoff:
-                        try:
-                            detail = http.get_json(f"{API.format(id=company_id)}/{raw['id']}")
-                        except Exception as exc:
-                            result.errors.append(f"{label} job {raw['id']}: {describe_error(exc)}")
-                    result.jobs.append(parse_job(raw, detail, board))
+                result.jobs += parse_each(
+                    postings, lambda raw: self._job(http, raw, board, cutoff, label, result.errors), result.errors,
+                    label)
         return result
+
+    def _job(self, http, raw: dict, board: dict, cutoff: datetime, label: str, errors: list[str]) -> Job:
+        """A posting plus its own page (the description), unless it is too old to keep. When the page fails,
+        the posting is kept without it."""
+        detail = {}
+        posted = parse_datetime(raw.get("releasedDate"))
+        if not posted or posted >= cutoff:
+            try:
+                detail = http.get_json(f"{API.format(id=board['board_token'])}/{raw['id']}")
+            except Exception as exc:
+                errors.append(f"{label} job {raw['id']}: {describe_error(exc)}")
+        return parse_job(raw, detail, board)
 
     def _list(self, http, company_id: str, country: str | None) -> list[dict]:
         postings: list[dict] = []

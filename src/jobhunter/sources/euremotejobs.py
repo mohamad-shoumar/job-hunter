@@ -17,8 +17,8 @@ from datetime import timedelta
 
 from ..models import REMOTE, Job
 from ..text import html_to_text, normalize_words, parse_datetime, parse_relative_age, utcnow
-from .base import Source, SourceResult, describe_error, section_enabled
-from .custom_page import _job_posting, _ld_locations
+from .base import Source, SourceResult, describe_error, parse_each, section_enabled
+from .custom_page import job_posting, ld_locations
 
 LISTINGS = "https://euremotejobs.com/jm-ajax/get_listings/"
 
@@ -61,19 +61,22 @@ class EuRemoteJobsSource(Source):
                 result.errors.append(f"page {page}: {describe_error(exc)}")
                 break
             items = parse_listing(data.get("html") or "", now)
-            for item in items:
-                if item["posted_at"] and item["posted_at"] < stop_at or not self.wanted(item["title"]):
-                    continue
-                try:
-                    page_html = http.get_text(item["url"])
-                except Exception as exc:
-                    result.errors.append(f"{item['url']}: {describe_error(exc)}")
-                    page_html = ""
-                result.jobs.append(parse_job(item, page_html))
+            fresh = [i for i in items if not (i["posted_at"] and i["posted_at"] < stop_at) and self.wanted(i["title"])]
+            result.jobs += parse_each(fresh, lambda item: self._job(http, item, result.errors), result.errors,
+                                      f"page {page}")
             oldest = min((i["posted_at"] for i in items if i["posted_at"]), default=None)
             if not items or page >= int(data.get("max_num_pages") or 0) or (oldest and oldest < stop_at):
                 break
         return result
+
+    def _job(self, http, item: dict, errors: list[str]) -> Job:
+        """A listing row plus its job page. When the page fails, the row alone is kept."""
+        try:
+            page_html = http.get_text(item["url"])
+        except Exception as exc:
+            errors.append(f"{item['url']}: {describe_error(exc)}")
+            page_html = ""
+        return parse_job(item, page_html)
 
 
 def parse_listing(page: str, now) -> list[dict]:
@@ -96,9 +99,9 @@ def parse_listing(page: str, now) -> list[dict]:
 
 def parse_job(item: dict, page_html: str) -> Job:
     """A listing row plus its job page (empty when the page failed: the row alone is kept)."""
-    posting = _job_posting(page_html) or {}
+    posting = job_posting(page_html) or {}
     apply = _APPLY.search(page_html)
-    allowed = _ld_locations(posting) or item["regions"]
+    allowed = ld_locations(posting) or item["regions"]
     return Job(
         source="euremotejobs",
         source_job_id=item["id"],

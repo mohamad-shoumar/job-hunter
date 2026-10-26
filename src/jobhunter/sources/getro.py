@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from ..models import HYBRID, ONSITE, REMOTE, UNKNOWN, Job
 from ..text import parse_datetime
-from .base import Source, SourceResult, describe_error, enabled_entries
+from .base import Source, SourceResult, describe_error, enabled_entries, parse_each
 
 API = "https://api.getro.com/api/v2/collections/{id}/search/jobs"
 HEADERS = {"Accept": "application/json"}
@@ -39,20 +39,23 @@ class GetroSource(Source):
         for board in self.boards:
             seen: set[str] = set()
             for query in board.get("queries") or self.queries:
+                label = f"{board['name']} ({board['collection_id']}) {query!r}"
                 try:
                     for page in range(self.max_pages):
                         body = {"hits_per_page": PAGE_SIZE, "page": page, "query": query,
                                 "filters": board.get("filters") or {}}
                         data = http.post_json(API.format(id=board["collection_id"]), body, HEADERS)
                         jobs = (data.get("results") or {}).get("jobs") or []
+                        fresh = []
                         for raw in jobs:
                             if str(raw.get("id")) not in seen:
                                 seen.add(str(raw.get("id")))
-                                result.jobs.append(parse_job(raw))
+                                fresh.append(raw)
+                        result.jobs += parse_each(fresh, parse_job, result.errors, label)
                         if len(jobs) < PAGE_SIZE:
                             break
                 except Exception as exc:
-                    result.errors.append(f"{board['name']} ({board['collection_id']}) {query!r}: {describe_error(exc)}")
+                    result.errors.append(f"{label}: {describe_error(exc)}")
             if not seen:
                 result.notes.append(f"{board['name']}: no jobs matched")
         return result

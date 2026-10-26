@@ -5,38 +5,20 @@ from __future__ import annotations
 from ..extract import normalize_workplace, remote_status_from_location
 from ..models import REMOTE, UNKNOWN, Job
 from ..text import html_to_text, parse_datetime
-from .base import Source, SourceResult, describe_error, enabled_entries
+from .base import BoardSource, enabled_entries, pay_period
 
 API = "https://api.ashbyhq.com/posting-api/job-board/{token}"
 
 
-class AshbySource(Source):
+class AshbySource(BoardSource):
     name = "ashby"
 
-    def __init__(self, boards: list[dict]):
-        self.boards = boards
+    def postings(self, http, board: dict) -> list[dict]:
+        data = http.get_json(API.format(token=board["board_token"]), params={"includeCompensation": "true"})
+        return [j for j in data.get("jobs") or [] if j.get("isListed", True)]
 
-    def fetch(self, http) -> SourceResult:
-        result = SourceResult(self.name)
-        for board in self.boards:
-            try:
-                data = http.get_json(API.format(token=board["board_token"]), params={"includeCompensation": "true"})
-            except Exception as exc:
-                result.errors.append(f"{board['company']} ({board['board_token']}): {describe_error(exc)}")
-                continue
-            jobs = [j for j in data.get("jobs") or [] if j.get("isListed", True)]
-            if not jobs:
-                result.notes.append(f"{board['company']}: board has no open jobs")
-            result.jobs.extend(parse_job(raw, board) for raw in jobs)
-        return result
-
-
-def _period(interval: str | None) -> str | None:
-    v = (interval or "").lower()
-    for period in ("year", "month", "hour"):
-        if period in v:
-            return period
-    return None
+    def parse(self, raw: dict, board: dict) -> Job:
+        return parse_job(raw, board)
 
 
 def parse_job(raw: dict, board: dict) -> Job:
@@ -67,7 +49,7 @@ def parse_job(raw: dict, board: dict) -> Job:
         salary_min=salary.get("minValue"),
         salary_max=salary.get("maxValue"),
         salary_currency=salary.get("currencyCode"),
-        salary_period=_period(salary.get("interval")),
+        salary_period=pay_period(salary.get("interval")),
         salary_raw=compensation.get("scrapeableCompensationSalarySummary") or compensation.get("compensationTierSummary"),
         posted_at=parse_datetime(raw.get("publishedAt")),
     )

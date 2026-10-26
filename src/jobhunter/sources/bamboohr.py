@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from ..models import HYBRID, ONSITE, REMOTE, UNKNOWN, Job
 from ..text import html_to_text, parse_datetime
-from .base import Source, SourceResult, describe_error, enabled_entries
+from .base import Source, SourceResult, describe_error, enabled_entries, parse_each
 
 LIST = "https://{token}.bamboohr.com/careers/list"
 DETAIL = "https://{token}.bamboohr.com/careers/{id}/detail"
@@ -35,14 +35,18 @@ class BambooHRSource(Source):
                 continue
             if not listed:
                 result.notes.append(f"{board['company']}: board has no open jobs")
-            for row in listed:
-                try:
-                    detail = http.get_json(DETAIL.format(token=token, id=row["id"])).get("result") or {}
-                except Exception as exc:
-                    result.errors.append(f"{board['company']} job {row['id']}: {describe_error(exc)}")
-                    detail = {}
-                result.jobs.append(parse_job(row, (detail.get("jobOpening") or {}), board))
+            result.jobs += parse_each(listed, lambda row: self._job(http, row, board, result.errors), result.errors,
+                                      f"{board['company']} ({token})")
         return result
+
+    def _job(self, http, row: dict, board: dict, errors: list[str]) -> Job:
+        """A listed job plus its own page. When the page fails, the job is kept without it."""
+        try:
+            detail = http.get_json(DETAIL.format(token=board["board_token"], id=row["id"])).get("result") or {}
+        except Exception as exc:
+            errors.append(f"{board['company']} job {row['id']}: {describe_error(exc)}")
+            detail = {}
+        return parse_job(row, (detail.get("jobOpening") or {}), board)
 
 
 def _place(location: dict | None) -> str:

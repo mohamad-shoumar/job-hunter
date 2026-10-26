@@ -22,7 +22,7 @@ import time
 
 from ..models import UNKNOWN, Job
 from ..text import html_to_text, normalize_words, parse_datetime, parse_relative_age, utcnow
-from .base import Source, SourceResult, describe_error, enabled_entries, section_enabled
+from .base import Source, SourceResult, describe_error, enabled_entries, parse_each, section_enabled
 
 SEARCH = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
 POSTING = "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{id}"
@@ -87,14 +87,18 @@ class LinkedInSource(Source):
                         cards.setdefault(card["id"], card)
                 if len(found) < PAGE_SIZE:
                     break
-        for card in cards.values():
-            try:
-                page = self._get(http, POSTING.format(id=card["id"]))
-            except Exception as exc:
-                result.errors.append(f"job {card['id']}: {describe_error(exc)}")
-                page = ""
-            result.jobs.append(parse_job(card, page, now))
+        result.jobs += parse_each(list(cards.values()), lambda card: self._job(http, card, now, result.errors),
+                                  result.errors)
         return result
+
+    def _job(self, http, card: dict, now, errors: list[str]) -> Job:
+        """A card plus its job page. When the page fails, the card alone is kept."""
+        try:
+            page = self._get(http, POSTING.format(id=card["id"]))
+        except Exception as exc:
+            errors.append(f"job {card['id']}: {describe_error(exc)}")
+            page = ""
+        return parse_job(card, page, now)
 
 
 def parse_cards(page: str) -> list[dict]:

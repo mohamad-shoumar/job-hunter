@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from ..models import HYBRID, ONSITE, REMOTE, UNKNOWN, Job
 from ..text import html_to_text, parse_datetime
-from .base import Source, SourceResult, describe_error, section_enabled
+from .base import Source, SourceResult, describe_error, parse_each, section_enabled
 
 API = "https://jobs.workable.com/api/v1/jobs"
 _WORKPLACE = {"remote": REMOTE, "hybrid": HYBRID, "on_site": ONSITE}
@@ -45,12 +45,13 @@ class WorkableSource(Source):
                     params = {"query": query, "location": country, "day_range": days}
                     if token:
                         params["pageToken"] = token
+                    label = f'"{query}" in {country} page {page + 1}'
                     try:
                         data = http.get_json(API, params=params)
                     except Exception as exc:
-                        result.errors.append(f'"{query}" in {country} page {page + 1}: {describe_error(exc)}')
+                        result.errors.append(f"{label}: {describe_error(exc)}")
                         break
-                    result.jobs.extend(parse_job(raw) for raw in data.get("jobs") or [])
+                    result.jobs += parse_each(data.get("jobs") or [], parse_job, result.errors, label)
                     token = data.get("nextPageToken")
                     if not token:
                         break

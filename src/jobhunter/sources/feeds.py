@@ -9,7 +9,7 @@ from html.entities import name2codepoint
 _XML_ENTITIES = {"amp", "lt", "gt", "quot", "apos"}
 
 
-def _fix_entities(text: str) -> str:
+def fix_entities(text: str) -> str:
     def named(m: re.Match) -> str:
         name = m.group(1)
         if name in _XML_ENTITIES:
@@ -21,20 +21,20 @@ def _fix_entities(text: str) -> str:
     return re.sub(r"&(?!#?\w+;)", "&amp;", text)  # bare ampersands
 
 
-def _local(tag: str) -> str:
+def local_name(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
 
 
 def parse_feed_items(xml_text: str) -> list[dict[str, str]]:
     """Each <item>/<entry> as {child tag: text}. The first child of a name wins."""
-    root = ET.fromstring(_fix_entities(xml_text))
+    root = ET.fromstring(fix_entities(xml_text))
     items = []
     for node in root.iter():
-        if _local(node.tag) not in ("item", "entry"):
+        if local_name(node.tag) not in ("item", "entry"):
             continue
         fields: dict[str, str] = {}
         for child in node:
-            name = _local(child.tag)
+            name = local_name(child.tag)
             text = (child.text or "").strip()
             if name == "link" and not text:
                 text = child.attrib.get("href", "")

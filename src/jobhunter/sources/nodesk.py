@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from ..models import REMOTE, Job
 from ..text import html_to_text, parse_datetime
-from .base import Source, SourceResult, describe_error, section_enabled
+from .base import Source, SourceResult, describe_error, parse_each, section_enabled
 from .feeds import parse_feed_items
 
 DEFAULT_FEEDS = ["https://nodesk.co/remote-jobs/engineering/index.xml"]
@@ -25,7 +25,8 @@ class NoDeskSource(Source):
             except Exception as exc:
                 result.errors.append(f"{feed}: {describe_error(exc)}")
                 continue
-            result.jobs.extend(parse_item(item) for item in items[: max(0, self.limit - len(result.jobs))])
+            result.jobs += parse_each(items[: max(0, self.limit - len(result.jobs))], parse_item, result.errors, feed,
+                                      key="guid")
         return result
 
 

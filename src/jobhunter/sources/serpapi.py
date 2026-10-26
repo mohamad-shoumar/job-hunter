@@ -26,7 +26,7 @@ import re
 from ..identity import ats_key_from_url
 from ..models import REMOTE, UNKNOWN, Job
 from ..text import clean_text, parse_relative_age, utcnow
-from .base import Source, SourceResult, describe_error, section_enabled
+from .base import Source, SourceResult, describe_error, parse_each, section_enabled
 
 API = "https://serpapi.com/search.json"
 
@@ -60,16 +60,18 @@ class SerpApiSource(Source):
                 params = {"engine": self.engine, "q": query, "hl": "en", "api_key": api_key, **self.params, **extra}
                 if token:
                     params["next_page_token"] = token
+                label = f'query "{query}" page {page + 1}'
                 try:
                     data = http.get_json(API, params=params)
                 except Exception as exc:
-                    result.errors.append(f'query "{query}" page {page + 1}: {describe_error(exc)}')
+                    result.errors.append(f"{label}: {describe_error(exc)}")
                     break
                 if data.get("error"):
                     if "hasn't returned any results" not in data["error"]:
                         result.errors.append(f'query "{query}": {data["error"]}')
                     break
-                result.jobs.extend(parse_job(raw, now) for raw in data.get("jobs_results") or [])
+                result.jobs += parse_each(data.get("jobs_results") or [], lambda raw: parse_job(raw, now),
+                                          result.errors, label, key="job_id")
                 token = (data.get("serpapi_pagination") or {}).get("next_page_token")
                 if not token:
                     break

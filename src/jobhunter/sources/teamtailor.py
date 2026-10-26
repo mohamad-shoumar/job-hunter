@@ -12,8 +12,8 @@ import xml.etree.ElementTree as ET
 from ..extract import normalize_workplace
 from ..models import ONSITE, REMOTE, Job
 from ..text import html_to_text, parse_datetime
-from .base import Source, SourceResult, describe_error, enabled_entries
-from .feeds import _fix_entities, _local
+from .base import BoardSource, enabled_entries
+from .feeds import fix_entities, local_name
 
 
 # Teamtailor's own words: "none" is not remote at all, "fully" is fully remote.
@@ -25,36 +25,29 @@ def feed_url(board: dict) -> str:
     return f"https://{site.removeprefix('https://').rstrip('/')}/jobs.rss"
 
 
-class TeamtailorSource(Source):
+class TeamtailorSource(BoardSource):
     name = "teamtailor"
 
-    def __init__(self, boards: list[dict]):
-        self.boards = boards
+    def label(self, board: dict) -> str:
+        return f"{board['company']} ({feed_url(board)})"
 
-    def fetch(self, http) -> SourceResult:
-        result = SourceResult(self.name)
-        for board in self.boards:
-            try:
-                items = parse_feed(http.get_text(feed_url(board)))
-            except Exception as exc:
-                result.errors.append(f"{board['company']} ({feed_url(board)}): {describe_error(exc)}")
-                continue
-            if not items:
-                result.notes.append(f"{board['company']}: board has no open jobs")
-            result.jobs.extend(parse_job(item, board) for item in items)
-        return result
+    def postings(self, http, board: dict) -> list[dict]:
+        return parse_feed(http.get_text(feed_url(board)))
+
+    def parse(self, item: dict, board: dict) -> Job:
+        return parse_job(item, board)
 
 
 def parse_feed(xml_text: str) -> list[dict]:
     """Each <item> as its plain fields plus "locations": ["Dubai, United Arab Emirates", ...]."""
     items = []
-    for node in ET.fromstring(_fix_entities(xml_text)).iter("item"):
+    for node in ET.fromstring(fix_entities(xml_text)).iter("item"):
         fields: dict = {"locations": []}
         for child in node:
-            name = _local(child.tag)
+            name = local_name(child.tag)
             if name == "locations":
                 for loc in child:
-                    parts = {_local(p.tag): (p.text or "").strip() for p in loc}
+                    parts = {local_name(p.tag): (p.text or "").strip() for p in loc}
                     place = ", ".join(v for v in (parts.get("city"), parts.get("country")) if v)
                     if place:
                         fields["locations"].append(place)

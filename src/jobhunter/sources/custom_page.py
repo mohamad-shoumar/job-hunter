@@ -36,14 +36,14 @@ class CustomPageSource(Source):
     def fetch(self, http) -> SourceResult:
         result = SourceResult(self.name)
         for page in self.pages:
-            try:
+            try:  # one bad link ("http://[x" is not a URL) or pattern costs only this page
                 listing = http.get_text(page["url"])
+                pattern = re.compile(page["job_link_pattern"])
+                links = list(dict.fromkeys(urljoin(page["url"], html.unescape(h)) for h in _HREF.findall(listing)))
+                links = [link for link in links if pattern.search(link)]
             except Exception as exc:
                 result.errors.append(f"{page['company']}: {describe_error(exc)}")
                 continue
-            pattern = re.compile(page["job_link_pattern"])
-            links = list(dict.fromkeys(urljoin(page["url"], html.unescape(h)) for h in _HREF.findall(listing)))
-            links = [link for link in links if pattern.search(link)]
             if not links:
                 result.notes.append(f"{page['company']}: no links matched job_link_pattern")
             for link in links[: int(page.get("max_jobs", 25))]:
@@ -54,7 +54,7 @@ class CustomPageSource(Source):
         return result
 
 
-def _job_posting(page_html: str) -> dict | None:
+def job_posting(page_html: str) -> dict | None:
     for block in _JSON_LD.findall(page_html):
         try:
             data = json.loads(block.strip())
@@ -73,7 +73,7 @@ def _job_posting(page_html: str) -> dict | None:
     return None
 
 
-def _ld_locations(posting: dict) -> list[str]:
+def ld_locations(posting: dict) -> list[str]:
     requirements = posting.get("applicantLocationRequirements") or []
     if isinstance(requirements, dict):
         requirements = [requirements]
@@ -81,7 +81,7 @@ def _ld_locations(posting: dict) -> list[str]:
 
 
 def parse_job_page(page_html: str, url: str, page: dict) -> Job:
-    posting = _job_posting(page_html) or {}
+    posting = job_posting(page_html) or {}
     h1 = _H1.search(page_html)
     title_tag = _TITLE.search(page_html)
     title = posting.get("title") or html_to_text(h1.group(1) if h1 else "") or html_to_text(title_tag.group(1) if title_tag else "")
@@ -91,7 +91,7 @@ def parse_job_page(page_html: str, url: str, page: dict) -> Job:
         body = _BODY.search(page_html)
         description = html_to_text(body.group(1) if body else page_html)
     workplace = "remote" if posting.get("jobLocationType") == "TELECOMMUTE" else page.get("default_workplace_type")
-    allowed = _ld_locations(posting)
+    allowed = ld_locations(posting)
     location = ", ".join(allowed) or page.get("default_location")
     org = posting.get("hiringOrganization") or {}
     return Job(

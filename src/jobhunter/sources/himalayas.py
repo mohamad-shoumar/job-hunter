@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from ..models import REMOTE, Job
 from ..text import html_to_text, parse_datetime
-from .base import Source, SourceResult, describe_error, section_enabled
+from .base import Source, SourceResult, describe_error, parse_each, section_enabled
 
 SEARCH = "https://himalayas.app/jobs/api/search"
 PAGE_SIZE = 20
@@ -42,7 +42,7 @@ class HimalayasSource(Source):
                     result.errors.append(f'query "{query}" page {page}: {describe_error(exc)}')
                     break
                 raw_jobs = data.get("jobs") or []
-                jobs = [parse_job(raw) for raw in raw_jobs]
+                jobs = parse_each(raw_jobs, parse_job, result.errors, f'query "{query}" page {page}', key="guid")
                 if self.since is None:
                     jobs = jobs[: self.limit - fetched]
                 result.jobs.extend(jobs)

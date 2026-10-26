@@ -10,30 +10,20 @@ from __future__ import annotations
 from ..extract import normalize_workplace
 from ..models import Job
 from ..text import html_to_text
-from .base import Source, SourceResult, describe_error, enabled_entries
+from .base import BoardSource, enabled_entries, pay_period
 
 API = "https://{token}.pinpointhq.com/postings.json"
 _SECTIONS = ("description", "key_responsibilities", "skills_knowledge_expertise", "benefits")
 
 
-class PinpointSource(Source):
+class PinpointSource(BoardSource):
     name = "pinpoint"
 
-    def __init__(self, boards: list[dict]):
-        self.boards = boards
+    def postings(self, http, board: dict) -> list[dict]:
+        return http.get_json(API.format(token=board["board_token"])).get("data") or []
 
-    def fetch(self, http) -> SourceResult:
-        result = SourceResult(self.name)
-        for board in self.boards:
-            try:
-                postings = http.get_json(API.format(token=board["board_token"])).get("data") or []
-            except Exception as exc:
-                result.errors.append(f"{board['company']} ({board['board_token']}): {describe_error(exc)}")
-                continue
-            if not postings:
-                result.notes.append(f"{board['company']}: board has no open jobs")
-            result.jobs.extend(parse_job(raw, board) for raw in postings)
-        return result
+    def parse(self, raw: dict, board: dict) -> Job:
+        return parse_job(raw, board)
 
 
 def _money(value) -> float | None:
@@ -50,7 +40,6 @@ def parse_job(raw: dict, board: dict) -> Job:
     place = ", ".join(v.strip() for v in parts if v and v.strip() and v.strip().lower() != "remote")
     visible = str(raw.get("compensation_visible")).lower() == "true"
     low, high = (_money(raw.get("compensation_minimum")), _money(raw.get("compensation_maximum"))) if visible else (None, None)
-    frequency = (raw.get("compensation_frequency") or "").lower()
     return Job(
         source="pinpoint",
         source_job_id=str(raw["id"]),
@@ -67,7 +56,7 @@ def parse_job(raw: dict, board: dict) -> Job:
         salary_min=low,
         salary_max=high,
         salary_currency=raw.get("compensation_currency") if low or high else None,
-        salary_period=next((p for p in ("year", "month", "hour") if p in frequency), None) if low or high else None,
+        salary_period=pay_period(raw.get("compensation_frequency")) if low or high else None,
     )
 
 

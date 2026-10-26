@@ -5,40 +5,22 @@ from __future__ import annotations
 from ..extract import normalize_workplace, remote_status_from_location
 from ..models import UNKNOWN, Job
 from ..text import clean_text, html_to_text, parse_datetime
-from .base import Source, SourceResult, describe_error, enabled_entries
+from .base import BoardError, BoardSource, enabled_entries, pay_period
 
 API = "https://api.lever.co/v0/postings/{token}"
 
 
-class LeverSource(Source):
+class LeverSource(BoardSource):
     name = "lever"
 
-    def __init__(self, boards: list[dict]):
-        self.boards = boards
+    def postings(self, http, board: dict) -> list[dict]:
+        data = http.get_json(API.format(token=board["board_token"]), params={"mode": "json"})
+        if not isinstance(data, list):  # {"ok": false, "error": "Document not found"}
+            raise BoardError(data.get("error", "unexpected response"))
+        return data
 
-    def fetch(self, http) -> SourceResult:
-        result = SourceResult(self.name)
-        for board in self.boards:
-            try:
-                data = http.get_json(API.format(token=board["board_token"]), params={"mode": "json"})
-            except Exception as exc:
-                result.errors.append(f"{board['company']} ({board['board_token']}): {describe_error(exc)}")
-                continue
-            if not isinstance(data, list):  # {"ok": false, "error": "Document not found"}
-                result.errors.append(f"{board['company']} ({board['board_token']}): {data.get('error', 'unexpected response')}")
-                continue
-            if not data:
-                result.notes.append(f"{board['company']}: board has no open jobs")
-            result.jobs.extend(parse_job(raw, board) for raw in data)
-        return result
-
-
-def _period(interval: str | None) -> str | None:
-    v = (interval or "").lower()
-    for period in ("year", "month", "hour"):
-        if period in v:
-            return period
-    return None
+    def parse(self, raw: dict, board: dict) -> Job:
+        return parse_job(raw, board)
 
 
 def parse_job(raw: dict, board: dict) -> Job:
@@ -69,7 +51,7 @@ def parse_job(raw: dict, board: dict) -> Job:
         salary_min=salary.get("min"),
         salary_max=salary.get("max"),
         salary_currency=salary.get("currency"),
-        salary_period=_period(salary.get("interval")),
+        salary_period=pay_period(salary.get("interval")),
         posted_at=parse_datetime(raw.get("createdAt")),
     )
 

@@ -25,7 +25,7 @@ from ..geo import classify_place
 from ..identity import ats_key_from_url
 from ..models import HYBRID, ONSITE, REMOTE, UNKNOWN, Job
 from ..text import html_to_text, parse_datetime
-from .base import Source, SourceResult, describe_error, section_enabled
+from .base import Source, SourceResult, describe_error, parse_each, section_enabled
 
 SEARCH = "https://hn.algolia.com/api/v1/search_by_date"
 ITEM = "https://hn.algolia.com/api/v1/items/{id}"
@@ -102,10 +102,8 @@ class HackerNewsSource(Source):
                 result.errors.append(f"{story.get('title')}: {describe_error(exc)}")
                 continue
             result.notes.append(f"thread: {story.get('title')}")
-            for comment in (thread.get("children") or [])[: self.limit]:
-                if not comment.get("text"):
-                    continue
-                jobs = parse_comment(comment)
+            comments = [c for c in (thread.get("children") or [])[: self.limit] if c.get("text")]
+            for jobs in parse_each(comments, parse_comment, result.errors, str(story.get("title"))):
                 skipped += not jobs
                 result.jobs.extend(jobs)
         if skipped:

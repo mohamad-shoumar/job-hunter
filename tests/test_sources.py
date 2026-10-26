@@ -512,3 +512,44 @@ def test_linkedin_fetches_pages_of_target_titles_only(monkeypatch):
     assert job.source_url == job.application_url == "https://www.linkedin.com/jobs/view/4478986376"
     assert "Mid-Level .NET Backend Developer" in job.description
     assert job.tags == ["Associate"] and job.posted_at.date().isoformat() == "2026-10-21"
+
+
+def test_a_malformed_posting_costs_only_itself_not_its_board_or_the_others():
+    broken = fixture_json("lever_metabase.json")
+    broken[0]["categories"] = "broken"  # not the object Lever sends
+    acme, metabase = lever.API.format(token="acme"), lever.API.format(token="metabase")
+    http = FakeHttp({acme: broken, metabase: fixture_json("lever_metabase.json")})
+    boards = [{"company": "Acme", "board_token": "acme"}, {"company": "Metabase", "board_token": "metabase"}]
+    result = lever.LeverSource(boards).fetch(http)
+    assert result.errors == [
+        "Acme (acme) job 5eca795c-48dd-496a-be23-2181068a5450: AttributeError: 'str' object has no attribute 'get'"]
+    assert [(j.company, j.title) for j in result.jobs] == [
+        ("Acme", "CI Engineer"), ("Metabase", "Analytics Engineer"), ("Metabase", "CI Engineer")]
+
+
+def test_a_posting_without_an_id_is_named_by_its_place_and_the_next_page_is_still_read():
+    from jobhunter.sources import workable
+
+    def respond(params):
+        data = fixture_json("workable_search.json")
+        if "pageToken" in params:
+            return dict(data, nextPageToken=None)
+        del data["jobs"][1]["id"]
+        return data
+
+    result = workable.WorkableSource(["python"], ["Netherlands"]).fetch(FakeHttp({workable.API: respond}))
+    assert result.errors == ["\"python\" in Netherlands page 1 item 2: KeyError: 'id'"]
+    assert [j.company for j in result.jobs] == ["payabl.", "Informed Solutions", "payabl.", "OrganOx", "Informed Solutions"]
+
+
+def test_custom_page_with_a_link_that_is_not_a_url_costs_only_that_page():
+    http = FakeHttp({
+        "https://bad.example/jobs": '<a href="http://[broken/jobs/x">x</a>',
+        "https://x.example/jobs": '<a href="https://x.example/jobs/tpm">TPM</a>',
+        "https://x.example/jobs/tpm": "<html><body><h1>Technical Product Manager</h1></body></html>",
+    })
+    pages = [{"company": "Bad", "url": "https://bad.example/jobs", "job_link_pattern": "/jobs/"},
+             {"company": "X", "url": "https://x.example/jobs", "job_link_pattern": "/jobs/[a-z]+$"}]
+    result = custom_page.CustomPageSource(pages).fetch(http)
+    assert result.errors == ["Bad: ValueError: Invalid IPv6 URL"]
+    assert [j.title for j in result.jobs] == ["Technical Product Manager"]
