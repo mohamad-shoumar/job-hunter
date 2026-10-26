@@ -225,7 +225,7 @@ The model never writes a Summary: the Summary paragraph is mine and is copied wo
 
 **Context:** The CVs, emails and letters need my name, contact details and work history, and the code is public.
 
-**Decision:** My name and contact details are `MY_*` lines in `.env`. My profile (`profile/master_profile.md`) and base CV (`resume/resume.md`) are ignored by git; git has made-up `*.example.md` copies to start from. Tests use made-up details and a frozen made-up profile. Numbers like the lowest pay I would move for (`RELOCATION_MIN_MONTHLY_USD`) are also in `.env`, never in a tracked file.
+**Decision:** My name and contact details are `MY_*` lines in `.env`. My profile (`profile/master_profile.md`) and base CV (`resume/resume.md`) are ignored by git; git has made-up `*.example.md` copies to start from. Tests use a frozen profile in `tests/fixtures/`, so editing the real one never breaks a test. Numbers like the lowest pay I would move for (`RELOCATION_MIN_MONTHLY_USD`) are also in `.env`, never in a tracked file.
 
 **Why:** The code can be shared while my data stays private. It also stops profile edits from showing up as code changes.
 
