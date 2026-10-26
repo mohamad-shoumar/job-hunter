@@ -82,9 +82,8 @@ def write_edited_draft(store: JobStore, job_id: int, subject: str, body: str, wa
 def save_tailored_cv(store: JobStore, job_id: int, meta: dict, now: datetime, attach: str | None = None) -> None:
     """The tailored CV's details. `attach` names a PDF the email attaches from now on; None leaves cv_file."""
     store.conn.execute(
-        "UPDATE applications SET cv_tailored_json = ?, cv_file = CASE WHEN ? THEN ? ELSE cv_file END, updated_at = ? "
-        "WHERE job_id = ?",
-        (json.dumps(meta), 1 if attach else 0, attach, iso(now), job_id),
+        "UPDATE applications SET cv_tailored_json = ?, cv_file = COALESCE(?, cv_file), updated_at = ? WHERE job_id = ?",
+        (json.dumps(meta), attach or None, iso(now), job_id),
     )
 
 
