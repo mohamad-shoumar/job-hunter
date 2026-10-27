@@ -21,8 +21,11 @@ word for the posting's spelling of the same thing. It never adds a fact.
   adds it to the profile.
 - The `## Summary` paragraph is the user's own words: never touch it.
 - Never shorten a bullet or cut a clause, number or "estimated". Keep the `**bold**`. A swap
-  replaces at most two words with the posting's words for the same thing ("RESTful APIs" ->
-  "REST APIs"), never a new technology, number, title or claim.
+  replaces at most two words with the posting's words for the same thing ("Postgres" ->
+  "PostgreSQL"), never a new technology, number, title or claim. `check_version` judges a swap
+  by the profile's own words, so a spelling the profile doesn't use is blocked ("RESTful APIs"
+  -> "REST APIs" fails): keep the profile's word and list the posting's as a gap.
+- Certifications always print (the profile says so): never hide one.
 - No keyword lists, hidden text or extra lines made of posting words. Each term appears where it
   is true, at most about three times on the CV.
 - This file is tracked: never paste profile text, contact details or salary into it.
@@ -57,11 +60,11 @@ word for the posting's spelling of the same thing. It never adds a fact.
    - **Cut bullets** (lines starting with `// `): un-hide one if it matches a main duty of the
      posting. Lines whose tags didn't match this job (`// [fullstack] ...`) stay hidden.
    - **Page count**: the app keeps CVs to one page. A long bullet can take 3 printed lines, so
-     un-hiding one can need two or three lines out. Make room with the lines that match the
-     posting least: first a certification or project that has nothing to do with the job (put
-     `// ` before its `###` line and its bullet), then the printed bullet with the fewest posting
-     terms. Never hide the newest role's first bullet. Name every hidden line in the report. The
-     user can undo from the `.bak`.
+     un-hiding one can need two or three lines out. Make room by hiding (`// `) the printed
+     bullets that match the fewest posting terms (often a trading-only feature, or "Standardized
+     the local development workflow"). Never hide the newest role's first bullet, a role's only
+     bullet, or a certification. Name every hidden line in the report. The user can undo from
+     the `.bak`.
 5. **Rebuild** from `~/job-hunter`: `.venv/bin/jobhunter rebuild-cv <id>` (no model, just the
    PDF). It prints the page count ("(1 page)" or "2 pages ... cut a line").
    - To see what spilled onto page 2, save this as `p.swift` in the scratchpad and run
