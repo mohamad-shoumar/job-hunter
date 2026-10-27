@@ -7,7 +7,7 @@ from jobhunter import pipeline
 from jobhunter.ai_check import AiCheckConfig
 from jobhunter.classify import classify
 from jobhunter.config import Paths
-from jobhunter.models import NEEDS_REVIEW, REJECTED, SHORTLISTED
+from jobhunter.models import REJECTED, SHORTLISTED
 from jobhunter.posted_date import FOUND_ON_PAGE, DateFinder, build_finder, date_in, date_links, date_on_page, find_dates
 from jobhunter.store import JobStore, row_to_job
 from jobhunter.text import iso
@@ -40,7 +40,7 @@ def answer(quote="Posted 3 days ago", url=BOARD, found=True):
 
 
 def undated(**overrides):
-    """Open worldwide but undated, so it waits in needs_review."""
+    """Open worldwide but undated: shortlisted with a note, and the date lookup's to judge."""
     return make_job(**{"allowed_locations": ["Worldwide"], "posted_at": None, "application_url": PAGE, **overrides})
 
 
@@ -106,13 +106,13 @@ def test_a_found_date_shortlists_a_fresh_job_rejects_an_old_one_and_survives_rec
         job = undated(source_job_id=name, company=f"{name} co", application_url=f"https://jobgether.com/offer/{name}")
         job.first_seen = NOW
         cls = classify(job, filters, NOW)
-        assert cls.status == NEEDS_REVIEW
+        assert cls.status == SHORTLISTED
         ids[name] = store.insert(job, cls, None, NOW)
     store.commit()
     http = FakeHttp({"https://jobgether.com/offer/fresh": JSON_LD,
                      "https://jobgether.com/offer/old": JSON_LD.replace("2026-09-20", "2026-08-01")})
     run = find_dates(store, finder(http), [store.get(i) for i in ids.values()], filters, NOW)
-    assert run.checked == 2 and run.status_changes == {"needs_review -> shortlisted": 1, "needs_review -> rejected": 1}
+    assert run.checked == 2 and run.status_changes == {"shortlisted -> rejected": 1}
 
     fresh, old = store.get(ids["fresh"]), store.get(ids["old"])
     assert fresh["status"] == SHORTLISTED and fresh["posted_at"] == "2026-09-20T08:00:00+00:00"

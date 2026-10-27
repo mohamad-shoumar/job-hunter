@@ -1,8 +1,8 @@
 """Pinpoint careers sites: <slug>.pinpointhq.com/postings.json, public, no key.
 
 One request gives every job with its full description. It states no posting
-date, so these jobs go to needs_review ("age unknown") rather than the
-shortlist. Tabby hires through it.
+date, so these jobs are shortlisted with an "age unknown" note, and the daily
+run's date lookup (posted_date.py) tries to find one. Tabby hires through it.
 """
 
 from __future__ import annotations

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import shutil
+from dataclasses import replace
 from datetime import datetime, UTC
 from pathlib import Path
 
@@ -108,11 +109,13 @@ def make_job(**overrides) -> Job:
     return Job(**values)
 
 
-def store_job(store, filters, **overrides) -> int:
-    """Classify and insert a job; returns its id. Defaults to one that is shortlisted (open worldwide)."""
+def store_job(store, filters, status=None, **overrides) -> int:
+    """Classify and insert a job; returns its id. Defaults to one that is shortlisted (open worldwide).
+    `status` stores another one, e.g. needs_review for a job judged before 2026-10-27 that kept it."""
     from jobhunter.classify import classify
 
     overrides.setdefault("allowed_locations", ["Worldwide"])
     job = make_job(**overrides)
     job.first_seen = NOW
-    return store.insert(job, classify(job, filters, NOW), None, NOW)
+    cls = classify(job, filters, NOW)
+    return store.insert(job, replace(cls, status=status) if status else cls, None, NOW)

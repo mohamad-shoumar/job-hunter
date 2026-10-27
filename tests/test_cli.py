@@ -16,15 +16,16 @@ DAY = "2026-09-25"  # NOW's day, the report the jobs are filed under
 
 @pytest.fixture
 def home(tmp_path, filters, monkeypatch):
-    """A project folder with no .env: a shortlisted, a needs-review and a rejected job, filed under DAY."""
+    """A project folder with no .env: a shortlisted, a needs-review (left from before 2026-10-27) and a rejected
+    job, filed under DAY."""
     monkeypatch.setattr(cli, "utcnow", lambda: NOW)  # ages are judged on NOW, not on the day the tests run
     copy_config(tmp_path)
     shutil.copytree(FIXTURES / "profile", tmp_path / "profile")
     store = JobStore(tmp_path / "data" / "jobs.sqlite")
     ids = [
         store_job(store, filters),  # #1 Acme, open worldwide: shortlisted
-        store_job(store, filters, source_job_id="2", company="Initech", title="Backend Engineer",
-                  allowed_locations=[]),  # #2 no word on where you may live: needs review
+        store_job(store, filters, status="needs_review", source_job_id="2", company="Initech",
+                  title="Backend Engineer", allowed_locations=[]),  # #2 unclear, judged when that meant needs review
         store_job(store, filters, source_job_id="3", company="Globex", title="Sales Manager"),  # #3 rejected
     ]
     store.set_report_date(ids, DAY)
@@ -86,6 +87,7 @@ def test_reclassify_applies_an_edited_filter_and_rebuilds_that_day_s_report(home
     filters_file = home / "config" / "filters.json"
     settings = json.loads(filters_file.read_text())
     settings["blocked_companies"].append({"name": "Acme", "why": "never again"})
+    settings["blocked_companies"].append({"name": "Initech", "why": "left for review"})
     filters_file.write_text(json.dumps(settings))
     assert jobhunter(home, "reclassify") == 0
     path = home / "reports" / f"{DAY}.md"
@@ -93,7 +95,7 @@ def test_reclassify_applies_an_edited_filter_and_rebuilds_that_day_s_report(home
     assert out[:2] == ["    1  shortlisted -> rejected", f"rebuilt {path}"]
     job = stored(home, 1)
     assert (job["status"], job["reject_code"]) == ("rejected", "blocked_company")
-    assert stored(home, 2)["status"] == "needs_review"  # the others are judged the same as before
+    assert stored(home, 2)["status"] == "needs_review"  # left from before 2026-10-27: yours to review, never re-judged
     text = path.read_text()
     assert "## Shortlisted (0)" in text and "never again" in text
 

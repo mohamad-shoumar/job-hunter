@@ -1,4 +1,4 @@
-"""AI web check for jobs the rules leave unclear (status needs_review).
+"""AI web check for shortlisted jobs the rules leave unclear (eligibility `unclear`).
 
 The rules decide everything they can quote. When they cannot tell whether a
 company hires from Lebanon ("Remote", no country list), Claude searches the
@@ -21,7 +21,8 @@ verified quote changes a job's status (see classify.apply_ai_check):
 `cannot_hire` rejects it, `can_hire` shortlists it as `likely`, and so does
 `sponsors_visa` when visa.read_posting also reads the quote as a visa offer (a
 work visa in any country: decision 2026-10-22, see docs/decisions.md). Anything
-else leaves it in needs_review with the finding attached.
+else leaves it shortlisted as `unclear` with the finding attached (there is no
+review list since 2026-10-27; jobs left in needs_review are never checked by the run).
 
 Results are stored in jobs.ai_check_json, so `reclassify` keeps them, and a
 job is checked once unless asked again (`jobhunter check --recheck`).
@@ -138,7 +139,7 @@ class AiCheckConfig:
     max_fetches_per_job: int = 3
     max_page_tokens: int = 12000
     workers: int = 4
-    # Undated needs_review jobs: look up when they were posted (posted_date.py), before the check above.
+    # Undated shortlisted jobs: look up when they were posted (posted_date.py), before the check above.
     find_dates: bool = True
     max_dates_per_run: int = 25
 

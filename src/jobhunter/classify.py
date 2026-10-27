@@ -1,7 +1,8 @@
-"""Eligibility + relevance + freshness -> one status per job.
+"""Eligibility + relevance + freshness -> one status per job: rejected, shortlisted or visa_list.
 
 The rules in eligibility.py come first. Only when they say `unclear` does a
 stored AI web check (ai_check.py) get a say, and only with a verified quote.
+needs_review is no longer given (2026-10-27); the jobs that have it keep it.
 """
 
 from __future__ import annotations
@@ -16,10 +17,8 @@ from .identity import company_key
 from .models import (
     CAN_HIRE,
     CANNOT_HIRE,
-    ELIGIBLE,
     IRRELEVANT,
     LIKELY,
-    NEEDS_REVIEW,
     NOT_ELIGIBLE,
     REJECTED,
     SHORTLISTED,
@@ -136,15 +135,16 @@ def classify(job: Job, filters: Filters, now: datetime, check_age: bool = True) 
             relevance = Assessment(relevance.verdict, [*relevance.reasons, "No posting date, so its age is unknown"],
                                    relevance.code)
         return Classification(VISA_LIST, eligibility, relevance, score)
-    status = SHORTLISTED if eligibility.verdict in (ELIGIBLE, LIKELY) else NEEDS_REVIEW
+    # A job the rules keep is shortlisted, an `unclear` or undated one too: there is no review list (decision
+    # 2026-10-27). The report and the web app show it as `unclear` or "No posting date", and the daily run's AI
+    # check and date lookup still reject the ones they find quoted evidence against.
     found = job.date_check
     if found and found.posted_at and job.posted_at:
         relevance = Assessment(relevance.verdict, [*relevance.reasons, f'Posting date {found.posted_at[:10]} '
                                                    f'found on a page: "{found.quote}" ({found.source_url})'],
                                relevance.code)
-    if status == SHORTLISTED and not job.posted_at:
+    if not job.posted_at:
         # An unknown age is not a fresh one: some sources re-list months-old jobs undated.
-        status = NEEDS_REVIEW
         relevance = Assessment(relevance.verdict, [*relevance.reasons, "No posting date, so its age is unknown"],
                                relevance.code)
-    return Classification(status, eligibility, relevance, score)
+    return Classification(SHORTLISTED, eligibility, relevance, score)

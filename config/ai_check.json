@@ -1,5 +1,5 @@
 {
-  "_about": "AI check for jobs the rules leave unclear (needs_review). The model must give an exact quote; the code checks the quote is really on the page before the job's status changes. `enabled` controls the daily run only: `jobhunter check` works either way. See src/jobhunter/ai_check.py.",
+  "_about": "AI check for shortlisted jobs the rules leave unclear (eligibility unclear): it can reject them. The model must give an exact quote; the code checks the quote is really on the page before the job's status changes. `enabled` controls the daily run only: `jobhunter check` works either way. See src/jobhunter/ai_check.py.",
 
   "enabled": true,
   "_model": "The first step. deepseek-* (DEEPSEEK_API_KEY, about $0.01 a job): code fetches the job's own links and its Greenhouse/Lever/Ashby posting, DeepSeek reads them; it cannot search the web. claude-code: the Claude Code CLI with web search on your Claude login, for every job. claude-* (ANTHROPIC_API_KEY): the API with its own web search, about $0.10-0.30 a job with claude-opus-5-5.",
@@ -11,7 +11,7 @@
   "max_jobs_per_run": 50,
   "_lookback_days": "The daily run checks unchecked jobs from today and the days before, newest first, up to max_jobs_per_run, so a busy day's leftovers are checked on a later run.",
   "lookback_days": 14,
-  "_find_dates": "Before the check: undated needs_review jobs (Google Jobs often gives no date) get their posting date from the schema.org datePosted on their own pages, else from web_model searching the web; code finds the quote on the page and reads the date from it. Then the age rule judges them. See src/jobhunter/posted_date.py and `jobhunter dates`.",
+  "_find_dates": "Before the check: undated shortlisted jobs (Google Jobs often gives no date) get their posting date from the schema.org datePosted on their own pages, else from web_model searching the web; code finds the quote on the page and reads the date from it. Then the age rule judges them. See src/jobhunter/posted_date.py and `jobhunter dates`.",
   "find_dates": true,
   "max_dates_per_run": 25,
   "max_searches_per_job": 4,

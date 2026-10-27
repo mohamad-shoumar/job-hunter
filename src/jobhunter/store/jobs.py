@@ -286,20 +286,20 @@ class JobStore:
         return self.conn.execute("SELECT * FROM jobs ORDER BY id").fetchall()
 
     def needs_date_check(self, recheck: bool = False) -> list[sqlite3.Row]:
-        """Undated jobs waiting for review, newest first. `recheck` includes ones searched before without luck."""
+        """Undated shortlisted jobs, newest first. `recheck` includes ones searched before without luck."""
         unchecked = "" if recheck else " AND date_check_json IS NULL"
         return self.conn.execute(
             f"SELECT * FROM jobs WHERE status = ? AND posted_at IS NULL{unchecked} "
-            "ORDER BY first_seen DESC, id DESC", (NEEDS_REVIEW,)
+            "ORDER BY first_seen DESC, id DESC", (SHORTLISTED,)
         ).fetchall()
 
     def needs_ai_check(self, recheck: bool = False) -> list[sqlite3.Row]:
-        """Jobs waiting for review because the rules could not tell about Lebanon, newest
-        first. `recheck` includes ones already checked."""
+        """Shortlisted jobs whose rules could not tell about Lebanon, newest first. `recheck`
+        includes ones already checked. Jobs left in needs_review are the user's to review."""
         unchecked = "" if recheck else " AND ai_check_json IS NULL"
         return self.conn.execute(
             f"SELECT * FROM jobs WHERE status = ? AND eligibility = ?{unchecked} "
-            "ORDER BY COALESCE(posted_at, first_seen) DESC, id DESC", (NEEDS_REVIEW, UNCLEAR)
+            "ORDER BY COALESCE(posted_at, first_seen) DESC, id DESC", (SHORTLISTED, UNCLEAR)
         ).fetchall()
 
     def unreported(self) -> list[sqlite3.Row]:

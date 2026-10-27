@@ -1,7 +1,9 @@
-"""When was an undated job posted? For jobs in needs_review that no source gave a date.
+"""When was an undated job posted? For shortlisted jobs that no source gave a date.
 
-A job with no date is never shortlisted (classify: an unknown age is not a fresh
-one), and Google Jobs through SerpApi often gives none. Two steps, like the AI check:
+A job with no date is shortlisted with a note (classify: an unknown age is not a
+fresh one, but there is no review list since 2026-10-27), and Google Jobs through
+SerpApi often gives none; a date found here lets the age rule reject an old one.
+Two steps, like the AI check:
 
 1. Code fetches the job's own links (ai_check.job_links) and reads the schema.org
    JobPosting `datePosted` the page gives search engines: where Google gets its date.

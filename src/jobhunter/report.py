@@ -204,20 +204,23 @@ def render(day: str, rows: list[sqlite3.Row], sightings: dict[int, list[sqlite3.
     rejected = [r for r in rows if r["status"] == REJECTED]
 
     out = [f"# Jobs — {date.fromisoformat(day):%A %d %B %Y}", ""]
-    out += [f"{len(shortlisted)} shortlisted · {len(review)} need review · {len(visa)} on the visa list · "
-            f"{len(rejected)} rejected", ""]
+    need_review = f"{len(review)} need review · " if review else ""  # only days before 2026-10-27
+    out += [f"{len(shortlisted)} shortlisted · {need_review}{len(visa)} on the visa list · {len(rejected)} rejected", ""]
     stamp = f"Updated {generated_at.astimezone():%Y-%m-%d %H:%M}"
     if summary:
         stamp += f" by run {summary['run_id']}"
     out += [stamp + ". A job appears in one daily file only.", ""]
 
     out += [f"## Shortlisted ({len(shortlisted)})", ""]
-    out += ["A target role, and the posting says (or strongly suggests) it can hire from Lebanon.", ""]
+    out += ["A target role the rules did not reject. One marked `unclear` does not say whether it can hire from "
+            "Lebanon (and the AI check found nothing either way), and one with no posting date may be old: check "
+            "those before applying.", ""]
     out += blocks(shortlisted)
 
-    out += [f"## Needs review ({len(review)})", ""]
-    out += ["A target role, but the posting does not say clearly whether Lebanon is allowed, or has no posting date. Check before applying.", ""]
-    out += blocks(review)
+    if review:  # jobs judged before 2026-10-27 keep needs_review; none get it now
+        out += [f"## Needs review ({len(review)})", ""]
+        out += ["A target role, but the posting does not say clearly whether Lebanon is allowed, or has no posting date. Check before applying.", ""]
+        out += blocks(review)
 
     out += [f"## Visa list ({len(visa)})", ""]
     out += ["Abroad (the EU or UK): a target role at an employer that offers a visa in the posting, or is on its "

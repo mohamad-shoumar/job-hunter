@@ -22,6 +22,7 @@ Sentences marked "(draft: check)" give a reason I have not written down anywhere
 15. [The web app only answers my own browser](#15-the-web-app-only-answers-my-own-browser)
 16. [Personal details stay out of git](#16-personal-details-stay-out-of-git)
 17. [LinkedIn through its logged-out search, slowly](#17-linkedin-through-its-logged-out-search-slowly)
+18. [No review list: a job is shortlisted or rejected](#18-no-review-list-a-job-is-shortlisted-or-rejected)
 
 ---
 
@@ -31,11 +32,11 @@ Sentences marked "(draft: check)" give a reason I have not written down anywhere
 
 **Context:** Most postings say who they can hire ("Remote - US", "Worldwide"). Some only say "Remote", and then nobody can tell whether they would hire someone living in Lebanon.
 
-**Decision:** Plain code makes every call it can, and each verdict quotes the words it rests on (`Restricted to "Remote - US"`). Only jobs the rules mark `unclear` (status `needs_review`) go to a model. The model must answer with an exact quote and the page it came from. Code then looks for that quote, word for word, in the posting or in a page code fetched itself (`find_quote` in `llm.py`). If the quote is not there, the answer changes nothing.
+**Decision:** Plain code makes every call it can, and each verdict quotes the words it rests on (`Restricted to "Remote - US"`). Only jobs the rules mark `unclear` go to a model. The model must answer with an exact quote and the page it came from. Code then looks for that quote, word for word, in the posting or in a page code fetched itself (`find_quote` in `llm.py`). If the quote is not there, the answer changes nothing.
 
 **Why:** A model can write a quote that sounds right but is not on the page. A quote that code finds in text it fetched itself cannot be made up. Rules that quote their reason also let me see exactly why a job was dropped, and fix the rule when it is wrong (draft: check).
 
-**Trade-off:** Rules miss things a person would catch, so some jobs wait in "needs review". A found quote proves the words exist, not that the model read them right, so the report always shows the link.
+**Trade-off:** Rules miss things a person would catch, so some jobs stay `unclear` (shortlisted since 2026-10-27, see [18](#18-no-review-list-a-job-is-shortlisted-or-rejected)). A found quote proves the words exist, not that the model read them right, so the report always shows the link.
 
 ## 2. SQLite is the memory; reports are only output
 
@@ -242,3 +243,15 @@ The model never writes a Summary: the Summary paragraph is mine and is copied wo
 **Why:** It finds jobs worth applying to that I had no other way to see, and at this low volume the load on LinkedIn stays tiny.
 
 **Trade-off:** It goes against LinkedIn's terms and can stop working at any time. It is the slowest source (a few minutes a run), and logged out, the remote and level filters do nothing, so searches cannot be narrowed further.
+
+## 18. No review list: a job is shortlisted or rejected
+
+**Date:** 2026-10-27
+
+**Context:** Jobs the rules could not settle waited in "needs review": a posting that says only "Remote", or one with no posting date. By 2026-10-27 that list held 183 jobs, next to 208 shortlisted.
+
+**Decision:** Every job the rules keep is shortlisted, an unclear or undated one too. A job is now rejected, shortlisted, or (abroad) on the visa list. The daily run's AI check and date lookup still run on those jobs and reject the ones they find quoted evidence against; what they cannot settle stays shortlisted, marked `unclear` or "No posting date". The jobs already in "needs review" stay there for me to go through by hand: `reclassify`, the AI check and the date lookup leave them alone.
+
+**Why:** (draft: check) One list to act on. The fit grade sorts the shortlist, so an unclear job worth a look still gets seen, instead of sitting in a second list.
+
+**Trade-off:** The shortlist gets jobs that may turn out to be US-only or months old, and the daily run makes CVs and looks up contacts for them too. The report and the web app mark them `unclear`, so I check those before applying.

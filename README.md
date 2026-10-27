@@ -47,7 +47,7 @@ flowchart LR
 1. **Fetch.** Each source adapter turns one site into the same `Job` shape. One broken board or posting
    becomes an error line, not a failed run.
 2. **Dedup.** The same job on three sites becomes one row, with every sighting kept.
-3. **Rules.** Plain code gives each new job one status (shortlisted, needs review, visa list, rejected) and
+3. **Rules.** Plain code gives each new job one status (shortlisted, visa list, rejected) and
    the quote it rests on. Rejected jobs stay stored, so they never come back as "new".
 4. **Optional steps.** Models look only at what the rules could not settle, and code checks what they say.
    The fit grade only sorts. Each step can fail without stopping the run.

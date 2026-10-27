@@ -67,8 +67,8 @@ that holds `config/`) and `-v` (debug logging).
 | `jobhunter rebuild-cv <id>` | after you edit a job's CV text in `resume/versions/`, rebuild its PDF (no AI) and list lines that say more than your profile |
 | `jobhunter cover <id>` | a two-paragraph cover letter for that job, next to its CV |
 | `jobhunter inbox` | check Gmail for replies and bounces (the daily run does this too) |
-| `jobhunter check` | AI-check waiting "needs review" jobs, newest first (`--limit N`, `--recheck`, or job ids) |
-| `jobhunter dates` | find when undated "needs review" jobs were posted (`--limit N`, `--recheck`, or job ids) |
+| `jobhunter check` | AI-check shortlisted jobs the rules left `unclear`, newest first (`--limit N`, `--recheck`, or job ids) |
+| `jobhunter dates` | find when undated shortlisted jobs were posted (`--limit N`, `--recheck`, or job ids) |
 | `jobhunter grade` | AI fit grade 1-5 for open jobs, learned from your Applied and skipped jobs (`--regrade`, `--days N`, `--limit N`, or job ids) |
 | `jobhunter show <id>` | everything stored about one job and why it got its status (`-d` adds the description) |
 | `jobhunter reclassify` | judge every stored job again after you edit `config/filters.json`, and rebuild the day files that changed |
@@ -82,8 +82,9 @@ that holds `config/`) and `-v` (debug logging).
 One Markdown file per day, `reports/2026-09-27.md`. Each job in it has the reason for its status. It has five
 parts:
 
-- **Shortlisted** and **Needs review**: each job with the reason it can (or might) hire from Lebanon, its
-  fit, salary, dates and apply link.
+- **Shortlisted**: each job with the reason it can (or might) hire from Lebanon (`unclear` when nothing
+  says), its fit, salary, dates and apply link. Days before 2026-10-27 also have **Needs review**, for the
+  jobs judged while that list existed.
 - **Visa list**: jobs abroad (the EU and UK) at employers that sponsor a work visa, each with the quoted
   evidence. Kept apart from the remote jobs: see [the visa list](#moving-abroad-on-a-work-visa).
 - **Rejected**: every rejected job, listed under the rule that rejected it, with the exact word, place or
@@ -164,23 +165,26 @@ Jobs in the UAE or Qatar, and jobs in the EU and UK that sponsor a visa, have th
 
 Each job gets one status:
 
-- **shortlisted**: eligible or likely, and a target role;
-- **needs review**: unclear. A job with no posting date also waits here, since an unknown age is not a fresh
-  one;
+- **shortlisted**: a target role the rules did not reject. Eligible and likely ones, and also `unclear` ones
+  (nothing says whether Lebanon is allowed) and ones with no posting date, marked so: check those before
+  applying. The two steps below can still reject them;
 - **visa list**: a job abroad that sponsors a visa ([below](#moving-abroad-on-a-work-visa));
 - **rejected**.
 
-### 4. Posting dates, only for undated "needs review" jobs
+There is no "needs review" any more (since 2026-10-27). The jobs that had it keep it, for you to go through:
+`reclassify` and the steps below leave them alone.
+
+### 4. Posting dates, only for undated shortlisted jobs
 
 `src/jobhunter/posted_date.py`, `find_dates` in `config/ai_check.json`
 
-Before the AI check, the run looks up when undated "needs review" jobs were posted (Google Jobs often gives
+Before the AI check, the run looks up when undated shortlisted jobs were posted (Google Jobs often gives
 no date), up to `max_dates_per_run` (25). Code first reads the schema.org `datePosted` on the job's own
 pages. When no page has one, Claude Code (`web_model`) searches the web and quotes the words that state the
 date. Code finds that quote on the page and reads the date from the quote, never from the model's answer.
 Then the usual age rule judges the job. `jobhunter dates` does the same by hand.
 
-### 5. AI check, only for "needs review"
+### 5. AI check, only for `unclear` jobs
 
 `src/jobhunter/ai_check.py`, `config/ai_check.json`
 
@@ -205,9 +209,9 @@ embedded in it). A `claude-*` model instead uses the Anthropic API with its own 
 | cannot hire | yes | rejected, under "AI check: cannot hire from Lebanon", with the quote and link |
 | can hire | yes | shortlisted as `likely` |
 | sponsors a work visa (any country) | yes, and the visa rules read it as an offer | shortlisted as `likely` |
-| anything else | | stays in "needs review", with what the AI found attached |
+| anything else | | stays shortlisted as `unclear`, with what the AI found attached |
 
-It runs at the end of `jobhunter run` on unchecked "needs review" jobs from the last `lookback_days` (14),
+It runs at the end of `jobhunter run` on unchecked `unclear` shortlisted jobs from the last `lookback_days` (14),
 newest first, at most `max_jobs_per_run` (50), and never on a job the rules already decided. Each job is
 checked once, and the result is stored, so `reclassify` keeps it. For older waiting jobs:
 `jobhunter check --limit 250`. A found quote proves the words exist, not that the AI read them right, so the
@@ -261,7 +265,8 @@ grades.
 
 - **Today**: replies to answer, follow-ups due, new shortlisted and visa-list jobs to triage (Save or Skip),
   sends to double-check, and jobs ghosted this week.
-- **Jobs**: the list, by view (Shortlisted, Needs review, Visa list, ...). Click one for everything about it.
+- **Jobs**: the list, by view (Shortlisted, Needs review (jobs from before 2026-10-27), Visa list, ...). Click
+  one for everything about it.
 - **Pipeline**: every tracked job by stage. **To apply** holds shortlisted jobs you haven't acted on, plus
   visa-list jobs posted today or yesterday (with a "visa" chip), newest posting first, one per company.
   **Email someone** holds jobs you applied to where nobody at the company has been emailed yet, for

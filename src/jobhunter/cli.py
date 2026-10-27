@@ -20,7 +20,7 @@ from .extract import enrich
 from .fitgrade import build_grader, grade_jobs, to_grade
 from .report import write_report
 from .sources import build_sources
-from .models import NEEDS_REVIEW
+from .models import NEEDS_REVIEW, UNCLEAR
 from .store import JobStore, row_to_job
 from .text import utcnow
 
@@ -68,8 +68,9 @@ def _date_range(args) -> tuple[date, date] | None:
 def _print_report_counts(store: JobStore, report_paths: list[Path]) -> None:
     for path in report_paths:
         c = Counter(row["status"] for row in store.jobs_for_report(path.stem))
-        print(f"{path}   {c['shortlisted']} shortlisted, {c['needs_review']} need review, "
-              f"{c['visa_list']} on the visa list, {c['rejected']} rejected")
+        review = f"{c['needs_review']} need review, " if c["needs_review"] else ""  # only days before 2026-10-27
+        print(f"{path}   {c['shortlisted']} shortlisted, {review}{c['visa_list']} on the visa list, "
+              f"{c['rejected']} rejected")
 
 
 def cmd_run(args) -> int:
@@ -245,7 +246,7 @@ def cmd_grade(args) -> int:
 
 
 def cmd_check(args) -> int:
-    """AI web check for needs_review jobs: given ids, or the unchecked ones newest first."""
+    """AI web check for shortlisted jobs with an unclear location: given ids, or the unchecked ones newest first."""
     paths, _, filters = _load(args)
     checker, note = build_checker(paths.ai_check_file, require_enabled=False)
     if checker is None:
@@ -259,8 +260,8 @@ def cmd_check(args) -> int:
                 row = store.get(job_id)
                 if row is None:
                     print(f"#{job_id}: no such job")
-                elif row["status"] != NEEDS_REVIEW and not row["ai_check_json"]:  # AI-decided jobs may be re-checked
-                    print(f"#{job_id}: skipped, status is {row['status']} (only needs_review jobs are AI-checked)")
+                elif row["eligibility"] != UNCLEAR and not row["ai_check_json"]:  # AI-decided jobs may be re-checked
+                    print(f"#{job_id}: skipped, the rules say {row['eligibility']} (only unclear jobs are AI-checked)")
                 else:
                     rows.append(row)
             waiting = len(rows)
@@ -298,7 +299,7 @@ def cmd_check(args) -> int:
 
 
 def cmd_dates(args) -> int:
-    """Posting dates for undated needs_review jobs: given ids, or the ones not looked up yet, newest first."""
+    """Posting dates for undated shortlisted jobs: given ids, or the ones not looked up yet, newest first."""
     paths, _, filters = _load(args)
     finder, note = build_finder(paths.ai_check_file, require_enabled=False)
     if note:
@@ -369,6 +370,8 @@ def cmd_reclassify(args) -> int:
 
     try:
         for row in store.all_jobs():
+            if row["status"] == NEEDS_REVIEW:
+                continue  # left from before 2026-10-27, for the user to review by hand: never re-judged
             job = row_to_job(row)
             job.required_yoe = None  # no source sets it: it is always read from the text
             job = enrich(job)  # re-extract too, so extraction changes apply
@@ -392,7 +395,7 @@ def cmd_reclassify(args) -> int:
         print(f"{count:5}  {change}")
     for path in rebuilt:
         print(f"rebuilt {path}")
-    print("jobs that became shortlisted/needs_review/visa_list and were never reported go into the next daily report")
+    print("jobs that became shortlisted/visa_list and were never reported go into the next daily report")
     return 0
 
 
@@ -714,11 +717,12 @@ def main(argv: list[str] | None = None) -> int:
 
     p = sub.add_parser(
         "check",
-        help="AI web check: can the company hire from Lebanon? (needs_review jobs; models in config/ai_check.json)",
+        help="AI web check: can the company hire from Lebanon? (shortlisted jobs the rules left unclear; "
+        "models in config/ai_check.json)",
         description="The model in config/ai_check.json reads the job's pages (DeepSeek), then searches the web for "
         "the ones it could not settle (web_model, e.g. Claude Code), and returns a verdict with a quote. The quote must be "
         "found word for word on the page before it changes a job's status. Without ids: the unchecked "
-        "needs_review jobs, newest first, up to max_jobs_per_run from config/ai_check.json.",
+        "shortlisted jobs the rules left unclear, newest first, up to max_jobs_per_run from config/ai_check.json.",
     )
     p.add_argument("job_ids", type=int, nargs="*", help="check these jobs (again, if already checked)")
     p.add_argument("--limit", type=int, metavar="N", help="check at most N jobs (default: max_jobs_per_run)")
@@ -727,10 +731,10 @@ def main(argv: list[str] | None = None) -> int:
 
     p = sub.add_parser(
         "dates",
-        help="find when undated needs_review jobs were posted (job pages, then web search; config/ai_check.json)",
+        help="find when undated shortlisted jobs were posted (job pages, then web search; config/ai_check.json)",
         description="Code reads the schema.org datePosted on the job's own pages; when none has one, web_model "
         "(Claude Code) searches the web and quotes the words that state the date. Code finds the quote on the page "
-        "and reads the date from it, then the age rule judges the job. Without ids: the undated needs_review jobs "
+        "and reads the date from it, then the age rule judges the job. Without ids: the undated shortlisted jobs "
         "not looked up yet, newest first, up to max_dates_per_run.",
     )
     p.add_argument("job_ids", type=int, nargs="*", help="look up these jobs (again, if already looked up)")
@@ -757,7 +761,8 @@ def main(argv: list[str] | None = None) -> int:
                    help="the day to rebuild (default: today, adding relevant jobs never reported)")
     p.set_defaults(func=cmd_report)
 
-    p = sub.add_parser("reclassify", help="re-apply the filters to every stored job (after editing them)")
+    p = sub.add_parser("reclassify", help="re-apply the filters to every stored job (after editing them); "
+                       "jobs left in needs_review are skipped")
     p.set_defaults(func=cmd_reclassify)
 
     p = sub.add_parser("show", help="everything stored about one job, and why it got its status")

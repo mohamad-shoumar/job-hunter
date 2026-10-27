@@ -7,7 +7,7 @@ import pytest
 
 from jobhunter.classify import classify
 from jobhunter.extract import enrich
-from jobhunter.models import HYBRID, NEEDS_REVIEW, ONSITE, REJECTED, REMOTE, SHORTLISTED, VISA_LIST
+from jobhunter.models import HYBRID, ONSITE, REJECTED, REMOTE, SHORTLISTED, VISA_LIST
 from jobhunter.sponsors import Registers, Sponsor
 from jobhunter.visa import read_posting
 
@@ -264,7 +264,7 @@ def test_a_remote_job_open_to_lebanon_stays_a_remote_job(filters):
     # From the stored jobs (2026-10-13): these were shortlisted before the visa list and must stay so.
     tz = _classify(filters, source="hackernews", remote_status="unknown", company="OpenSanctions",
                    allowed_locations=["Berlin, Germany / REMOTE (CET ±3 preferred)"])
-    assert tz.status in (SHORTLISTED, NEEDS_REVIEW) and tz.eligibility.verdict != "visa_sponsor"
+    assert tz.status == SHORTLISTED and tz.eligibility.verdict != "visa_sponsor"
     prefer = _classify(filters, remote_status=REMOTE, allowed_locations=["REMOTE (preferred Spain, UK, Poland, Romania)"],
                        description="Python.\nNo visa sponsorship/relocation.")
     assert prefer.status != REJECTED
@@ -315,7 +315,7 @@ def test_the_visa_list_has_its_own_report_section(tmp_path, filters):
     assert visa_id in {r["id"] for r in store.unreported()}
     store.set_report_date([r["id"] for r in store.unreported()], "2026-09-25")
     text = write_report(store, tmp_path, "2026-09-25", None, NOW).read_text()
-    assert "1 shortlisted · 0 need review · 1 on the visa list · 0 rejected" in text
+    assert "1 shortlisted · 1 on the visa list · 0 rejected" in text
     section = text.split("## Visa list (1)")[1].split("## Rejected")[0]
     assert "Wheely" in section and '- **Visa:** visa_sponsor — On-site in "London", the UK;' in section
     assert "Wheely" not in text.split("## Visa list")[0]

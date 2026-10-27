@@ -20,7 +20,7 @@ from jobhunter.sources import greenhouse, himalayas
 from jobhunter.store import JobStore
 from jobhunter.store.applications import get_application
 
-from .conftest import NOW, FakeHttp, fixture_json, make_job
+from .conftest import NOW, FakeHttp, fixture_json, make_job, store_job
 
 
 def ingest(store, filters, *results, now=NOW):
@@ -119,7 +119,8 @@ def test_daily_report_is_named_by_date_and_explains_rejections(tmp_path, filters
     path = write_report(store, tmp_path, TODAY, summary.to_dict(), NOW)
     assert path.name == f"{TODAY}.md" and sorted(p.name for p in tmp_path.iterdir()) == [f"{TODAY}.md"]
     text = path.read_text()
-    assert "## Shortlisted (1)" in text and "## Needs review (1)" in text and "## Rejected (3)" in text
+    assert "## Shortlisted (2)" in text and "## Rejected (3)" in text
+    assert "need review" not in text and "## Needs review" not in text  # none since 2026-10-27
     # every rejected job is listed with the exact word / place that rejected it
     assert '| Engineering Manager, Backend](https://example.com/jobs/1) | Gamma | Title contains \\"manager\\" |' not in text
     assert 'Gamma | Title contains "manager" |' in text
@@ -223,9 +224,9 @@ def test_end_to_end_run(tmp_path, filters):
     assert summary.new == 5
     assert [p.name for p in reports] == [f"{TODAY}.md"]
     text = reports[0].read_text()
-    # Himalayas gives no location for it, so it waits for review rather than being shortlisted.
-    review = text.split("## Needs review")[1].split("## Rejected")[0]
-    assert "Backend Engineer (Senior+) — Miris" in review
+    # Himalayas gives no location for it: shortlisted all the same, marked unclear.
+    shortlisted = text.split("## Shortlisted")[1].split("## Visa list")[0]
+    assert "Backend Engineer (Senior+) — Miris" in shortlisted and "unclear" in shortlisted
     assert "| greenhouse | 2 | 2 | 0 |" in text
 
     tomorrow = NOW + timedelta(days=1)
@@ -267,20 +268,32 @@ def test_reclassify_surfaces_jobs_after_rules_change(filters):
     assert [r["id"] for r in store.unreported()] == [1]
 
 
-def test_needs_review_status_for_unclear_eligibility(filters):
+def test_unclear_eligibility_is_shortlisted_and_waits_for_the_ai_check(filters):
+    # No review list since 2026-10-27: a job is rejected or shortlisted.
     store = JobStore(":memory:")
     ingest(store, filters, SourceResult("test", [make_job(location_raw="Remote")]))
-    assert store.get(1)["status"] == NEEDS_REVIEW
+    row = store.get(1)
+    assert (row["status"], row["eligibility"]) == (SHORTLISTED, "unclear")
+    assert [r["id"] for r in store.needs_ai_check()] == [1]
 
 
-def test_job_with_no_posting_date_is_not_shortlisted(filters):
-    # Proxify #1495 came from Google Jobs with no date and was months old.
+def test_job_with_no_posting_date_is_shortlisted_with_a_note_and_waits_for_the_date_lookup(filters):
+    # Proxify #1495 came from Google Jobs with no date and was months old: the date lookup can reject such a one.
     store = JobStore(":memory:")
     ingest(store, filters, SourceResult("test", [make_job(posted_at=None, allowed_locations=["Worldwide"])]))
     row = store.get(1)
-    assert row["status"] == NEEDS_REVIEW and row["eligibility"] != "unclear"
+    assert row["status"] == SHORTLISTED and row["eligibility"] != "unclear"
     assert "No posting date, so its age is unknown" in json.loads(row["relevance_reasons_json"])
+    assert [r["id"] for r in store.needs_date_check()] == [1]
     assert store.needs_ai_check() == []  # the AI Lebanon check has nothing to answer here
+
+
+def test_jobs_left_in_needs_review_are_never_looked_up_or_checked(filters):
+    # Judged before 2026-10-27: the user reviews them by hand.
+    store = JobStore(":memory:")
+    store_job(store, filters, status=NEEDS_REVIEW, location_raw="Remote", allowed_locations=[], posted_at=None)
+    store.commit()
+    assert store.needs_ai_check() == [] and store.needs_date_check() == []
 
 
 def test_six_years_is_too_senior(filters):

@@ -31,7 +31,7 @@ from .config import Filters, OutreachConfig
 from .extract import enrich
 from .fitgrade import FitGrader, GradeRun, build_grader, grade_jobs, to_grade
 from .http import Http, wait_for_network
-from .models import NEEDS_REVIEW, UNCLEAR, Job
+from .models import SHORTLISTED, UNCLEAR, Job
 from .posted_date import DateFinder, DateRun, build_finder, find_dates
 from .outreach import run_outreach
 from .report import write_report
@@ -249,12 +249,12 @@ def assign_range(store: JobStore, summary: RunSummary, filters: Filters, now: da
 
 def date_check_days(store: JobStore, finder: DateFinder, days: list[str], filters: Filters,
                     now: datetime) -> DateRun:
-    """Look up when the undated needs_review jobs filed under `days` were posted, newest first, up to the cap.
+    """Look up when the undated shortlisted jobs filed under `days` were posted, newest first, up to the cap.
 
     Before the AI check, so one that turns out too old is rejected without it. Its changed_days are the report days
     whose jobs changed status."""
     waiting = [row for day in days for row in store.jobs_for_report(day)
-               if row["status"] == NEEDS_REVIEW and not row["posted_at"] and not row["date_check_json"]]
+               if row["status"] == SHORTLISTED and not row["posted_at"] and not row["date_check_json"]]
     waiting.sort(key=lambda r: (r["first_seen"], r["id"]), reverse=True)
     limit = finder.config.max_dates_per_run
     result = find_dates(store, finder, waiting[:limit], filters, now)
@@ -265,11 +265,12 @@ def date_check_days(store: JobStore, finder: DateFinder, days: list[str], filter
 
 def ai_check_days(store: JobStore, checker: AiChecker, days: list[str], filters: Filters,
                   now: datetime) -> CheckRun:
-    """AI-check the unchecked needs_review jobs filed under `days`, newest first, up to the per-run cap.
+    """AI-check the unchecked shortlisted jobs with an unclear location filed under `days`, newest first, up to
+    the per-run cap. Jobs left in needs_review (before 2026-10-27) are the user's to review: never checked here.
 
     Its changed_days are the report days whose jobs changed status, so their files are written again."""
     waiting = [row for day in days for row in store.jobs_for_report(day)
-               if row["status"] == NEEDS_REVIEW and row["eligibility"] == UNCLEAR and not row["ai_check_json"]]
+               if row["status"] == SHORTLISTED and row["eligibility"] == UNCLEAR and not row["ai_check_json"]]
     waiting.sort(key=lambda r: (r["posted_at"] or r["first_seen"], r["id"]), reverse=True)
     limit = checker.config.max_jobs_per_run
     result = check_jobs(store, checker, waiting[:limit], filters, now)

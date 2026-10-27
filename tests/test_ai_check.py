@@ -31,7 +31,7 @@ from jobhunter.models import (
 from jobhunter.sources import himalayas
 from jobhunter.store import JobStore, row_to_job
 
-from .conftest import NOW, FakeHttp, fixture_json, make_job
+from .conftest import NOW, FakeHttp, fixture_json, make_job, store_job
 
 PAGE_URL = "https://job-boards.greenhouse.io/acme/jobs/42"
 PAGE_TEXT = "Senior Backend Engineer\n\n**Location:** Remote – United States\n\nAbout the role..."
@@ -73,11 +73,11 @@ def checker(client, **config):
 
 
 def stored_unclear_job(store, filters, **overrides):
-    """A remote job with no location anywhere: the rules say unclear."""
+    """A remote job with no location anywhere: the rules say unclear, and it is shortlisted."""
     job = make_job(**overrides)
     job.first_seen = NOW
     cls = classify(job, filters, NOW)
-    assert cls.status == NEEDS_REVIEW
+    assert cls.status == SHORTLISTED and cls.eligibility.verdict == UNCLEAR
     job_id = store.insert(job, cls, None, NOW)
     store.commit()
     return job_id
@@ -103,7 +103,7 @@ def test_verified_cannot_hire_rejects_the_job_and_survives_reclassify(filters):
     assert row["reject_reason"] == ('AI check: The Greenhouse posting lists Remote - United States only. '
                                     f'"Location: Remote - United States" ({PAGE_URL})')
     assert json.loads(row["eligibility_reasons_json"])[1].startswith("Rules: Remote, but the posting does not say")
-    assert run.checked == 1 and run.status_changes == {"needs_review -> rejected": 1}
+    assert run.checked == 1 and run.status_changes == {"shortlisted -> rejected": 1}
     assert run.cost_usd == 0.1  # 20k in ($0.08) + 500 out ($0.01) on Opus + one search ($0.01)
     # reclassify rebuilds the job from the row: the stored check still applies.
     assert classify(row_to_job(row), filters, NOW).status == REJECTED
@@ -118,7 +118,7 @@ def test_a_quote_not_on_any_page_is_not_used(filters):
     row = store.get(job_id)
     check = row_to_job(row).ai_check
     assert check.verdict == CANNOT_HIRE and not check.verified
-    assert row["status"] == NEEDS_REVIEW
+    assert row["status"] == SHORTLISTED and row["eligibility"] == UNCLEAR
     assert "quote was not found on the page, so it is not used" in json.loads(row["eligibility_reasons_json"])[-1]
 
 
@@ -151,10 +151,10 @@ def test_a_sponsorship_quote_the_visa_rules_do_not_read_as_an_offer_is_not_used(
     for quote in ("We are unable to sponsor visas for this role", "Sponsorship is available for the right person"):
         check = AiCheck("sponsors_visa", "It sponsors.", quote, "https://acme.com/faq", verified=True)
         cls = classify(make_job(ai_check=check), filters, NOW)
-        assert cls.status == NEEDS_REVIEW, quote
+        assert cls.status == SHORTLISTED and cls.eligibility.verdict == UNCLEAR, quote
         assert "does not offer one, so it is not used" in cls.eligibility.reasons[-1]
     unverified = AiCheck("sponsors_visa", "It sponsors.", "We offer visa sponsorship", "https://acme.com/faq")
-    assert classify(make_job(ai_check=unverified), filters, NOW).status == NEEDS_REVIEW
+    assert classify(make_job(ai_check=unverified), filters, NOW).eligibility.verdict == UNCLEAR
 
 
 def test_rules_that_quote_evidence_still_win(filters):
@@ -208,13 +208,13 @@ def test_build_checker_needs_config_and_key(tmp_path, monkeypatch):
     assert checker_ is None and "ANTHROPIC_API_KEY" in note
 
 
-def test_daily_run_checks_new_needs_review_jobs_and_reports_them(tmp_path, filters):
+def test_daily_run_checks_new_unclear_jobs_and_reports_them(tmp_path, filters):
     (tmp_path / "config").mkdir()
     http = FakeHttp({himalayas.SEARCH: lambda p: fixture_json("himalayas_search.json") if p["page"] == 1 else {"jobs": []}})
     client = FakeClient(response(fetched(), verdict()))
     summary, reports = pipeline.run(Paths(tmp_path), {"himalayas": {"queries": ["backend"]}}, filters,
                                     pipeline.RunOptions(http=http, now=NOW, ai_checker=checker(client)))
-    assert len(client.calls) == 1  # only Miris needs review; the Node.js and Java roles are rejected by title
+    assert len(client.calls) == 1  # only Miris is unclear; the Node.js and Java roles are rejected by title
     assert "Company: Miris" in client.calls[0]["messages"][0]["content"]
     assert summary.ai_check.checked == 1 and summary.ai_check.verdicts == {CANNOT_HIRE: 1}
     text = reports[0].read_text()
@@ -238,16 +238,18 @@ def test_no_ai_flag_skips_the_check(tmp_path, filters):
 
 
 def test_daily_run_also_checks_the_last_days_leftovers(tmp_path, filters):
-    """A job over yesterday's cap is checked today; one older than lookback_days is left for `jobhunter check`."""
+    """A job over yesterday's cap is checked today; one older than lookback_days is left for `jobhunter check`,
+    and one left in needs_review (judged before 2026-10-27) is the user's to review."""
     (tmp_path / "config").mkdir()
     paths = Paths(tmp_path)
     store = JobStore(paths.db_file)
     yesterday = stored_unclear_job(store, filters, source_job_id="y", company="Yesterday Co")
     old = stored_unclear_job(store, filters, source_job_id="o", company="Old Co")
+    review = store_job(store, filters, status=NEEDS_REVIEW, source_job_id="r", company="Review Co", allowed_locations=[])
     today = pipeline.local_day(NOW)
-    store.set_report_date([yesterday], (today - pipeline.timedelta(days=1)).isoformat())
+    store.set_report_date([yesterday, review], (today - pipeline.timedelta(days=1)).isoformat())
     store.set_report_date([old], (today - pipeline.timedelta(days=9)).isoformat())
-    store.mark_reported([yesterday, old], NOW)  # shown on their days, so not moved to today's report
+    store.mark_reported([yesterday, old, review], NOW)  # shown on their days, so not moved to today's report
     store.close()
     http = FakeHttp({himalayas.SEARCH: {"jobs": []}})
     client = FakeClient(response(fetched(), verdict()))
@@ -319,7 +321,7 @@ def test_a_deepseek_quote_on_no_page_is_not_used(filters):
     model = FakeModel(answer(quote="Applicants must live in the United States"))
     check_jobs(store, deepseek(model, FakeHttp({GH_API: GH_JSON})), [store.get(job_id)], filters, NOW)
     row = store.get(job_id)
-    assert row["status"] == NEEDS_REVIEW and json.loads(row["ai_check_json"])["verified"] is False
+    assert row["status"] == SHORTLISTED and json.loads(row["ai_check_json"])["verified"] is False
 
 
 def test_claude_code_runs_only_when_deepseek_could_not_settle_it(filters):
