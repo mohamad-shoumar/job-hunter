@@ -57,7 +57,8 @@
     { "company": "Ziina", "board_token": "ziina" },
     { "company": "Qlub", "board_token": "qlub" },
     { "company": "Lean Technologies", "board_token": "LeanTech" },
-    { "company": "Brain Co.", "board_token": "brainco", "_note": "Abu Dhabi 'Deployed' AI roles next to its San Francisco ones (2026-10-21 research)." }
+    { "company": "Brain Co.", "board_token": "brainco", "_note": "Abu Dhabi 'Deployed' AI roles next to its San Francisco ones (2026-10-21 research)." },
+    { "company": "Mindly", "board_token": "mindly", "_note": "Remote, hires in CET/EET time zones; no source listed it, found by hand in a Google search (2026-10-27)." }
   ],
   "custom_pages": [
     {
