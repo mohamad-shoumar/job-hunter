@@ -1,6 +1,6 @@
 ---
 name: apply-job
-description: Work through the "To apply" column of the jobhunter app in Chrome - get a checked tailored CV, fill the job's application form on the company site or in LinkedIn Easy Apply, find one LinkedIn contact per job (CEO at a small company, else the hiring manager, else HR, else a team lead) and write a note under 200 characters - and stop before the final Apply/Submit, never pressing Connect or Message. Use when the user says "apply to my jobs", "go through To apply", or names a job to apply to.
+description: Work through the "To apply" column of the jobhunter app in Chrome - get a checked tailored CV, fill the job's application form on the company site or in LinkedIn Easy Apply, find one LinkedIn contact per job (CEO at a small company, else the hiring manager, else HR, else a team lead) and write a note of at most 300 characters with two achievements - and stop before the final Apply/Submit, never pressing Connect or Message. Use when the user says "apply to my jobs", "go through To apply", or names a job to apply to.
 ---
 
 # Apply to jobs from the "To apply" column
@@ -247,11 +247,15 @@ already signed in.
 - **Email:** only when it is public, on the person's LinkedIn Contact info or the company's own site.
   Never guess one.
 - **The note** (the user's rules, 2026-10-29):
-  - **Under 200 characters**, counting spaces and punctuation; aim for 140-190. Count with code
-    (`len()` in Python or `.length` in JS), never by eye, and put the count in the report. Over
-    200: shorten the opening or the ask first, never the role.
-  - **ONE achievement**, the one that best fits the posting and the person. Use a shorter wording
-    when space is tight; combine two only if the note still stays under 200.
+  - **At most 300 characters** (LinkedIn's limit), counting spaces and punctuation; aim for
+    220-290. Count with code (`len()` in Python or `.length` in JS), never by eye, and put the
+    count in the report. Over 300: shorten the opening or the ask first, never the role or an
+    achievement's facts.
+  - **TWO achievements**, the two that best fit the posting and the person, joined in one sentence
+    so it reads like a person talking, not a list. Keep each one's facts and numbers word for word
+    (15K, 800+, 3 engineers, "AI-native"); only the joining words and the tense may change ("I lead
+    a backend team of 3 engineers and built an AWS event-driven system handling 800+ concurrent
+    jobs."). Never two that say the same thing.
 
     | Achievement | Best fit |
     | --- | --- |
@@ -260,20 +264,27 @@ already signed in.
     | **AWS:** Built an AWS event-driven system handling 800+ concurrent jobs. | Backend, cloud, distributed systems |
     | **Leadership:** Lead a backend team of 3 engineers. | Lead and senior roles |
 
-  - **The template for the person's group:**
-    - CEO / hiring manager: "Hi [Name], I applied for the [Role]. [Achievement]. I'd love to
-      discuss how I could contribute to your team."
-    - HR / recruiter: "Hi [Name], I applied for the [Role] at [Company]. [Achievement]. Would you
-      be open to a quick chat?"
-    - Engineer / team lead: "Hey [Name], I recently applied for the [Role] at [Company]. Curious to
-      hear what it's like working there from someone on the inside. How's the culture?" If it
-      fits, name their team or work instead of the general line.
+  - **The template for the person's group** ([Achievements] is the one sentence above). These
+    are a starting shape, not a script: reword so it reads naturally for this person and job, but
+    keep the parts (who you are writing to, the role, the two achievements, one easy ask).
+    - CEO / hiring manager: "Hi [Name], I just applied for the [Role] role at [Company].
+      [Achievements] I'd love to hear what your team is building next and how I could help."
+    - HR / recruiter: "Hi [Name], I just applied for the [Role] role at [Company]. [Achievements]
+      Would you be open to a quick chat about it?"
+    - Engineer / team lead: "Hey [Name], I just applied for the [Role] role at [Company].
+      [Achievements] I'd love to hear what it's like on your team from someone on the inside." If
+      it fits, name their team or work instead of the general line.
     - Agency recruiter (only for an agency-posted job, see above): "Hi [Name], I'm a backend
-      developer and team lead exploring [role/location] opportunities. Happy to connect if
-      you're hiring for similar roles."
+      developer and team lead looking at [role/location] roles. [Achievements] Happy to connect if
+      you're hiring for something similar."
+    - Example (286 characters, long names on purpose): "Hi Alexandra, I just applied for the
+      Senior Backend Engineer role at Wayve Technologies. I've built AI-native workflows to ship
+      features and fixes daily, and an AWS event-driven system handling 800+ concurrent jobs. I'd
+      love to hear what your team is building next and how I could help."
   - A real shared link may go in when it fits ("Fellow AUB alum."). Details about the person only
     from their profile; never invent an achievement or a detail about them. Never ask for a
-    referral. Tone: confident, human, direct.
+    referral. Tone: confident, human, direct; no stiff lines like "I'd love to discuss how I could
+    contribute to your team".
 - Nobody found in any group: note "no LinkedIn contact" and the searches you tried.
 
 ## At the end
