@@ -1,6 +1,6 @@
 ---
 name: apply-job
-description: Work through the "To apply" column of the jobhunter app in Chrome - get a checked tailored CV, fill the job's application form on the company site or in LinkedIn Easy Apply, draft the outreach email - and stop before the final Apply/Submit and Send. Use when the user says "apply to my jobs", "go through To apply", or names a job to apply to.
+description: Work through the "To apply" column of the jobhunter app in Chrome - get a checked tailored CV, fill the job's application form on the company site or in LinkedIn Easy Apply, find LinkedIn contacts (HR, hiring manager, team lead) and write a note for each - and stop before the final Apply/Submit, never pressing Connect or Message. Use when the user says "apply to my jobs", "go through To apply", or names a job to apply to.
 ---
 
 # Apply to jobs from the "To apply" column
@@ -13,11 +13,13 @@ question, one field or one stuck page. Make a sensible choice, note it, keep goi
 
 1. **Never press the final Apply / Submit / Send application button.** Fill everything, scroll to it,
    leave the tab open for the user to press it.
-2. **Never press Send on an email** in the app. Draft it and leave it. (.claude/CLAUDE.md: emails go out
-   only from the user's own click on Send.)
+2. **Never contact anyone.** On LinkedIn never press Connect, Message, Follow or InMail, and never
+   open the Connect dialog or type into it. Step 4 only finds the people and writes the note; the
+   user sends it. Never press Send on an email in the app either (.claude/CLAUDE.md: emails go out
+   only from the user's own click on Send).
 
 Everything else (uploading the CV, answering questions, clicking Next between form pages, Tailor CV,
-Find contact, Write with AI) you do without asking.
+searching LinkedIn and opening profiles) you do without asking.
 
 The user has said yes, for every run, to ticking an application form's privacy notice / data
 processing / candidate privacy policy checkbox (the one a form needs before it can be submitted).
@@ -205,16 +207,44 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
   account, so the user does those.
 - Finish at the final **Apply/Submit** button. Don't press it. Leave the tab open.
 
-### 4. Email draft
-- Back in the app, on the job's card: if there's no contact, press **Find contact**. Then press
-  **Write with AI** (or **Fill template**) to draft the email. The app's own rules and checks
-  (`pitch.py`, `check_draft`) write and check it.
-- If the draft shows "needs edit" warnings, leave them for the user. **Don't press Send.**
-- If no contact can be found, still draft the email so it's ready, and note "no contact".
+### 4. LinkedIn contacts (find and write, never send)
+Outreach goes through LinkedIn now, not email (the user's call, 2026-10-29). Don't use the app's
+Find contact, Write with AI or Gmail drafts in this step. Search only on LinkedIn, where the user is
+already signed in.
+- **Who, in this order:**
+  1. HR / recruiter / talent acquisition at the company (one who hires engineers, or in the job's
+     region, if you can tell).
+  2. The hiring manager: the engineering manager or head of the team the role sits in.
+  3. A team lead or tech lead on that team.
+  Leave out people who have left the company and recruiters from outside agencies.
+- **Within each group, put first the people with a link to the user:** 1st or 2nd-degree
+  connections, or shared connections ("X mutual connections"); fellow alumni of the American
+  University of Beirut (AUB) or Software Engineering Factory; an Arab background the profile shows
+  (studied, worked or lives in Lebanon or another Arab country, or lists Arabic). Go by what the
+  profile shows, not a guess from the name alone.
+- **How to search:** the company's LinkedIn page, People tab, with a keyword (recruiter, talent,
+  HR, engineering manager, tech lead, team lead); its "Where they studied" filter finds AUB alumni.
+  Or people search: `https://www.linkedin.com/search/results/people/?keywords=<company> recruiter`.
+  Read only the first page of results. Opening a profile is fine (they will see the user viewed it).
+- **Pace:** the Easy Apply rules apply here too: slowly, at most 4 searches and 5 profiles per
+  company, and any "unusual activity" warning stops all LinkedIn work for the run.
+- Pick up to 3 people, ideally one from each group.
+- **Email:** only when it is public, on the person's LinkedIn Contact info or the company's own site.
+  Never guess one.
+- **The note, one per person:** under 300 characters (LinkedIn's limit for a connection note),
+  plain words, no pitch phrases. Say which role the user applied to, one true fact from the
+  profile/CV that fits the posting, and a short ask (for a recruiter: who is best to talk to; for a
+  manager or lead: open to a quick chat). Name the shared link only when it is real ("fellow AUB
+  alum"). Facts only from the profile. Example:
+  "Hi <first name>, I just applied for the <role> role at <company>. I lead a small team at
+  <current employer>, building with Python, TypeScript and AWS. Fellow AUB alum too. Happy to share
+  more if useful. Thanks, <user's first name>"
+- Nobody found: note "no LinkedIn contact" and the searches you tried.
 
 ## At the end
 
 Report one line per job: company, role, where you applied (the URL of the tab left open), CV used,
-salary entered, anything you guessed, and the email status (drafted / no contact /
-needs edit). List the jobs you skipped (pressed Skip) separately, one line each with the reason.
-The user then goes through the open tabs and presses Apply, and presses Send in the app.
+salary entered and anything you guessed. Under it, list its LinkedIn contacts: name, title, profile
+URL, why picked (group, and the link to the user if any), email if public, and the note ready to
+paste. List the jobs you skipped (pressed Skip) separately, one line each with the reason.
+The user then goes through the open tabs and presses Apply, and sends the LinkedIn notes themselves.
