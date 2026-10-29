@@ -30,7 +30,7 @@ from jobhunter.models import (
 from jobhunter.sources import himalayas
 from jobhunter.store import JobStore, row_to_job
 
-from .conftest import NOW, FakeHttp, fixture_json, make_job, store_job
+from .conftest import NOW, FakeHttp, fixture_json, make_job
 
 PAGE_URL = "https://job-boards.greenhouse.io/acme/jobs/42"
 PAGE_TEXT = "Senior Backend Engineer\n\n**Location:** Remote – United States\n\nAbout the role..."

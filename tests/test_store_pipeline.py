@@ -299,7 +299,7 @@ def test_reclassify_leaves_tracking_alone(tmp_path, filters):
 
     from jobhunter import cli, tracking
 
-    from .conftest import ROOT, store_job
+    from .conftest import ROOT
 
     # The shipped config/ on purpose: the CLI needs a whole project folder.
     shutil.copytree(ROOT / "config", tmp_path / "config")
@@ -321,7 +321,7 @@ def test_reclassify_lets_the_web_app_save_while_it_runs(tmp_path, filters, monke
 
     from jobhunter import cli, tracking
 
-    from .conftest import ROOT, store_job
+    from .conftest import ROOT
 
     # The shipped config/ on purpose: the CLI needs a whole project folder.
     shutil.copytree(ROOT / "config", tmp_path / "config")
@@ -397,7 +397,6 @@ def test_a_failing_optional_step_is_recorded_as_its_own_result_with_an_error(
 def test_the_outreach_step_runs_without_any_keys(tmp_path, filters):
     from jobhunter.outreach import run_outreach
 
-    from .conftest import store_job
 
     store = JobStore(":memory:")
     job_id = store_job(store, filters)
