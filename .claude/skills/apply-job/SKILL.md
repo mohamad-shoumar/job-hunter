@@ -268,8 +268,8 @@ already signed in.
     - Engineer / team lead: "Hey [Name], I recently applied for the [Role] at [Company]. Curious to
       hear what it's like working there from someone on the inside. How's the culture?" If it
       fits, name their team or work instead of the general line.
-    - Agency recruiter (only for an agency-posted job, see above): "Hi [Name], I'm a Python/AWS
-      backend engineer and team lead exploring [role/location] opportunities. Happy to connect if
+    - Agency recruiter (only for an agency-posted job, see above): "Hi [Name], I'm a backend
+      developer and team lead exploring [role/location] opportunities. Happy to connect if
       you're hiring for similar roles."
   - A real shared link may go in when it fits ("Fellow AUB alum."). Details about the person only
     from their profile; never invent an achievement or a detail about them. Never ask for a
