@@ -14,13 +14,16 @@ from datetime import date, datetime
 from pathlib import Path
 
 from .fitgrade import grade_of, sort_grade
-from .models import ELIGIBLE, LIKELY, NEEDS_REVIEW, REJECTED, SHORTLISTED, VISA_LIST
+from .models import ELIGIBLE, LIKELY, REJECTED, REVIEW_CLEARED, SHORTLISTED, VISA_LIST
 from .store import JobStore
 
 _ELIGIBILITY_ORDER = {ELIGIBLE: 0, LIKELY: 1}
 
 # Rejection groups, in report order: (code, heading, explanation).
 _REJECT_GROUPS = [
+    (REVIEW_CLEARED, "Cleared from the old review list",
+     "Jobs that waited in needs review from before 2026-10-27, cleared on your call (2026-10-29). "
+     "`reclassify` never judges them again."),
     ("blocked_company", "Company on your blocked list", "`blocked_companies` in `config/filters.json`."),
     ("agency", "Staffing agency or talent marketplace", "`agencies` in `config/filters.json`; what matched is quoted."),
     ("title_excluded", "Title has an excluded word",
@@ -199,13 +202,11 @@ def render(day: str, rows: list[sqlite3.Row], sightings: dict[int, list[sqlite3.
         return [block(i, r, others) for i, (r, others) in enumerate(one_per_company(section), 1)] or ["_None._", ""]
 
     shortlisted = sorted((r for r in rows if r["status"] == SHORTLISTED), key=_sort_key)
-    review = sorted((r for r in rows if r["status"] == NEEDS_REVIEW), key=_sort_key)
     visa = sorted((r for r in rows if r["status"] == VISA_LIST), key=_sort_key)
     rejected = [r for r in rows if r["status"] == REJECTED]
 
     out = [f"# Jobs — {date.fromisoformat(day):%A %d %B %Y}", ""]
-    need_review = f"{len(review)} need review · " if review else ""  # only days before 2026-10-27
-    out += [f"{len(shortlisted)} shortlisted · {need_review}{len(visa)} on the visa list · {len(rejected)} rejected", ""]
+    out += [f"{len(shortlisted)} shortlisted · {len(visa)} on the visa list · {len(rejected)} rejected", ""]
     stamp = f"Updated {generated_at.astimezone():%Y-%m-%d %H:%M}"
     if summary:
         stamp += f" by run {summary['run_id']}"
@@ -216,11 +217,6 @@ def render(day: str, rows: list[sqlite3.Row], sightings: dict[int, list[sqlite3.
             "Lebanon (and the AI check found nothing either way), and one with no posting date may be old: check "
             "those before applying.", ""]
     out += blocks(shortlisted)
-
-    if review:  # jobs judged before 2026-10-27 keep needs_review; none get it now
-        out += [f"## Needs review ({len(review)})", ""]
-        out += ["A target role, but the posting does not say clearly whether Lebanon is allowed, or has no posting date. Check before applying.", ""]
-        out += blocks(review)
 
     out += [f"## Visa list ({len(visa)})", ""]
     out += ["Abroad (the EU or UK): a target role at an employer that offers a visa in the posting, or is on its "
@@ -300,5 +296,5 @@ def write_report(store: JobStore, reports_dir: Path, day: str, summary: dict | N
     reports_dir.mkdir(parents=True, exist_ok=True)
     path = reports_dir / f"{day}.md"
     path.write_text(text)
-    store.mark_reported([r["id"] for r in rows if r["status"] in (SHORTLISTED, NEEDS_REVIEW, VISA_LIST)], now)
+    store.mark_reported([r["id"] for r in rows if r["status"] in (SHORTLISTED, VISA_LIST)], now)
     return path

@@ -41,10 +41,12 @@ SPONSORS_VISA = "sponsors_visa"
 
 # Final status, which decides where a job shows up
 SHORTLISTED = "shortlisted"
-NEEDS_REVIEW = "needs_review"
 REJECTED = "rejected"
 # The separate list of jobs abroad that sponsor a work visa (visa.py): not in the shortlist or "To apply".
 VISA_LIST = "visa_list"
+# The reject code of the jobs that waited in "needs review" (a status until 2026-10-27): cleared on the
+# user's call (2026-10-29) by migration 2 (store/schema.py), and never judged again (`reclassify` skips them).
+REVIEW_CLEARED = "review_cleared"
 
 # Where you are with a job (applications.stage; tracking.py moves jobs between them)
 NEW = "new"

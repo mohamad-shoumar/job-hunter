@@ -83,8 +83,7 @@ One Markdown file per day, `reports/2026-09-27.md`. Each job in it has the reaso
 parts:
 
 - **Shortlisted**: each job with the reason it can (or might) hire from Lebanon (`unclear` when nothing
-  says), its fit, salary, dates and apply link. Days before 2026-10-27 also have **Needs review**, for the
-  jobs judged while that list existed.
+  says), its fit, salary, dates and apply link.
 - **Visa list**: jobs abroad (the EU and UK) at employers that sponsor a work visa, each with the quoted
   evidence. Kept apart from the remote jobs: see [the visa list](#moving-abroad-on-a-work-visa).
 - **Rejected**: every rejected job, listed under the rule that rejected it, with the exact word, place or
@@ -171,8 +170,9 @@ Each job gets one status:
 - **visa list**: a job abroad that sponsors a visa ([below](#moving-abroad-on-a-work-visa));
 - **rejected**.
 
-There is no "needs review" any more (since 2026-10-27). The jobs that had it keep it, for you to go through:
-`reclassify` and the steps below leave them alone.
+There is no "needs review" any more (since 2026-10-27). The 183 jobs left in it were cleared on 2026-10-29
+(rejected, code `review_cleared`, listed under "Cleared from the old review list"): `reclassify` never judges
+them again.
 
 ### 4. Posting dates, only for undated shortlisted jobs
 
@@ -265,13 +265,12 @@ grades.
 
 - **Today**: replies to answer, follow-ups due, new shortlisted and visa-list jobs to triage (Save or Skip),
   sends to double-check, and jobs ghosted this week.
-- **Jobs**: the list, by view (Shortlisted, Needs review (jobs from before 2026-10-27), Visa list, ...). Click
+- **Jobs**: the list, by view (Shortlisted, Visa list, Tracked, Closed, Rejected). Click
   one for everything about it.
-- **Pipeline**: every tracked job by stage. **To apply** holds shortlisted jobs you haven't acted on, plus
-  visa-list jobs posted today or yesterday (with a "visa" chip), newest posting first, one per company.
-  **Email someone** holds jobs you applied to where nobody at the company has been emailed yet, for
-  `reach_out_days` (7) after you reached out. Then Saved, Reached out, Replied, Interviewing, Offer,
-  Rejected and Closed.
+- **Pipeline**: every tracked job by stage. **To apply** holds shortlisted jobs you haven't acted on or
+  saved, plus visa-list jobs posted today or yesterday (with a "visa" chip), newest posting first, one per
+  company. Then Reached out (newest first: every job there gets a LinkedIn note, so there is no separate
+  Email someone column), Replied, Interviewing, Offer and Closed (rejected, ghosted or skipped, on the card).
 - **Stats**: your own reply rate, by who you emailed and by company size.
 
 ### Who to email

@@ -20,7 +20,7 @@ from .extract import enrich
 from .fitgrade import build_grader, grade_jobs, to_grade
 from .report import write_report
 from .sources import build_sources
-from .models import NEEDS_REVIEW, UNCLEAR
+from .models import REVIEW_CLEARED, UNCLEAR
 from .store import JobStore, row_to_job
 from .text import utcnow
 
@@ -68,8 +68,7 @@ def _date_range(args) -> tuple[date, date] | None:
 def _print_report_counts(store: JobStore, report_paths: list[Path]) -> None:
     for path in report_paths:
         c = Counter(row["status"] for row in store.jobs_for_report(path.stem))
-        review = f"{c['needs_review']} need review, " if c["needs_review"] else ""  # only days before 2026-10-27
-        print(f"{path}   {c['shortlisted']} shortlisted, {review}{c['visa_list']} on the visa list, "
+        print(f"{path}   {c['shortlisted']} shortlisted, {c['visa_list']} on the visa list, "
               f"{c['rejected']} rejected")
 
 
@@ -370,8 +369,8 @@ def cmd_reclassify(args) -> int:
 
     try:
         for row in store.all_jobs():
-            if row["status"] == NEEDS_REVIEW:
-                continue  # left from before 2026-10-27, for the user to review by hand: never re-judged
+            if row["reject_code"] == REVIEW_CLEARED:
+                continue  # the old review list, cleared on the user's call (2026-10-29): never judged again
             job = row_to_job(row)
             job.required_yoe = None  # no source sets it: it is always read from the text
             job = enrich(job)  # re-extract too, so extraction changes apply
@@ -762,7 +761,7 @@ def main(argv: list[str] | None = None) -> int:
     p.set_defaults(func=cmd_report)
 
     p = sub.add_parser("reclassify", help="re-apply the filters to every stored job (after editing them); "
-                       "jobs left in needs_review are skipped")
+                       "jobs cleared from the old review list are skipped")
     p.set_defaults(func=cmd_reclassify)
 
     p = sub.add_parser("show", help="everything stored about one job, and why it got its status")

@@ -130,7 +130,6 @@ function emailBadge(status) {
 }
 function statusChip(status, eligibility) {
   if (status === "shortlisted") return `<span class="chip good">shortlisted · ${esc(eligibility)}</span>`;
-  if (status === "needs_review") return `<span class="chip warn">needs review</span>`;
   if (status === "visa_list") return `<span class="chip info">visa list · ${esc(eligibility === "visa_sponsor" ? "sponsors visas" : eligibility)}</span>`;
   return `<span class="chip bad">${esc(status)}</span>`;
 }
@@ -181,8 +180,6 @@ async function renderJobs() {
       <div class="filters">
         <select id="view">
           <option value="shortlisted">Shortlisted</option>
-          <option value="active">Shortlisted + needs review</option>
-          <option value="needs_review">Needs review</option>
           <option value="visa_list">Visa list (EU/UK, sponsors visas)</option>
           <option value="tracked">Tracked (saved and after)</option>
           <option value="closed">Closed</option>
@@ -738,22 +735,18 @@ async function renderToday() {
 
 // --- pipeline ----------------------------------------------------------------------
 
-// Board columns. "To apply" is shortlisted jobs you haven't acted on (stage new), plus visa-list jobs posted
-// today or yesterday, newest posting first. "Email someone" is Reached out jobs nobody at the company was
-// emailed about, for a week after you applied (to_email, reach_out_days); then they join Reached out. Both
-// are newest reached out first. Rejected gets its own column, and Closed holds the other reasons (ghosted, skipped).
+// Board columns. "To apply" is shortlisted jobs you haven't acted on (stage new) or saved, plus visa-list jobs
+// posted today or yesterday, newest posting first. Reached out is newest reached out first: every job there gets
+// a LinkedIn note now, so there is no Email someone column (the user's call, 2026-10-29), and no Saved or
+// Rejected column either. Closed holds every reason (rejected, ghosted, skipped), shown on the card.
 const BOARD = [
   { key: "to_apply", label: "To apply", stage: "new" },
-  { key: "saved", stage: "saved" },
-  { key: "to_email", label: "Email someone", stage: "reached_out" },
   ...["reached_out", "replied", "interviewing", "offer"].map((s) => ({ key: s, stage: s })),
-  { key: "rejected", label: "Rejected", stage: "closed", reason: "rejected" },
   { key: "closed", label: "Closed", stage: "closed" },
 ];
+const toApplyStage = (j) => !j.stage || j.stage === "new" || j.stage === "saved";
 function boardKey(j) {
-  if (!j.stage || j.stage === "new") return "to_apply";
-  if (j.stage === "closed") return j.closed_reason === "rejected" ? "rejected" : "closed";
-  return j.to_email ? "to_email" : j.stage;
+  return toApplyStage(j) ? "to_apply" : j.stage;
 }
 // Newest first, by the local day the card shows; the same day keeps the grade order.
 const localDay = (iso) => { const d = new Date(iso); return isNaN(d) ? String(iso || "").slice(0, 10) : d.toLocaleDateString("sv"); };
@@ -767,12 +760,13 @@ async function renderPipeline() {
     api("/api/jobs?view=shortlisted"), api("/api/jobs?view=visa_list&days=2"), api("/api/jobs?view=tracked"), api("/api/jobs?view=closed"),
   ]);
   const grade = (j) => j.fit_grade?.grade;
-  const toApply = onePerCompany([...open.jobs, ...visa.jobs].filter((j) => !j.stage || j.stage === "new"), grade, newestDay(postedAt));
-  const toEmail = onePerCompany(tracked.jobs.filter((j) => j.to_email), grade, newestReachedOut);
-  const reachedOut = tracked.jobs.filter((j) => !j.to_email && j.stage === "reached_out").sort(newestReachedOut);
-  const jobs = [...toApply, ...toEmail, ...reachedOut, ...tracked.jobs.filter((j) => j.stage !== "reached_out"), ...closed.jobs];
-  // A reached-out card offers only its own one of the two Reached out columns: the other is the same stage.
-  const options = (current) => BOARD.filter((c) => c.key === current || c.stage !== "reached_out" || !["to_email", "reached_out"].includes(current))
+  // A saved job is in the tracked list too (and a visa-list one may be older than the two days): it shows once, in To apply.
+  const waiting = [...open.jobs, ...visa.jobs].filter(toApplyStage);
+  const ids = new Set(waiting.map((j) => j.id));
+  const toApply = onePerCompany([...waiting, ...tracked.jobs.filter((j) => j.stage === "saved" && !ids.has(j.id))], grade, newestDay(postedAt));
+  const reachedOut = tracked.jobs.filter((j) => j.stage === "reached_out").sort(newestReachedOut);
+  const jobs = [...toApply, ...reachedOut, ...tracked.jobs.filter((j) => !toApplyStage(j) && j.stage !== "reached_out"), ...closed.jobs];
+  const options = (current) => BOARD
     .map((c) => `<option value="${c.key}" ${c.key === current ? "selected" : ""}>${esc(c.label || stageLabel(c.stage))}</option>`).join("");
   $("#main").innerHTML = `<div class="board">${BOARD.map((col) => {
     const cards = jobs.filter((j) => boardKey(j) === col.key);
@@ -784,13 +778,12 @@ async function renderPipeline() {
           ${j.status === "visa_list" ? `<span class="chip info">visa</span>` : ""}
           ${col.key === "to_apply" ? `<span class="chip">posted ${esc(day(postedAt(j)))}</span>${gradeChip(j.fit_grade)}<span class="chip">fit ${j.fit}</span>${j.has_cv ? `<span class="chip good">CV</span>` : ""}${j.has_cover ? `<span class="chip good">letter</span>` : ""}` : ""}
           ${j.applied_at ? `<span class="chip">applied ${esc(day(j.applied_at))}</span>` : ""}${j.emailed_at ? `<span class="chip info">emailed ${esc(day(j.emailed_at))}</span>` : ""}
-          ${!j.applied_at && !j.emailed_at && j.reached_out_at && ["to_email", "reached_out"].includes(col.key) ? `<span class="chip">reached out ${esc(day(j.reached_out_at))}</span>` : ""}
+          ${!j.applied_at && !j.emailed_at && j.reached_out_at && col.key === "reached_out" ? `<span class="chip">reached out ${esc(day(j.reached_out_at))}</span>` : ""}
           ${j.stage === "reached_out" && j.next_follow_up_at ? `<span class="chip ${new Date(j.next_follow_up_at) <= new Date() ? "warn" : ""}">follow-up ${esc(day(j.next_follow_up_at))}</span>` : ""}
           ${j.closed_reason && col.key === "closed" ? `<span class="chip">${esc(j.closed_reason)}${j.skip_reason ? esc(": " + ((state.status?.skip_reasons || {})[j.skip_reason] || j.skip_reason)) : ""}</span>` : ""}
         </div>
         <div class="row"><select data-move="${j.id}">${options(col.key)}</select>
-          ${col.key === "to_apply" ? `<button class="btn small danger" data-quick="skipped" data-id="${j.id}">Skip</button>${moreButton(j)}` : ""}
-          ${col.key === "to_email" ? moreButton(j) : ""}</div>
+          ${col.key === "to_apply" ? `<button class="btn small danger" data-quick="skipped" data-id="${j.id}">Skip</button>${moreButton(j)}` : ""}</div>
       </div>`).join("") || `<div class="small muted" style="margin-top:8px">Empty</div>`}</div>`;
   }).join("")}</div>`;
 }
@@ -888,7 +881,7 @@ document.addEventListener("change", async (e) => {
     if (e.target.matches("[data-move]")) {
       const col = BOARD.find((c) => c.key === e.target.value);
       const stage = col.stage;
-      const reason = col.reason || (stage === "closed" ? prompt("Why closed? ghosted or skipped", "skipped") : undefined);
+      const reason = col.reason || (stage === "closed" ? prompt("Why closed? rejected, ghosted or skipped", "skipped") : undefined);
       if (stage === "closed" && !reason) return renderPipeline();
       await api(`/api/jobs/${e.target.dataset.move}/stage`, { method: "POST", body: { stage, reason } });
       toast(`Moved to ${col.label || stageLabel(stage, reason)}`);

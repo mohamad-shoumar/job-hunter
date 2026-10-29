@@ -109,13 +109,14 @@ def make_job(**overrides) -> Job:
     return Job(**values)
 
 
-def store_job(store, filters, status=None, **overrides) -> int:
+def store_job(store, filters, status=None, reject_code=None, **overrides) -> int:
     """Classify and insert a job; returns its id. Defaults to one that is shortlisted (open worldwide).
-    `status` stores another one, e.g. needs_review for a job judged before 2026-10-27 that kept it."""
+    `status` and `reject_code` store others, e.g. rejected / review_cleared for a job from the old review list."""
     from jobhunter.classify import classify
 
     overrides.setdefault("allowed_locations", ["Worldwide"])
     job = make_job(**overrides)
     job.first_seen = NOW
     cls = classify(job, filters, NOW)
-    return store.insert(job, replace(cls, status=status) if status else cls, None, NOW)
+    cls = replace(cls, status=status or cls.status, reject_code=reject_code or cls.reject_code)
+    return store.insert(job, cls, None, NOW)

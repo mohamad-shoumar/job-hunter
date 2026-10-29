@@ -72,6 +72,22 @@ def test_migrating_twice_changes_nothing(tmp_path):
     assert shape(store.conn) == before[0]
 
 
+def test_migration_2_clears_the_old_review_list(tmp_path):
+    db = old_database(tmp_path, V0)
+    conn = sqlite3.connect(db)
+    for i, status in enumerate(["needs_review", "shortlisted"], 1):
+        conn.execute("INSERT INTO jobs (id, fingerprint, company, title, source, remote_status, first_seen, last_seen, "
+                     "status, eligibility, relevance) VALUES (?, ?, 'Initech', 'Backend Engineer', 'test', 'remote', "
+                     "'2026-10-20', '2026-10-20', ?, 'unclear', 'relevant')", (i, f"f{i}", status))
+    conn.commit()
+    conn.close()
+    store = JobStore(db)
+    rows = {r["id"]: r for r in store.conn.execute("SELECT * FROM jobs")}
+    assert (rows[1]["status"], rows[1]["reject_code"]) == ("rejected", "review_cleared")
+    assert "cleared on the user's call (2026-10-29)" in rows[1]["reject_reason"]
+    assert (rows[2]["status"], rows[2]["reject_code"]) == ("shortlisted", None)
+
+
 def test_a_new_database_is_at_the_latest_version(tmp_path):
     assert user_version(JobStore(":memory:").conn) == LATEST_VERSION
     store = JobStore(tmp_path / "data" / "jobs.sqlite")

@@ -22,7 +22,7 @@ verified quote changes a job's status (see classify.apply_ai_check):
 `sponsors_visa` when visa.read_posting also reads the quote as a visa offer (a
 work visa in any country: decision 2026-10-22, see docs/decisions.md). Anything
 else leaves it shortlisted as `unclear` with the finding attached (there is no
-review list since 2026-10-27; jobs left in needs_review are never checked by the run).
+review list since 2026-10-27).
 
 Results are stored in jobs.ai_check_json, so `reclassify` keeps them, and a
 job is checked once unless asked again (`jobhunter check --recheck`).

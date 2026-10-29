@@ -301,8 +301,7 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
         since = datetime.combine(local_day(now()) - timedelta(days=days - 1), time.min).astimezone() if days else None
         rows = job_list(store, view, q, yoe, since)
         contacts = chosen_contacts(store, rows, config)
-        t = now()
-        return {"jobs": [_job_summary(row, contacts[row["id"]], config, t) for row in rows]}
+        return {"jobs": [_job_summary(row, contacts[row["id"]], config) for row in rows]}
 
     @app.get("/api/jobs/{job_id}")
     def job(job_id: int, store: JobStore = Depends(db)):
@@ -547,7 +546,7 @@ def _contact_json(contact: sqlite3.Row | None, targets: list[str] | None = None)
     return data
 
 
-def _job_summary(row: sqlite3.Row, contact: sqlite3.Row | None, config: OutreachConfig, now: datetime) -> dict:
+def _job_summary(row: sqlite3.Row, contact: sqlite3.Row | None, config: OutreachConfig) -> dict:
     """A row of the job list; `contact` is its chosen_contact (looked up for the whole list at once)."""
     reasons = _reasons(row, "eligibility_reasons_json")
     company, _ = clean_company_name(row["company"])
@@ -563,7 +562,6 @@ def _job_summary(row: sqlite3.Row, contact: sqlite3.Row | None, config: Outreach
         "has_cv": bool(row["has_cv"]), "has_cover": bool(row["has_cover"]),
         "replied_at": row["replied_at"], "next_follow_up_at": row["next_follow_up_at"],
         "reached_out_at": tracking.reached_out_at(row) if row["stage"] not in (None, NEW, SAVED) else None,
-        "to_email": tracking.needs_email(row, now, config),
         "job_board": skip_list_match(row["company"], config),
         "contact": {"name": contact["full_name"], "role": ROLE_LABELS.get(contact["role"], contact["role"]),
                     "email_status": contact["email_status"] if contact["email"] else None} if contact else None,

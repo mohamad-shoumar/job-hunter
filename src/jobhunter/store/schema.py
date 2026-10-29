@@ -243,9 +243,20 @@ def _v1_added_columns(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS jobs_report_date ON jobs (report_date)")
 
 
+def _v2_review_cleared(conn: sqlite3.Connection) -> None:
+    """The jobs left in needs_review (a status until 2026-10-27) are cleared, on the user's call (2026-10-29):
+    rejected with code review_cleared, which `reclassify` never judges again (judged again, all 183 came out
+    shortlisted, and they were weeks old)."""
+    conn.execute(
+        "UPDATE jobs SET status = 'rejected', reject_code = 'review_cleared', reject_reason = ? "
+        "WHERE status = 'needs_review'",
+        ("Waited in needs review from before 2026-10-27; cleared on the user's call (2026-10-29)",),
+    )
+
+
 # Migration n is MIGRATIONS[n - 1]. Only ever add to the end; each one must be safe to run on a database
 # that SCHEMA has just created, since a new database runs them all too.
-MIGRATIONS = [_v1_added_columns]
+MIGRATIONS = [_v1_added_columns, _v2_review_cleared]
 LATEST_VERSION = len(MIGRATIONS)
 
 

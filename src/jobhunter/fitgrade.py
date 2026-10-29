@@ -30,7 +30,7 @@ from pathlib import Path
 
 from .extract import find_required_yoe
 from .llm import JsonModel, Usage, error_line, json_model
-from .models import NEEDS_REVIEW, SHORTLISTED, VISA_LIST
+from .models import SHORTLISTED, VISA_LIST
 from .profile import load_profile, sections
 from .store import JobStore
 from .store.lists import applied_jobs, jobs_to_grade, skipped_jobs
@@ -39,7 +39,7 @@ from .tracking import SKIP_REASONS
 
 log = logging.getLogger(__name__)
 
-SHOWN = (SHORTLISTED, NEEDS_REVIEW, VISA_LIST)
+SHOWN = (SHORTLISTED, VISA_LIST)
 
 SYSTEM = """You help one job seeker sort the job postings they will read today. Grade how much this \
 person would want to apply to the job below, from 1 (they would skip it) to 5 (exactly what they look for).

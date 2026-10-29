@@ -33,7 +33,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from ..identity import ats_key_from_url, fingerprint
-from ..models import NEEDS_REVIEW, SHORTLISTED, UNCLEAR, VISA_LIST, AiCheck, Classification, DateCheck, Job
+from ..models import SHORTLISTED, UNCLEAR, VISA_LIST, AiCheck, Classification, DateCheck, Job
 from ..text import iso, parse_datetime
 from .schema import migrate as migrate_schema
 
@@ -295,7 +295,7 @@ class JobStore:
 
     def needs_ai_check(self, recheck: bool = False) -> list[sqlite3.Row]:
         """Shortlisted jobs whose rules could not tell about Lebanon, newest first. `recheck`
-        includes ones already checked. Jobs left in needs_review are the user's to review."""
+        includes ones already checked."""
         unchecked = "" if recheck else " AND ai_check_json IS NULL"
         return self.conn.execute(
             f"SELECT * FROM jobs WHERE status = ? AND eligibility = ?{unchecked} "
@@ -304,8 +304,8 @@ class JobStore:
 
     def unreported(self) -> list[sqlite3.Row]:
         return self.conn.execute(
-            "SELECT * FROM jobs WHERE reported_at IS NULL AND status IN (?, ?, ?) ORDER BY id",
-            (SHORTLISTED, NEEDS_REVIEW, VISA_LIST),
+            "SELECT * FROM jobs WHERE reported_at IS NULL AND status IN (?, ?) ORDER BY id",
+            (SHORTLISTED, VISA_LIST),
         ).fetchall()
 
     def mark_reported(self, job_ids: list[int], now: datetime) -> None:

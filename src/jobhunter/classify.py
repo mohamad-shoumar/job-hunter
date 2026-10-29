@@ -2,7 +2,8 @@
 
 The rules in eligibility.py come first. Only when they say `unclear` does a
 stored AI web check (ai_check.py) get a say, and only with a verified quote.
-needs_review is no longer given (2026-10-27); the jobs that have it keep it.
+needs_review is no longer given (2026-10-27); the jobs left in it were cleared on 2026-10-29
+(models.REVIEW_CLEARED).
 """
 
 from __future__ import annotations

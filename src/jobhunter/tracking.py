@@ -209,15 +209,6 @@ def reached_out_at(row) -> str | None:
     return row["moved_to_reached_out_at"] or row["application_updated_at"]
 
 
-def needs_email(row, now: datetime, config: OutreachConfig) -> bool:
-    """Reached out but nobody at the company emailed and no reply, within `reach_out_days`:
-    the Pipeline's Email someone column. You still send from the job's page."""
-    if row["stage"] != REACHED_OUT or row["emailed_at"] or row["replied_at"] or row["company_emailed"]:
-        return False
-    when = reached_out_at(row)
-    return bool(when) and parse_datetime(when) >= now - timedelta(days=config.reach_out_days)
-
-
 # --- sending limits -----------------------------------------------------------
 
 

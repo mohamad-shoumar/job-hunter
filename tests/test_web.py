@@ -88,13 +88,13 @@ def test_list_and_detail(client):
     assert detail["company"]["why"].startswith("Size unknown") and detail["application"] is None
 
 
-def test_applied_jobs_say_when_you_reached_out_and_whether_to_email(client):
+def test_applied_jobs_say_when_you_reached_out(client):
     client.patch("/api/jobs/1/application", json={"applied": True}, headers=AUTH)
     client.post("/api/jobs/2/stage", json={"stage": "saved"}, headers=AUTH)
     jobs = {j["id"]: j for j in client.get("/api/jobs?view=tracked").json()["jobs"]}
-    assert jobs[1]["stage"] == "reached_out" and jobs[1]["to_email"] is True
+    assert jobs[1]["stage"] == "reached_out" and "to_email" not in jobs[1]
     assert jobs[1]["reached_out_at"] == jobs[1]["applied_at"]
-    assert jobs[2]["to_email"] is False and jobs[2]["reached_out_at"] is None
+    assert jobs[2]["reached_out_at"] is None
 
 
 def test_track_contact_draft_send(client):

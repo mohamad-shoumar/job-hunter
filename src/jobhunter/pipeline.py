@@ -266,7 +266,7 @@ def date_check_days(store: JobStore, finder: DateFinder, days: list[str], filter
 def ai_check_days(store: JobStore, checker: AiChecker, days: list[str], filters: Filters,
                   now: datetime) -> CheckRun:
     """AI-check the unchecked shortlisted jobs with an unclear location filed under `days`, newest first, up to
-    the per-run cap. Jobs left in needs_review (before 2026-10-27) are the user's to review: never checked here.
+    the per-run cap.
 
     Its changed_days are the report days whose jobs changed status, so their files are written again."""
     waiting = [row for day in days for row in store.jobs_for_report(day)

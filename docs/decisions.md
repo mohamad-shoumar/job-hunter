@@ -23,6 +23,7 @@ Sentences marked "(draft: check)" give a reason I have not written down anywhere
 16. [Personal details stay out of git](#16-personal-details-stay-out-of-git)
 17. [LinkedIn through its logged-out search, slowly](#17-linkedin-through-its-logged-out-search-slowly)
 18. [No review list: a job is shortlisted or rejected](#18-no-review-list-a-job-is-shortlisted-or-rejected)
+19. [The old review list is cleared, and the Pipeline has fewer columns](#19-the-old-review-list-is-cleared-and-the-pipeline-has-fewer-columns)
 
 ---
 
@@ -255,3 +256,15 @@ The model never writes a Summary: the Summary paragraph is mine and is copied wo
 **Why:** (draft: check) One list to act on. The fit grade sorts the shortlist, so an unclear job worth a look still gets seen, instead of sitting in a second list.
 
 **Trade-off:** The shortlist gets jobs that may turn out to be US-only or months old, and the daily run makes CVs and looks up contacts for them too. The report and the web app mark them `unclear`, so I check those before applying.
+
+## 19. The old review list is cleared, and the Pipeline has fewer columns
+
+**Date:** 2026-10-29
+
+**Context:** Since decision 18, 183 jobs still waited in "needs review", all weeks old. Judged again by today's rules, every one would come out shortlisted, which would fill To apply with old postings. The Pipeline also had a Saved column nobody used (no job was in it), a Rejected column next to Closed, and an Email someone column for applied jobs nobody at the company had been emailed about.
+
+**Decision:** The 183 jobs are rejected with the code `review_cleared` (migration 2), and `reclassify` never judges them again. The "needs review" status is gone from the code. The Pipeline drops the Saved, Rejected and Email someone columns: a saved job shows in To apply, a rejected one in Closed (the reason is on the card), and every Reached out job is in one column, newest first.
+
+**Why:** The jobs in review are old now, and new unclear jobs go to the shortlist anyway. Outreach goes through LinkedIn now: I send a LinkedIn note for every job I apply to (the apply-job skill finds the person and writes it), so a column of "jobs nobody was emailed about" no longer says what to do next. (draft: check) Fewer columns, and one place for each job.
+
+**Trade-off:** A cleared job that was worth applying to is gone from my lists. They are still stored, under "Rejected (in a report)" in the Jobs tab and "Cleared from the old review list" in their day's report, and a database copy from before the change is in `data/backups/`.

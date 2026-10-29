@@ -22,7 +22,6 @@ from jobhunter.models import (
     CANNOT_HIRE,
     ELIGIBLE,
     LIKELY,
-    NEEDS_REVIEW,
     REJECTED,
     SHORTLISTED,
     UNCLEAR,
@@ -238,18 +237,16 @@ def test_no_ai_flag_skips_the_check(tmp_path, filters):
 
 
 def test_daily_run_also_checks_the_last_days_leftovers(tmp_path, filters):
-    """A job over yesterday's cap is checked today; one older than lookback_days is left for `jobhunter check`,
-    and one left in needs_review (judged before 2026-10-27) is the user's to review."""
+    """A job over yesterday's cap is checked today; one older than lookback_days is left for `jobhunter check`."""
     (tmp_path / "config").mkdir()
     paths = Paths(tmp_path)
     store = JobStore(paths.db_file)
     yesterday = stored_unclear_job(store, filters, source_job_id="y", company="Yesterday Co")
     old = stored_unclear_job(store, filters, source_job_id="o", company="Old Co")
-    review = store_job(store, filters, status=NEEDS_REVIEW, source_job_id="r", company="Review Co", allowed_locations=[])
     today = pipeline.local_day(NOW)
-    store.set_report_date([yesterday, review], (today - pipeline.timedelta(days=1)).isoformat())
+    store.set_report_date([yesterday], (today - pipeline.timedelta(days=1)).isoformat())
     store.set_report_date([old], (today - pipeline.timedelta(days=9)).isoformat())
-    store.mark_reported([yesterday, old, review], NOW)  # shown on their days, so not moved to today's report
+    store.mark_reported([yesterday, old], NOW)  # shown on their days, so not moved to today's report
     store.close()
     http = FakeHttp({himalayas.SEARCH: {"jobs": []}})
     client = FakeClient(response(fetched(), verdict()))

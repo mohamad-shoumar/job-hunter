@@ -12,7 +12,7 @@ from jobhunter import http as http_module
 from jobhunter.ai_check import CheckRun
 from jobhunter.config import Filters, Paths
 from jobhunter.fitgrade import GradeRun
-from jobhunter.models import CLOSED, NEEDS_REVIEW, REJECTED, SAVED, SHORTLISTED
+from jobhunter.models import CLOSED, REJECTED, SAVED, SHORTLISTED
 from jobhunter.posted_date import DateRun
 from jobhunter.report import write_report
 from jobhunter.sources import Source, SourceResult
@@ -286,14 +286,6 @@ def test_job_with_no_posting_date_is_shortlisted_with_a_note_and_waits_for_the_d
     assert "No posting date, so its age is unknown" in json.loads(row["relevance_reasons_json"])
     assert [r["id"] for r in store.needs_date_check()] == [1]
     assert store.needs_ai_check() == []  # the AI Lebanon check has nothing to answer here
-
-
-def test_jobs_left_in_needs_review_are_never_looked_up_or_checked(filters):
-    # Judged before 2026-10-27: the user reviews them by hand.
-    store = JobStore(":memory:")
-    store_job(store, filters, status=NEEDS_REVIEW, location_raw="Remote", allowed_locations=[], posted_at=None)
-    store.commit()
-    assert store.needs_ai_check() == [] and store.needs_date_check() == []
 
 
 def test_six_years_is_too_senior(filters):

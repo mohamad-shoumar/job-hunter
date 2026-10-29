@@ -7,28 +7,24 @@ import sqlite3
 from datetime import datetime
 
 from ..models import (
-    CLOSED, NEEDS_REVIEW, NEW, REACHED_OUT, REJECTED, SAVED, SHORTLISTED, STAGE_LABELS, VISA_LIST,
+    CLOSED, NEW, REACHED_OUT, REJECTED, SAVED, SHORTLISTED, STAGE_LABELS, VISA_LIST,
 )
 from ..text import iso
 from .jobs import JobStore
 
 # Columns for a SELECT over `jobs j LEFT JOIN applications a`: when the job last moved to
-# Reached out (set_stage writes "Saved → Reached out"), and whether anyone at the same
-# company was emailed, for any job (one email covers two roles there). See tracking.reached_out_at.
+# Reached out (set_stage writes "Saved → Reached out"). See tracking.reached_out_at.
 OUTREACH_COLUMNS = f"""
     (SELECT MAX(e.at) FROM events e WHERE e.job_id = j.id AND e.kind = 'stage'
      AND e.detail LIKE '%→ {STAGE_LABELS[REACHED_OUT]}%') AS moved_to_reached_out_at,
-    a.updated_at AS application_updated_at,
-    EXISTS (SELECT 1 FROM applications a2 JOIN jobs j2 ON j2.id = a2.job_id
-            WHERE a2.emailed_at IS NOT NULL AND lower(trim(j2.company)) = lower(trim(j.company))) AS company_emailed
+    a.updated_at AS application_updated_at
 """
 
 # The job list's views and years filters: only these keys pick SQL text; every value goes in as a parameter.
 _OPEN = "COALESCE(a.stage, :new) != :closed"
 JOB_VIEWS = {
-    "active": f"j.status IN (:shortlisted, :needs_review) AND {_OPEN}",
+    "active": f"j.status = :shortlisted AND {_OPEN}",
     "shortlisted": f"j.status = :shortlisted AND {_OPEN}",
-    "needs_review": f"j.status = :needs_review AND {_OPEN}",
     "visa_list": f"j.status = :visa_list AND {_OPEN}",
     "tracked": "a.stage IS NOT NULL AND a.stage NOT IN (:new, :closed)",
     "closed": "a.stage = :closed",
@@ -38,8 +34,7 @@ JOB_VIEWS = {
 YEARS = {"lt3": "j.required_yoe < 3", "3-4": "j.required_yoe >= 3 AND j.required_yoe < 4",
          "4-5": "j.required_yoe >= 4 AND j.required_yoe < 5", "5+": "j.required_yoe >= 5",
          "none": "j.required_yoe IS NULL"}
-_NAMES = {"new": NEW, "closed": CLOSED, "shortlisted": SHORTLISTED, "needs_review": NEEDS_REVIEW,
-          "visa_list": VISA_LIST, "rejected": REJECTED}
+_NAMES = {"new": NEW, "closed": CLOSED, "shortlisted": SHORTLISTED, "visa_list": VISA_LIST, "rejected": REJECTED}
 
 
 def job_list(store: JobStore, view: str, q: str = "", yoe: str = "",

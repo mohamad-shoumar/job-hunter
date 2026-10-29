@@ -41,8 +41,6 @@
   "follow_up_business_days": [4, 7],
   "_ghost_after_business_days": "No reply this long after the last follow-up was due: the job moves to Closed (ghosted). A later reply moves it back.",
   "ghost_after_business_days": 7,
-  "_reach_out_days": "A job you applied to with nobody at the company emailed: shown in the Pipeline's Email someone column for this many days after you applied, so you can write to a person while it is fresh.",
-  "reach_out_days": 7,
 
   "_caps": "Emails per day (test sends to yourself do not count). Guessed addresses have their own lower cap, because bounces hurt your Gmail's reputation.",
   "daily_send_cap": 15,
