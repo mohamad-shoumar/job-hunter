@@ -1,6 +1,6 @@
 ---
 name: apply-job
-description: Work through the "To apply" column of the jobhunter app in Chrome - get a checked tailored CV, fill the job's application form on the company site or in LinkedIn Easy Apply, find LinkedIn contacts (HR, hiring manager, team lead) and write a note for each - and stop before the final Apply/Submit, never pressing Connect or Message. Use when the user says "apply to my jobs", "go through To apply", or names a job to apply to.
+description: Work through the "To apply" column of the jobhunter app in Chrome - get a checked tailored CV, fill the job's application form on the company site or in LinkedIn Easy Apply, find one LinkedIn contact per job (CEO at a small company, else the hiring manager, else HR, else a team lead) and write a note under 200 characters - and stop before the final Apply/Submit, never pressing Connect or Message. Use when the user says "apply to my jobs", "go through To apply", or names a job to apply to.
 ---
 
 # Apply to jobs from the "To apply" column
@@ -14,7 +14,7 @@ question, one field or one stuck page. Make a sensible choice, note it, keep goi
 1. **Never press the final Apply / Submit / Send application button.** Fill everything, scroll to it,
    leave the tab open for the user to press it.
 2. **Never contact anyone.** On LinkedIn never press Connect, Message, Follow or InMail, and never
-   open the Connect dialog or type into it. Step 4 only finds the people and writes the note; the
+   open the Connect dialog or type into it. Step 4 only finds the person and writes the note; the
    user sends it. Never press Send on an email in the app either (.claude/CLAUDE.md: emails go out
    only from the user's own click on Send).
 
@@ -207,44 +207,71 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
   account, so the user does those.
 - Finish at the final **Apply/Submit** button. Don't press it. Leave the tab open.
 
-### 4. LinkedIn contacts (find and write, never send)
+### 4. One LinkedIn contact (find and write, never send)
 Outreach goes through LinkedIn now, not email (the user's call, 2026-10-29). Don't use the app's
 Find contact, Write with AI or Gmail drafts in this step. Search only on LinkedIn, where the user is
 already signed in.
-- **Who, in this order:**
-  1. HR / recruiter / talent acquisition at the company (one who hires engineers, or in the job's
-     region, if you can tell).
-  2. The hiring manager: the engineering manager or head of the team the role sits in.
-  3. A team lead or tech lead on that team.
-  Leave out people who have left the company and recruiters from outside agencies.
-- **Within each group, put first the people with a link to the user:** 1st or 2nd-degree
-  connections, or shared connections ("X mutual connections"); fellow alumni of the American
-  University of Beirut (AUB) or Software Engineering Factory; an Arab background the profile shows
-  (studied, worked or lives in Lebanon or another Arab country, or lists Arabic). Go by what the
-  profile shows, not a guess from the name alone.
-- **How to search:** the company's LinkedIn page, People tab, with a keyword (recruiter, talent,
-  HR, engineering manager, tech lead, team lead); its "Where they studied" filter finds AUB alumni.
-  Or people search: `https://www.linkedin.com/search/results/people/?keywords=<company> recruiter`.
+- **One person per job** (the user's call, 2026-10-29). Go down this list and stop at the first
+  group where you find someone:
+  1. **The CEO / founder, only at a small company:** at most 50 employees on the company's LinkedIn
+     page ("11-50 employees"), the same line the app uses (`small_company_max_employees` in
+     `config/outreach.json`). A size you can't find counts as small, as in the app. A bigger
+     company starts at 2.
+  2. **The hiring manager:** the engineering manager or head of the team the role sits in.
+  3. **HR / recruiter / talent acquisition** at the company (one who hires engineers, or in the
+     job's region, if you can tell).
+  4. **An engineer, team lead or tech lead** on that team.
+  Leave out people who have left the company. Leave out agency recruiters too, unless an agency
+  posted the job and hides the client: then the agency's recruiter for it is the one person.
+- **Inside a group, pick the one with a link to the user:** a 1st or 2nd-degree connection, or
+  shared connections ("X mutual connections"); a fellow alum of the American University of Beirut
+  (AUB) or Software Engineering Factory; an Arab background the profile shows (studied, worked or
+  lives in Lebanon or another Arab country, or lists Arabic). Go by what the profile shows, not a
+  guess from the name alone. A link never moves someone above an earlier group.
+- **How to search:** the company's LinkedIn page, People tab, with a keyword (CEO, founder,
+  engineering manager, recruiter, talent, HR, tech lead, team lead); its "Where they studied" filter
+  finds AUB alumni. Or people search:
+  `https://www.linkedin.com/search/results/people/?keywords=<company> recruiter`.
   Read only the first page of results. Opening a profile is fine (they will see the user viewed it).
 - **Pace:** the Easy Apply rules apply here too: slowly, at most 4 searches and 5 profiles per
   company, and any "unusual activity" warning stops all LinkedIn work for the run.
-- Pick up to 3 people, ideally one from each group.
 - **Email:** only when it is public, on the person's LinkedIn Contact info or the company's own site.
   Never guess one.
-- **The note, one per person:** under 300 characters (LinkedIn's limit for a connection note),
-  plain words, no pitch phrases. Say which role the user applied to, one true fact from the
-  profile/CV that fits the posting, and a short ask (for a recruiter: who is best to talk to; for a
-  manager or lead: open to a quick chat). Name the shared link only when it is real ("fellow AUB
-  alum"). Facts only from the profile. Example:
-  "Hi <first name>, I just applied for the <role> role at <company>. I lead a small team at
-  <current employer>, building with Python, TypeScript and AWS. Fellow AUB alum too. Happy to share
-  more if useful. Thanks, <user's first name>"
-- Nobody found: note "no LinkedIn contact" and the searches you tried.
+- **The note** (the user's rules, 2026-10-29):
+  - **Under 200 characters**, counting spaces and punctuation; aim for 140-190. Count with code
+    (`len()` in Python or `.length` in JS), never by eye, and put the count in the report. Over
+    200: shorten the opening or the ask first, never the role.
+  - **ONE achievement**, the one that best fits the posting and the person. Use a shorter wording
+    when space is tight; combine two only if the note still stays under 200.
+
+    | Achievement | Best fit |
+    | --- | --- |
+    | **Scale:** Helped scale a platform to 15K users. | Product, startups, scalability |
+    | **AI delivery:** Built AI-native workflows to ship features and fixes daily. | AI-first, fast-paced teams |
+    | **AWS:** Built an AWS event-driven system handling 800+ concurrent jobs. | Backend, cloud, distributed systems |
+    | **Leadership:** Lead a backend team of 3 engineers. | Lead and senior roles |
+
+  - **The template for the person's group:**
+    - CEO / hiring manager: "Hi [Name], I applied for the [Role]. [Achievement]. I'd love to
+      discuss how I could contribute to your team."
+    - HR / recruiter: "Hi [Name], I applied for the [Role] at [Company]. [Achievement]. Would you
+      be open to a quick chat?"
+    - Engineer / team lead: "Hey [Name], I recently applied for the [Role] at [Company]. Curious to
+      hear what it's like working there from someone on the inside. How's the culture?" If it
+      fits, name their team or work instead of the general line.
+    - Agency recruiter (only for an agency-posted job, see above): "Hi [Name], I'm a Python/AWS
+      backend engineer and team lead exploring [role/location] opportunities. Happy to connect if
+      you're hiring for similar roles."
+  - A real shared link may go in when it fits ("Fellow AUB alum."). Details about the person only
+    from their profile; never invent an achievement or a detail about them. Never ask for a
+    referral. Tone: confident, human, direct.
+- Nobody found in any group: note "no LinkedIn contact" and the searches you tried.
 
 ## At the end
 
 Report one line per job: company, role, where you applied (the URL of the tab left open), CV used,
-salary entered and anything you guessed. Under it, list its LinkedIn contacts: name, title, profile
-URL, why picked (group, and the link to the user if any), email if public, and the note ready to
-paste. List the jobs you skipped (pressed Skip) separately, one line each with the reason.
+salary entered and anything you guessed. Under it, its one LinkedIn contact: name, title, profile
+URL, group and why (the company size for a CEO, the link to the user if any), email if public, and
+the note ready to paste with its character count. List the jobs you skipped (pressed Skip)
+separately, one line each with the reason.
 The user then goes through the open tabs and presses Apply, and sends the LinkedIn notes themselves.
