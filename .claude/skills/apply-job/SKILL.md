@@ -121,8 +121,17 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
     10 Easy Apply forms per run. LinkedIn forbids automation and can restrict the account, so if
     it shows any "unusual activity" warning, stop all LinkedIn work for the run and say so in the report.
   - **Contact info:** check the email and phone against `MY_*` in `.env`; fix them if they differ.
-  - **Resume:** press **Upload resume** and upload the tailored PDF (use the stand-in method above if
-    the file box is hidden). Make sure the tailored file is the one selected, not an older resume.
+  - **Resume:** upload the tailored PDF and make sure it is the one selected, not an older resume.
+    LinkedIn has no file box on the page: it makes one only when **Upload resume** is pressed and
+    opens the system file picker, which the tools can't use. So catch that box instead (tested Oct
+    2026, on the Resume step of the Easy Apply window):
+    ```js
+    const orig=HTMLInputElement.prototype.click;
+    HTMLInputElement.prototype.click=function(){ if(this.type==='file'){ this.setAttribute('aria-label','jh caught file'); if(!this.isConnected){this.style.cssText='position:fixed;top:0;left:0;z-index:999999'; document.body.appendChild(this);} return;} return orig.call(this)};
+    [...document.querySelectorAll('button')].find(b=>/Upload resume/i.test(b.innerText||b.getAttribute('aria-label')||''))?.click()
+    ```
+    Then `find` "jh caught file input" and `file_upload` the PDF into it. LinkedIn shows "Resume
+    uploaded successfully" and selects the new file at the top of the list.
   - **Screening questions:** "How many years of experience with X?" gets the years from the
     profile. If X isn't in the profile, answer 0 and note it, never a guess. Yes/No skill questions
     are Yes only when the skill is in the profile. Other questions use the standard answers below.
