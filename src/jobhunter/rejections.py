@@ -55,6 +55,7 @@ REJECTION = [
     r"\b(?:pursue|progressing with|proceed with|move ahead with|moving forward with) (?:other|another) candidates?\b",
     r"\bnot (?:been )?(?:able to )?select(?:ed)? (?:your application|you)\b",
     r"\bnot been successful\b",
+    r"\b(?:have|has) not been selected\b",
     r"\bregret to inform you\b",
     r"\bposition has (?:now )?been filled\b",
     r"\bno longer (?:being )?considered\b",
@@ -262,9 +263,10 @@ def scan_rejections(store: JobStore, inbox, now: datetime, lookback_days: int, d
                 jobs = tracked_jobs(store)
         elif found is not None and "open applications there" in found.how:
             result.unsure.append(f'{found.company}: rejection email {day} not applied ({found.how}): "{found.sentence}"')
-        if not dry_run:
-            mark_seen(store, key, found.job_id if found else None,
-                      "rejection" if found and found.job_id else "rejection_other", now)
+        # Only a rejection is marked seen: any other email is read again next run, so a phrase
+        # added later still catches it (Liberis's "not been selected", read before it was added).
+        if found is not None and not dry_run:
+            mark_seen(store, key, found.job_id, "rejection" if found.job_id else "rejection_other", now)
     if not dry_run:
         store.commit()
     return result

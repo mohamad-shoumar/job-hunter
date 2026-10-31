@@ -1,5 +1,6 @@
 """Rejection emails close the job they are about (rejections.py), through a fake inbox."""
 
+import re
 from datetime import timedelta
 from email.message import EmailMessage
 
@@ -71,6 +72,7 @@ def test_the_sentences_that_say_no():
         "We will unfortunately not be advancing you as we have made the careful decision.",
         "After careful consideration we have decided not to proceed together for this role.",
         "We regret to inform you that the position has been filled.",
+        "We are sorry to inform you that you have not been selected for an interview on this occasion.",
     ]:
         assert rejection_sentence(f"Hi Mohamad. {text} Best, Team") == text, text
 
@@ -82,6 +84,7 @@ def test_thanks_and_maybes_are_not_a_no():
         "If we decide not to move forward, we will let you know by email.",
         "Should we not be moving forward, you will hear from us within two weeks.",
         "Unfortunately our office is closed on Friday.",
+        "If you have not been selected, we will keep your details on file.",
     ]:
         assert rejection_sentence(text) is None, text
 
@@ -240,3 +243,18 @@ def test_a_rejection_that_says_role_not_application(filters):
     check_inbox(store, ME, CONFIG, LATER, inbox=FakeInbox([
         letter("Beam AI <noreply@candidates.workablemail.com>", "Forward Deployed Engineer - Beam AI", body)]))
     assert get_application(store, job_id)["stage"] == CLOSED
+
+
+def test_only_rejections_are_marked_seen_so_a_new_phrase_still_catches_old_mail(filters, monkeypatch):
+    """Liberis's "you have not been selected" was read, and marked seen, before the phrase was added."""
+    from jobhunter import rejections
+    store = JobStore(":memory:")
+    job_id = applied(store, filters, "Liberis", "Senior Software Engineer")
+    body = "Hi Mohamad, We are sorry to inform you that you were passed over this time. Thanks, Liberis Talent Team"
+    inbox = FakeInbox([letter("no-reply@liberis.co.uk", "Liberis - an update on your application", body)])
+    assert check_inbox(store, ME, CONFIG, LATER, inbox=inbox).rejected == []
+    monkeypatch.setattr(rejections, "_REJECTION", re.compile(r"\bpassed over\b", re.I))
+    assert len(check_inbox(store, ME, CONFIG, LATER, inbox=inbox).rejected) == 1
+    assert get_application(store, job_id)["stage"] == CLOSED
+    # Now it's seen: a third run changes nothing.
+    assert check_inbox(store, ME, CONFIG, LATER, inbox=inbox).rejected == []
