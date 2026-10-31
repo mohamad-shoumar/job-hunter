@@ -229,3 +229,14 @@ def test_a_date_without_a_time_zone_does_not_break_the_check(filters):
         "GoReel <noreply@candidates.workablemail.com>", "Senior Python Developer - GoReel", NO,
         date="Mon, 28 Sep 2026 10:00:00 -0000")]))
     assert get_application(store, job_id)["stage"] == CLOSED
+
+
+def test_a_rejection_that_says_role_not_application(filters):
+    """Beam AI's email never says "application"."""
+    store = JobStore(":memory:")
+    job_id = applied(store, filters, "Beam AI", "Forward Deployed Engineer")
+    body = ("Hi Mohamad, Thank you so much for your interest in the Forward Deployed Engineer role at Beam AI. "
+            "After careful review, we've decided to move forward with other candidates at this stage.")
+    check_inbox(store, ME, CONFIG, LATER, inbox=FakeInbox([
+        letter("Beam AI <noreply@candidates.workablemail.com>", "Forward Deployed Engineer - Beam AI", body)]))
+    assert get_application(store, job_id)["stage"] == CLOSED

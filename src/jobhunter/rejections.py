@@ -8,7 +8,7 @@ An email counts when:
   1. a sentence in it says no, by one of REJECTION phrases ("we have decided not to move forward",
      "we regret to inform you", "pursue other candidates"); a sentence with "if"/"should" ("if we
      decide not to move forward, we will let you know") never counts;
-  2. it is about an application (the words "application", "candidacy", "applying" or "applied");
+  2. it is about an application (a word like "application", "candidacy", "role" or "position");
   3. its sender or subject names a company you have an application with: never the body, where
      short names (Wise, IMC, Lyst) turn up by chance. Applicant systems send from their own domains
      (ashbyhq.com, greenhouse-mail.io), so the company is in the sender's name or the subject;
@@ -62,7 +62,7 @@ REJECTION = [
 _REJECTION = re.compile("|".join(f"(?:{p})" for p in REJECTION), re.I)
 # "If we decide not to move forward, we'll let you know" says nothing yet.
 _CONDITIONAL = re.compile(r"\b(?:if|should|whether|in case|in the event)\b", re.I)
-_ABOUT_APPLYING = re.compile(r"\b(?:application|applications|candidacy|applying|applied|apply)\b", re.I)
+_ABOUT_APPLYING = re.compile(r"\b(?:application|applications|candidacy|candidates?|applying|applied|apply|role|position|vacancy)\b", re.I)
 # Senders whose emails mention companies without being from them.
 _NOT_EMPLOYERS = re.compile(r"linkedin|glassdoor|indeed|bayt|naukri|wellfound|otta|welcometothejungle|"
                             r"workable\.com$|jooble|himalayas|remoteok|weworkremotely", re.I)
@@ -71,7 +71,7 @@ _PLACEHOLDER = {"confidential", "confidential jobs", "stealth", "stealth startup
 _LEGAL = re.compile(r"\b(?:ltd|limited|inc|llc|l\.l\.c|gmbh|ag|se|sa|sas|bv|b\.v|plc|co|corp|corporation|company|"
                     r"group|holding|holdings|fz|fze|fzco|fz-llc|dmcc|pvt|private)\b\.?", re.I)
 # Gmail search: a broad net, read properly by the rules above.
-GMAIL_QUERY = ('-from:me (application OR candidacy OR applying OR applied) ("move forward" OR "moving forward" '
+GMAIL_QUERY = ('-from:me (application OR candidacy OR candidates OR applying OR applied OR role OR position OR vacancy) ("move forward" OR "moving forward" '
                'OR "regret" OR "unfortunately" OR "other candidates" OR "not proceed" OR "not to proceed" '
                'OR "progressing" OR "progress your" OR "not been successful" OR "not selected" OR "advancing" '
                'OR "been filled")')
