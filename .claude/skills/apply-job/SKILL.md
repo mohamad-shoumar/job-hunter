@@ -79,7 +79,9 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
   job you can't apply to: closed or not found, location rules, a site that refuses applicants from
   Lebanon, only on job aggregators, or a sign-up you can't do (except Proxify, below). A job whose
   form you filled but the user must finish (a CAPTCHA, a field only they can answer) stays in To
-  apply.
+  apply. In the Skip pop-up pick the reason that fits and write a short note that quotes the
+  posting ("UAE-Based Candidates only"): the fit grade learns from both, and the final answer
+  reuses the note.
 
 ### 3. Fill the form
 - Upload the tailored CV PDF wherever a resume is asked for. If `find`/`read_page` can't see the
@@ -292,6 +294,19 @@ already signed in.
 Report one line per job: company, role, where you applied (the URL of the tab left open), CV used,
 salary entered and anything you guessed. Under it, its one LinkedIn contact: name, title, profile
 URL, group and why (the company size for a CEO, the link to the user if any), email if public, and
-the note ready to paste with its character count. List the jobs you skipped (pressed Skip)
-separately, one line each with the reason.
+the note ready to paste with its character count.
+
+Then, in the chat answer itself (not only in a file), **why you skipped each job**: every job you
+pressed Skip on in this run, whether you looked at its form or not, one short line each with the
+company, the role and the reason in plain words, quoting the posting's own words when there are
+any. Group them like this (the user's request, 2026-10-31):
+
+- **Can't hire you from Lebanon:** location or visa rules. "**Corgi**, Full Stack: London on-site,
+  and the posting says "Visa Sponsorship: Not available"."
+- **Closed or gone:** "**IP STUDIOS**, Senior web developer: closed on LinkedIn a day after
+  posting, no other copy anywhere."
+- **Not your kind of role (my call, move back any you disagree with):** the posting's main work
+  is outside the target roles, or it is far too senior. "**Canonical**: despite the title, it's
+  a Jira administrator job."
+
 The user then goes through the open tabs and presses Apply, and sends the LinkedIn notes themselves.

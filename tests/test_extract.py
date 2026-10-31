@@ -38,6 +38,9 @@ from jobhunter.text import fix_mojibake, html_to_text, normalize_words, parse_da
         ("Base JD: Experience • Minimum 5 years of development and design experience in Python", 5),
         ("Proven track record of 4-7 years in back-end API development using Python.", 4),
         ("Experience level: 2–5 years", 2),
+        # A bare field value ending its line (FR Consultancy, 2026-10-30).
+        ("Skills: Banking Integration\n\nExperience: 6+\n\nRequisites:", 6),
+        ("Experience: 2026 onwards", None),
         ("- Experience working with Python on web frameworks (minimum of 2 years).", 2),
         ("3-8+ years in a customer-facing technical role", 3),
         ("- 5+ years shipping production software, 2+ building with LLMs in production", 5),

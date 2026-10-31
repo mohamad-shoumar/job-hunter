@@ -54,6 +54,8 @@
       "Qataris only", "children of Qatari mothers", "family book", "UAE residents only", "Qatar residents only",
       "currently residing in the UAE", "currently residing in UAE", "currently based in the UAE",
       "currently based in UAE", "currently residing in Qatar", "currently based in Qatar", "must be in the UAE",
+      "UAE-based candidates only", "UAE based candidates only", "Qatar-based candidates only",
+      "Qatar based candidates only",
       "must be residing in the UAE", "must be residing in Qatar", "transferable visa", "transferrable visa",
       "transferable residence visa", "own visa", "own sponsorship", "visa holders only", "valid UAE residence visa",
       "valid Qatar residence permit", "no visa sponsorship", "no sponsorship", "do not sponsor", "does not sponsor",
@@ -121,7 +123,7 @@
       "agents engineer", "llm engineer", "genai engineer", "ai platform engineer"
     ],
     "unless_title_names": ["backend", "fullstack"],
-    "title_words": ["senior", "lead"],
+    "title_words": ["senior", "lead", "expert"],
     "reject_if_required_yoe_at_least": 3
   },
 

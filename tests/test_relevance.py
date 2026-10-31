@@ -104,6 +104,9 @@ def test_fit_score_counts_profile_skills(filters):
         ("Sr. Forward Deployed Engineer", "Python.",
          '"forward deployed" roles are junior-only, and the title says "senior"'),
         ("Lead AI Deployment Engineer", "Python.", '"ai deployment engineer" roles are junior-only, and the title says "lead"'),
+        # SAP's level above senior (2026-10-31).
+        ("Forward Deployed Application/ML Engineering Expert", "Python.",
+         '"forward deployed" roles are junior-only, and the title says "expert"'),
         ("AI Automation Engineer", "3+ years building automation workflows. Python.",
          '"ai automation" roles are junior-only, and it asks for 3+ years: "3+ years building automation workflows."'),
         ("Forward Deployed Engineer", "You bring 5+ years of engineering experience.",

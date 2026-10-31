@@ -71,6 +71,30 @@ _RELOCATION = re.compile(
 _MAYBE = re.compile(r"\bmay\s+include\b|\bvar(?:y|ies)\s+by\b", re.I)
 # A refusal: a negation with "sponsor..." or with a visa being supported/provided/offered.
 _VISA_HELP = re.compile(r"\bvisas?\b[^.;:]{0,40}\b(?:support|supported|provide|provided|offer|offered|available|assist)", re.I)
+# Refusals the clause split would cut in two (Corgi, wolt; 2026-10-31): a field and its value,
+# "Visa Sponsorship: Not available", and a list after one "unable", "unable to offer fully remote
+# work, visa sponsorship, or relocation support". Not "Visa sponsorship available - no relocation
+# support", and not "can't offer remote work, but we do sponsor visas".
+_FIELD_REFUSAL = re.compile(
+    r"\b(?:visas?|sponsorship|work\s+permits?)\b[^:.;]{0,25}?\s*[:–—-]\s*"
+    r"(?:not\s+(?:available|offered|provided|possible|supported)\b|(?:unavailable|none|no|n/a)\s*(?:$|[.,;)]))",
+    re.I,
+)
+_LIST_REFUSAL = re.compile(
+    r"\b(?:unable|cannot|can't|can’t|not\s+able|won't|won’t|will\s+not|do\s+not|don't|don’t|does\s+not|doesn't|"
+    r"doesn’t)\s+(?:to\s+)?(?:offer|provide|support|sponsor|give)\b"
+    r"(?:(?!\b(?:but|however|although|though|while|whereas)\b)[^.;:!?]){0,100}?\b(?:visas?|sponsorship)\b",
+    re.I,
+)
+# "... and visa sponsorship is available": the list ended, the visa is offered.
+_OFFERED_AFTER = re.compile(r"[^,]*?\b(?:is|are)\s+(?:available|offered|provided|possible)\b", re.I)
+# Help only with a visa you already hold (Wise: "For local candidates we are able to support transfer
+# of visa sponsorship"). Not "can provide or transfer Dutch visa sponsorship", which offers one too.
+_TRANSFER = re.compile(
+    r"(?<!\bor\s)(?<!\band\s)(?<!/\s)(?<!/)\btransfer(?:s|ring)?\s+(?:of\s+)?(?:\w+\s+){0,2}?visas?(?:\s+sponsorship)?\b"
+    r"|\bvisas?\s+transfers?\b|\btransfers?\s+only\b",
+    re.I,
+)
 # A right to work you must already have. Alone it rejects; next to an offer it is a note.
 _NEEDS_PERMIT = re.compile(
     r"\b(?:right|authori[sz]ed|authori[sz]ation|eligible|eligibility|entitled|permitted|permission)\s+to\s+work\s+"
@@ -183,6 +207,24 @@ def _refuses(clause: str) -> bool:
     return bool(_NEGATION.search(clause) and (_SPONSOR_WORD.search(clause) or _VISA_HELP.search(clause)))
 
 
+def _aside(sentence: str, m: re.Match) -> bool:
+    """Inside brackets: an example, "hard requirements (e.g. [x] days in office, unable to provide visas, etc)"."""
+    before, after = sentence[:m.start()], sentence[m.end():]
+    return before.count("(") > before.count(")") or after.count(")") > after.count("(")
+
+
+def _sentence_refuses(sentence: str) -> bool:
+    if _FIELD_REFUSAL.search(sentence):
+        return True
+    m = _LIST_REFUSAL.search(sentence)
+    return bool(m) and not _aside(sentence, m) and not _OFFERED_AFTER.match(sentence, m.end())
+
+
+def _offers(sentence: str) -> bool:
+    return any(_OFFER.search(c) for c in _clauses(sentence)) or bool(
+        _RELOCATION_WITH_VISA.search(sentence) and not _NEGATION.search(sentence))
+
+
 @dataclass
 class Posting:
     """What a posting says about visas, each a sentence as written."""
@@ -197,11 +239,12 @@ def read_posting(text: str) -> Posting:
     found = Posting()
     for sentence in _sentences(text):
         clauses = _clauses(sentence)
-        if any(_refuses(c) for c in clauses):
+        if any(_refuses(c) for c in clauses) or _sentence_refuses(sentence):
             found.refusals.append(sentence)
-        elif any(_OFFER.search(c) for c in clauses) or (_RELOCATION_WITH_VISA.search(sentence)
-                                                         and not _NEGATION.search(sentence)):
+        elif _offers(_TRANSFER.sub(" ", sentence)):
             found.offers.append(sentence)
+        elif _offers(sentence):  # it offers only a transfer: a visa you must already have
+            found.permits.append(sentence)
         # "Legally authorized to work in the Netherlands, or eligible for sponsorship" asks for nothing.
         elif _NEEDS_PERMIT.search(sentence) and not _SPONSOR_WORD.search(sentence):
             found.permits.append(sentence)

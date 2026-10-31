@@ -64,6 +64,10 @@ def test_a_401k_does_not_drop_a_job_that_sponsors_the_move(filters):
     "We offer UK work permits and help with relocation.",
     # A clause about something else does not turn an offer into a refusal.
     "Visa sponsorship available (including transfer of Dutch visa; no relocation support)",
+    "Visa sponsorship available - no relocation support",
+    # A list after a refusal ends at "but", or when the visa is offered.
+    "We can't offer remote work, but we do sponsor visas.",
+    "We do not offer remote work for this role, and visa sponsorship is available.",
 ])
 def test_offers_in_the_words_companies_use(sentence):
     assert read_posting(f"Python and FastAPI.\n{sentence}").offers == [sentence]
@@ -77,6 +81,9 @@ def test_offers_in_the_words_companies_use(sentence):
     "Relocation and/or Visa are not supported for this role",
     "To be considered for this role, you'll need to have the independent right to work in the UK, as we're "
     "unfortunately unable to provide sponsorship at this time.",
+    # A field and its value, and a list after one "unable" (Corgi, wolt; 2026-10-31).
+    "Visa Sponsorship: Not available",
+    "We are currently unable to offer fully remote work, visa sponsorship, or relocation support for this opportunity.",
 ])
 def test_refusals_reject_the_job_quoted(filters, sentence):
     result = _classify(filters, allowed_locations=["London, United Kingdom"], description=f"Python APIs.\n{sentence}")
@@ -93,6 +100,23 @@ def test_refusals_reject_the_job_quoted(filters, sentence):
 def test_sponsorship_and_visa_in_other_senses_are_ignored(sentence):
     found = read_posting(sentence)
     assert not found.offers and not found.refusals
+
+
+def test_an_example_in_brackets_is_not_a_refusal():
+    """Omnea's application notes (2026-10-31): "unable to provide visas" is an example of a requirement."""
+    found = read_posting("If a role has hard requirements (e.g. [x] days in office, unable to provide visas, etc), "
+                         "tick the box.")
+    assert not found.refusals
+
+
+def test_a_visa_transfer_only_wants_a_visa_you_already_have(listed):
+    """Wise (2026-10-31): sponsorship only moves over for people already in the UK on a visa."""
+    sentence = "For local candidates we are able to support transfer of visa sponsorship."
+    assert read_posting(sentence).permits == [sentence]
+    result = _classify(listed, company="Roofoods Ltd t/a Deliveroo", allowed_locations=["London, United Kingdom"],
+                       description=f"Python APIs.\n{sentence}")
+    assert result.status == REJECTED and result.reject_code == "no_sponsor"
+    assert result.reject_reason == f'Wants a right to work you would need a visa for: "{sentence}"'
 
 
 def test_a_right_to_work_alone_rejects_and_next_to_an_offer_is_a_note(filters):

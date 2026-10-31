@@ -109,9 +109,12 @@ _YOE_RANGE = re.compile(
     r"relevant|industry|commercial|experience|exp)\b)",
     re.I,
 )
-# "Experience level: 2–5 years", "Experience: 8 years required".
+# "Experience level: 2–5 years", "Experience: 8 years required", and a bare "Experience: 6+" ending
+# its line (FR Consultancy, 2026-10-30).
 _YOE_LABEL = re.compile(
-    rf"\bexperience(?:\s+level)?\s*[:\-–—]\s*{_COUNT}\s*\+?\s*(?:(?:-|–|—|to)\s*{_COUNT}\s*\+?\s*)?{_YEARS}", re.I
+    rf"\bexperience(?:\s+level)?\s*[:\-–—]\s*{_COUNT}\s*"
+    rf"(?:\+?\s*(?:(?:-|–|—|to)\s*{_COUNT}\s*\+?\s*)?{_YEARS}|\+\s*$)",
+    re.I | re.M,
 )
 _YOE_PATTERNS = (_YOE, _YOE_RANGE, _YOE_LABEL, _YOE_MIN, _YOE_PLUS)
 _OPTIONAL_CONTEXT = re.compile(r"\b(?:preferred|nice to have|nice-to-have|bonus|ideally|a plus|is a plus)\b", re.I)

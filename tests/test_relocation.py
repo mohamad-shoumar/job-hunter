@@ -69,7 +69,8 @@ def test_nationals_only_or_a_visa_you_already_hold_is_rejected(filters):
                       title="Software Engineer - UAE National")
     assert title.status == REJECTED and title.reject_code == "local_only"
     for sentence in ("Candidates must have a transferable visa.", "This role is open to UAE Nationals only.",
-                     "We do not sponsor visas for this role."):
+                     "We do not sponsor visas for this role.",
+                     "Role: Integration Engineer ( UAE-Based Candidates only)"):  # FR Consultancy, 2026-10-30
         result = _classify(filters, remote_status=ONSITE, allowed_locations=["Dubai"],
                            description=f"Python APIs.\n{sentence}")
         assert result.reject_code == "local_only", sentence
