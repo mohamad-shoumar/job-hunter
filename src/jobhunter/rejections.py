@@ -74,7 +74,7 @@ _LEGAL = re.compile(r"\b(?:ltd|limited|inc|llc|l\.l\.c|gmbh|ag|se|sa|sas|bv|b\.v
 # Gmail search: a broad net, read properly by the rules above.
 GMAIL_QUERY = ('-from:me (application OR candidacy OR candidates OR applying OR applied OR role OR position OR vacancy) ("move forward" OR "moving forward" '
                'OR "regret" OR "unfortunately" OR "other candidates" OR "not proceed" OR "not to proceed" '
-               'OR "progressing" OR "progress your" OR "not been successful" OR "not selected" OR "advancing" '
+               'OR "progressing" OR "progress your" OR "not been successful" OR "not selected" OR "not been selected" OR "advancing" '
                'OR "been filled")')
 MAX_QUOTE = 220
 
