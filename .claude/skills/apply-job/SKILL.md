@@ -58,7 +58,18 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
   - There is no Summary section, and no `TODO` or leftover tag such as `[core]`.
   - The "Code changed these" warnings don't point to a broken line.
   If something critical is wrong, fall back to the general CV (`<Last>_Resume_General.pdf` in
-  `resume/output/`), note it for the report and keep going. Don't hand-edit the CV.
+  `resume/output/`), note it for the report and keep going. Don't fix a broken CV by hand.
+- **Mirror it only for grade 4 or 5** (the user's call, 2026-10-31: mirroring is real work, so
+  it goes to the best-fitting jobs). The card shows the grade chip ("grade 4/5"); or
+  `sqlite3 data/jobs.sqlite "select json_extract(fit_grade_json,'$.grade') from jobs where id=<id>"`.
+  - **Grade 4 or 5:** after the quick check, follow the whole `mirror-cv` skill on this job's
+    CV, then upload the rebuilt PDF. Do it thoroughly, not as a quick pass. Don't ask anything
+    during it: the `.bak` lets the user undo. If mirroring can't end at one page with
+    `check_version` printing `[]`, restore the `.bak`, rebuild, upload that and note it.
+  - **Grade 1-3 or no grade:** use the tailored CV as it is. No hand edits, unless the user
+    asked to mirror this job.
+  - A CV the user edited by hand (`edited_at` in `cv_tailored_json`) is mirrored too, but
+    their own lines are kept as they wrote them: only reorder around them.
 - The PDF is already on disk in `~/job-hunter/resume/output/`, so upload it from there. Press
   **Download ↓** too if the user wants a copy in Downloads.
 
@@ -291,8 +302,9 @@ already signed in.
 
 ## At the end
 
-Report one line per job: company, role, where you applied (the URL of the tab left open), CV used,
-salary entered and anything you guessed. Under it, its one LinkedIn contact: name, title, profile
+Report one line per job: company, role, grade, where you applied (the URL of the tab left open), CV
+used (mirrored or not; if mirrored, the posting's must-haves the profile doesn't have, so the user
+can add any that are true), salary entered and anything you guessed. Under it, its one LinkedIn contact: name, title, profile
 URL, group and why (the company size for a CEO, the link to the user if any), email if public, and
 the note ready to paste with its character count.
 

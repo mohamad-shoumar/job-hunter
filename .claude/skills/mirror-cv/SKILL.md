@@ -1,6 +1,6 @@
 ---
 name: mirror-cv
-description: Mirror one job posting's own words in that job's tailored CV - put the posting's terms first in the skills rows, bring the bullets that match its duties to the top (un-hiding cut ones), and use its spelling where it means the same thing - without adding any fact the profile doesn't have. Use when the user says "mirror", "mirroring", "match the posting's wording" or "make the CV fit this job better" for a job in the app.
+description: Mirror one job posting's own words in that job's tailored CV - put the posting's terms first in the skills rows, bring the bullets that match its duties to the top (un-hiding cut ones), and use its spelling where it means the same thing - without adding any fact the profile doesn't have. Use when the user says "mirror", "mirroring", "match the posting's wording" or "make the CV fit this job better" for a job in the app; apply-job also runs it on every job graded 4 or 5.
 ---
 
 # Mirror a job posting in its tailored CV
@@ -39,12 +39,16 @@ word for the posting's spelling of the same thing. It never adds a fact.
    bullets were "Cut to fit one page"), `tags` (why optional bullets matched) and `gaps` (terms
    the tailoring step already found missing). No tailored CV yet? Press **Tailor CV to this job**
    in the app first.
-2. **List the posting's terms**, most important first:
+2. **List the posting's terms.** Read the whole posting, every requirements and duties line, not
+   just the tech stack part. Write each term down in the posting's exact words:
    - stack: languages, frameworks, databases, cloud (usually a "tech stack" or "requirements" part)
    - kinds of work: "serverless", "event-driven", "multi-service", "tests and observability"
    - duties, in the posting's words: "design safe, deterministic workflows", "review code",
      "investigate a production issue"
-   Leave out perks, company history and soft words the Summary already covers.
+   Mark each one **must-have** (in the title, under "requirements" / "you have", or named twice
+   or more) or **nice-to-have** ("bonus", "nice to have", "plus"). Rank the must-haves by how much
+   the posting leans on them. Leave out perks, company history and soft words the Summary already
+   covers.
 3. **Sort each term into one of three groups** by reading the profile:
    - **Have, same word**: move it forward (below).
    - **Have, different word for the same thing** ("Postgres" / "PostgreSQL", "AWS Lambda" /
@@ -52,11 +56,19 @@ word for the posting's spelling of the same thing. It never adds a fact.
      If unsure, keep the profile's word.
    - **Not in the profile**: a gap. Report it.
 4. **Edit the version file** (`resume/versions/<name>.md`). First `cp <file> <file>.bak`.
+   **The goal:** every must-have you really have is on the CV in the posting's word, and the top
+   ones are in the **skim zone**: the headline, the first 3-4 items of each skills row, and the
+   newest role's first 3 bullets. Write down, before you edit, which must-haves the skim zone
+   already shows; you report before and after.
    - **Headline** (`title:`): the app already uses the posting's title. Leave it.
    - **Skills rows**: reorder each row so the posting's terms come first, in the order the
      posting gives them. Push unrelated items to the end of the row.
-   - **Bullets**: within each role, sort by how many posting terms and duties a bullet matches.
-     The newest role's first two bullets matter most.
+   - **Bullets**: within each role, sort by how many must-haves a bullet matches (a must-have
+     counts more than a nice-to-have). The newest role's first three bullets should answer the
+     posting's top must-haves, one each where you can.
+   - **Wording**: in every printed bullet, wherever the profile says the same thing in other
+     words, use the posting's word (the two-word swap rule above; `check_version` decides).
+     Go bullet by bullet, don't stop after the first few.
    - **Cut bullets** (lines starting with `// `): un-hide one if it matches a main duty of the
      posting. Lines whose tags didn't match this job (`// [fullstack] ...`) stay hidden.
    - **Page count**: the app keeps CVs to one page. A long bullet can take 3 printed lines, so
@@ -73,12 +85,20 @@ word for the posting's spelling of the same thing. It never adds a fact.
    - Check the file against the profile. This must print `[]`:
      `.venv/bin/python -c "from pathlib import Path; from jobhunter.cv import check_version; print(check_version(Path('resume/versions/<name>.md').read_text(), Path('profile/master_profile.md')))"`
      Each line it lists says more than the profile. Undo that change.
+   - **Recruiter pass.** Read page 1 of the PDF as a recruiter who has 6 seconds and the
+     posting's top 3 must-haves in mind. Can each one be found in the skim zone, in the
+     posting's word? If one you really have can't, reorder again and rebuild. Stop when it can,
+     or when the only way is a fact the profile doesn't have (a gap).
 6. **Already uploaded?** If an application form in Chrome already has this CV, upload the
    rebuilt PDF again (same file name). The form holds the old copy. To check it took, compare
    `input.files[0].size` on the page with `stat -f %z <pdf>`.
 
 ## Report
 
-- A table: posting term -> where it is on the CV now (skills row, which bullet), or "gap".
+- A table: posting term (must-have or nice-to-have) -> where it is on the CV now (skills row,
+  which bullet), or "gap".
+- The must-haves in the skim zone, before and after ("3 of 7 -> 6 of 7").
+- Any bullet hidden only because its tag didn't match this job (`// [fullstack] ...`) that would
+  answer a must-have: name it, so the user can decide (you don't un-hide it).
 - The gap list, so the user can add any that are true to the profile.
 - Bullets you un-hid or hid, page count, and whether you uploaded it again.
