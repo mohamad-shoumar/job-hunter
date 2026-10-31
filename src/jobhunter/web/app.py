@@ -53,7 +53,9 @@ from ..errors import AppError, BadRequest, Conflict, NotFound, UpstreamError
 from ..fitgrade import grade_of
 from ..hunter import Hunter
 from ..llm import anthropic_client, error_line, key_note
-from ..mailer import GmailInbox, MailAccount, SendError, SmtpSender, check_inbox, mail_account, outgoing, send_for_job
+from ..mailer import (
+    GmailInbox, MailAccount, SendError, SmtpSender, check_inbox, mail_account, needs_inbox, outgoing, send_for_job,
+)
 from ..models import NEW, SAVED, STAGE_LABELS, STAGES
 from ..pipeline import local_day
 from ..pitch import PitchWriter, build_writer, cv_for, cv_options, draft_for_job, edit_draft, reassemble, word_count
@@ -63,7 +65,7 @@ from ..store import JobStore
 from ..store.applications import events_for, get_application, set_application_contact, set_cv_file
 from ..store.companies import company_contacts, contact_at, forget_lookup
 from ..store.lists import JOB_VIEWS, YEARS, job_list
-from ..store.mail import company_contacted, has_mail, mail_for_job
+from ..store.mail import company_contacted, mail_for_job
 from ..text import parse_datetime, utcnow
 
 STATIC = Path(__file__).parent / "static"
@@ -515,7 +517,7 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
             raise BadRequest("Gmail is not set up: add GMAIL_ADDRESS and GMAIL_APP_PASSWORD to .env")
         inbox = None
         try:
-            inbox = services.inbox(account) if has_mail(store) else None
+            inbox = services.inbox(account) if needs_inbox(store, config) else None
             result = check_inbox(store, account, config, now(), inbox=inbox)
         except AppError:
             raise
