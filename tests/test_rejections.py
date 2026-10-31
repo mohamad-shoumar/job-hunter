@@ -220,3 +220,12 @@ def test_a_rejection_from_a_company_with_nothing_open_is_not_listed(filters):
         letter("Axmed <jobs@axmed.com>", "Your application", "Unfortunately, we are not going to progress your "
                "application. We have decided not to move forward.")]))
     assert result.rejected == [] and result.notes == []
+
+
+def test_a_date_without_a_time_zone_does_not_break_the_check(filters):
+    store = JobStore(":memory:")
+    job_id = applied(store, filters, "GoReel", "Senior Python Developer")
+    check_inbox(store, ME, CONFIG, LATER, inbox=FakeInbox([letter(
+        "GoReel <noreply@candidates.workablemail.com>", "Senior Python Developer - GoReel", NO,
+        date="Mon, 28 Sep 2026 10:00:00 -0000")]))
+    assert get_application(store, job_id)["stage"] == CLOSED

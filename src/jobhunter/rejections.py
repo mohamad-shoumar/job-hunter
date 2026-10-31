@@ -27,7 +27,7 @@ import logging
 import re
 import sqlite3
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from email.message import Message
 from email.utils import parseaddr, parsedate_to_datetime
 
@@ -221,9 +221,10 @@ def read_rejection(msg: Message, jobs: list[sqlite3.Row]) -> Rejection | None:
 
 def _date(msg: Message) -> datetime | None:
     try:
-        return parsedate_to_datetime(str(msg.get("Date")))
+        sent = parsedate_to_datetime(str(msg.get("Date")))
     except (TypeError, ValueError):
         return None
+    return sent.replace(tzinfo=UTC) if sent.tzinfo is None else sent  # "-0000" parses without a zone
 
 
 def _key(msg: Message, uid: int) -> str:
