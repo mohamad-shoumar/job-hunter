@@ -215,8 +215,12 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
     - Use a CV bullet or achievement only where it makes sense: the question asks about the
       user's experience ("What experience do you have ...", "Tell us about a challenge"), or a
       real example actually makes the point clearer. Otherwise leave the CV out. Never invent.
-    - Personal-opinion questions ("What excites you ...", "Favorite ..."): the profile can't
-      answer these. Leave them empty for the user and say so in the report.
+    - **An open question the profile, memory and the standard answers above can't answer**
+      ("Why this company?", "Why this role?", "Why are you looking?", "What are you looking for
+      next?", "Why are you a fit?", "What excites you ...", AI/AGI or other opinion questions):
+      follow the `job-application-answers` skill and fill it in (the user's call, 2026-10-31).
+      Its length rule (100-130 words, or the form's limit) wins here. List each one in the report
+      as "written by job-application-answers" so the user reads it before pressing Apply.
     - Avoid pitch phrases such as "My rule of thumb is", "What excites me is", "That is how I work
       today", and avoid stacking numbers (115+, 370+, 800+) into one answer.
 - **Unsure about a field?** Pick the most reasonable answer, note it for the report, keep going.
