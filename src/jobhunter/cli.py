@@ -113,7 +113,10 @@ def cmd_run(args) -> int:
             print(f"Cover letters: {', '.join(o['covers'])}")
         if o["inbox"]:
             i = o["inbox"]
-            print(f"Inbox: {i['replies']} replies, {i['probable']} probable, {i['bounces']} bounces")
+            print(f"Inbox: {i['replies']} replies, {i['probable']} probable, {i['bounces']} bounces, "
+                  f"{len(i['rejected'])} closed as rejected")
+            for line in i["rejected"]:
+                print(f"  closed: {line}")
         for line in o["notes"] + o["errors"]:
             print(f"  {line}")
         print("Open `jobhunter serve` to see contacts and send emails.\n")
@@ -608,11 +611,16 @@ def cmd_inbox(args) -> int:
         raise SystemExit("set GMAIL_ADDRESS and GMAIL_APP_PASSWORD in .env")
     store = JobStore(paths.db_file)
     try:
-        result = check_inbox(store, account, OutreachConfig.load(paths.outreach_file), utcnow())
+        result = check_inbox(store, account, OutreachConfig.load(paths.outreach_file), utcnow(), dry_run=args.dry_run)
     finally:
         store.close()
-    print(f"{result.scanned} new messages: {result.replies} replies, {result.probable} probable, "
-          f"{result.auto_replies} auto-replies, {result.bounces} bounces")
+    if args.dry_run:
+        print(f"Dry run, nothing changed. Rejection emails that would close {len(result.rejected)} jobs:")
+    else:
+        print(f"{result.scanned} new messages: {result.replies} replies, {result.probable} probable, "
+              f"{result.auto_replies} auto-replies, {result.bounces} bounces, {len(result.rejected)} closed as rejected")
+    for line in result.rejected:
+        print(f"  closed: {line}" if not args.dry_run else f"  {line}")
     for line in result.resolved + result.notes:
         print(f"  {line}")
     return 0
@@ -711,7 +719,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("job_ids", type=int, nargs="+")
     p.set_defaults(func=cmd_cover)
 
-    p = sub.add_parser("inbox", help="check Gmail for replies and bounces (also runs in the daily run)")
+    p = sub.add_parser("inbox", help="check Gmail for replies, bounces and rejections (also runs in the daily run)")
+    p.add_argument("--dry-run", action="store_true", help="only list the jobs rejection emails would close")
     p.set_defaults(func=cmd_inbox)
 
     p = sub.add_parser(

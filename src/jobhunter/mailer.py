@@ -48,7 +48,8 @@ from .errors import Conflict, UpstreamError
 from .pitch import cv_for, follow_up, to_html, to_plain
 from .profile import Profile
 from .store import JobStore
-from .store.applications import add_event, get_application
+from .rejections import scan_rejections
+from .store.applications import add_event, get_application, oldest_open_application
 from .store.companies import get_contact
 from .store.mail import (
     company_contacted, get_mail, has_mail, is_seen, mark_seen, our_mail, sent_for_job, set_error, set_failed, set_sent,
@@ -346,6 +347,13 @@ class GmailInbox:
         uids = [int(x) for x in (data[0] or b"").split()] if typ == "OK" and data else []
         return sorted(u for u in uids if u > after_uid)  # "n:*" returns the newest message even when n is past it
 
+    def search_raw(self, query: str) -> list[int]:
+        """UIDs matching a Gmail search ("after:2026/10/20 regret"). Sent as a literal, so the query
+        may hold quotes and accents."""
+        self.imap.literal = query.encode()
+        typ, data = self.imap.uid("SEARCH", "CHARSET", "UTF-8", "X-GM-RAW")
+        return sorted(int(x) for x in (data[0] or b"").split()) if typ == "OK" and data else []
+
     def headers(self, uids: list[int]) -> list[InboxMessage]:
         found = []
         for start in range(0, len(uids), 200):
@@ -452,6 +460,7 @@ class ScanResult:
     test_replies: int = 0
     resolved: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
+    rejected: list[str] = field(default_factory=list)  # jobs closed by a rejection email (rejections.py)
 
     def to_dict(self) -> dict:
         return {k: v for k, v in self.__dict__.items()}
@@ -582,20 +591,35 @@ def _handle(store: JobStore, inbox: GmailInbox, message: InboxMessage, ours: dic
     mark_seen(store, key, job_id, kind, now)
 
 
+def needs_inbox(store: JobStore, config: OutreachConfig) -> bool:
+    """Whether the inbox check has anything to look for: replies to sent emails or rejections."""
+    return has_mail(store) or (config.auto_close_rejections and oldest_open_application(store) is not None)
+
+
 def check_inbox(store: JobStore, account: MailAccount, config: OutreachConfig, now: datetime,
-                inbox: GmailInbox | None = None) -> ScanResult:
-    """Scan, then close as ghosted what waited long enough. Opens (and closes) its own IMAP connection."""
+                inbox: GmailInbox | None = None, dry_run: bool = False) -> ScanResult:
+    """Scan for replies, close the jobs a rejection email is about (rejections.py), then close as
+    ghosted what waited long enough. Opens (and closes) its own IMAP connection. A dry run only lists
+    the rejections it would apply."""
     result = ScanResult()
-    if has_mail(store):
+    if not needs_inbox(store, config):
+        result.notes.append("nothing sent yet")
+    else:
         own = inbox is None
         inbox = inbox or GmailInbox(account)
         try:
-            result = scan_inbox(store, inbox, account, config, now)
+            if has_mail(store) and not dry_run:
+                result = scan_inbox(store, inbox, account, config, now)
+            if config.auto_close_rejections:
+                inbox.open_all_mail()
+                found = scan_rejections(store, inbox, now, config.rejection_lookback_days, dry_run=dry_run)
+                result.rejected = found.closed
+                result.notes += found.unsure
         finally:
             if own:
                 inbox.close()
-    else:
-        result.notes.append("nothing sent yet")
+    if dry_run:
+        return result
     ghosted = tracking.apply_ghosting(store, now, config)
     if ghosted:
         result.notes.append(f"{len(ghosted)} closed as ghosted")

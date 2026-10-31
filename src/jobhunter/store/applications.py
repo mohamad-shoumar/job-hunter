@@ -10,7 +10,7 @@ import json
 import sqlite3
 from datetime import datetime
 
-from ..models import REACHED_OUT, REPLIED
+from ..models import CLOSED, REACHED_OUT, REPLIED
 from ..text import iso
 from .jobs import JobStore, rows_in
 
@@ -129,6 +129,22 @@ def ghost_candidates(store: JobStore) -> list[sqlite3.Row]:
         """,
         (REACHED_OUT,),
     ).fetchall()
+
+
+def tracked_jobs(store: JobStore) -> list[sqlite3.Row]:
+    """Every job with an application row, open or closed, with its title and company (rejections.py)."""
+    return store.conn.execute(
+        """
+        SELECT a.job_id, a.stage, a.created_at, j.title, j.company FROM applications a
+        JOIN jobs j ON j.id = a.job_id ORDER BY a.job_id
+        """
+    ).fetchall()
+
+
+def oldest_open_application(store: JobStore) -> str | None:
+    """When the oldest application that is not closed was created, or None when every one is closed."""
+    row = store.conn.execute("SELECT MIN(created_at) FROM applications WHERE stage != ?", (CLOSED,)).fetchone()
+    return row[0] if row else None
 
 
 def replied(store: JobStore) -> list[sqlite3.Row]:

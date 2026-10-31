@@ -283,26 +283,38 @@ already signed in.
 
   - **The template for the person's group** ([Achievements] is the one sentence above). These
     are a starting shape, not a script: reword so it reads naturally for this person and job, but
-    keep the parts (who you are writing to, the role, the two achievements, one easy ask).
-    - CEO / hiring manager: "Hi [Name], I just applied for the [Role] role at [Company].
-      [Achievements] I'd love to hear what your team is building next and how I could help."
-    - HR / recruiter: "Hi [Name], I just applied for the [Role] role at [Company]. [Achievements]
-      Would you be open to a quick chat about it?"
-    - Engineer / team lead: "Hey [Name], I just applied for the [Role] role at [Company].
-      [Achievements] I'd love to hear what it's like on your team from someone on the inside." If
-      it fits, name their team or work instead of the general line.
+    keep the parts (who you are writing to, the role, the two achievements, one easy ask). Name the
+    role only, never the company: no "at [Company]", "at your company" or "on [Company]'s team" (the
+    user's call, 2026-10-31: the person already works there). Use the role title as cleaned for the
+    CV headline (no "Remote", locations or brackets).
+    - CEO / hiring manager: "Hi [Name], I just applied for the [Role] role. [Achievements] I'd love
+      to hear what your team is building next and how I could help."
+    - HR / recruiter: "Hi [Name], I just applied for the [Role] role. [Achievements] Would you be
+      open to a quick chat about it?"
+    - Engineer / team lead: "Hey [Name], I just applied for the [Role] role. [Achievements] I'd love
+      to hear what it's like on your team from someone on the inside." If it fits, name their team
+      or work instead of the general line.
     - Agency recruiter (only for an agency-posted job, see above): "Hi [Name], I'm a backend
       developer and team lead looking at [role/location] roles. [Achievements] Happy to connect if
       you're hiring for something similar."
-    - Example (286 characters, long names on purpose): "Hi Alexandra, I just applied for the
-      Senior Backend Engineer role at Wayve Technologies. I've built AI-native workflows to ship
-      features and fixes daily, and an AWS event-driven system handling 800+ concurrent jobs. I'd
-      love to hear what your team is building next and how I could help."
+    - Example (264 characters): "Hi Alexandra, I just applied for the
+      Senior Backend Engineer role. I've built AI-native workflows to ship features and fixes
+      daily, and an AWS event-driven system handling 800+ concurrent jobs. I'd love to hear what
+      your team is building next and how I could help."
   - A real shared link may go in when it fits ("Fellow AUB alum."). Details about the person only
     from their profile; never invent an achievement or a detail about them. Never ask for a
     referral. Tone: confident, human, direct; no stiff lines like "I'd love to discuss how I could
     contribute to your team".
 - Nobody found in any group: note "no LinkedIn contact" and the searches you tried.
+- **Add the job to the outreach tracker** (the user's call, 2026-10-31), right after its contact is
+  found: append one row to `~/job-hunter/reports/linkedin_notes_2026-10-31.md` (git-ignored) under
+  its table, numbering on from the last row. Columns, in this order: `# | Company | Role | Contact |
+  LinkedIn | Why this person | Gmail | Note`. Role is a link to the posting, LinkedIn is
+  `[profile](url)` (or `-`), Gmail is what the inbox shows for the job so far ("received Oct 31",
+  "nothing found"), Note is the note as written (or `-` with no contact). Escape any `|` as `\|`.
+  A week after the first rows (around 2026-11-07) the user reviews how many accepted and replied, to
+  decide whether to target less senior people or change the note, so add a row for every job,
+  including "no LinkedIn contact" ones.
 
 ## At the end
 
@@ -310,7 +322,7 @@ Report one line per job: company, role, grade, where you applied (the URL of the
 used (mirrored or not; if mirrored, the posting's must-haves the profile doesn't have, so the user
 can add any that are true), salary entered and anything you guessed. Under it, its one LinkedIn contact: name, title, profile
 URL, group and why (the company size for a CEO, the link to the user if any), email if public, and
-the note ready to paste with its character count.
+the note ready to paste with its character count. Say how many rows you added to the outreach tracker.
 
 Then, in the chat answer itself (not only in a file), **why you skipped each job**: every job you
 pressed Skip on in this run, whether you looked at its form or not, one short line each with the
