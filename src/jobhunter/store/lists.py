@@ -21,11 +21,14 @@ OUTREACH_COLUMNS = f"""
 """
 
 # The job list's views and years filters: only these keys pick SQL text; every value goes in as a parameter.
+# Shortlisted and Visa list are the jobs still waiting for you (not acted on, or saved), like To apply: one you
+# reached out on lives under Tracked (the user's call, 2026-11-01: old reached-out jobs read as new shortlisted ones).
 _OPEN = "COALESCE(a.stage, :new) != :closed"
+_WAITING = "COALESCE(a.stage, :new) IN (:new, :saved)"
 JOB_VIEWS = {
     "active": f"j.status = :shortlisted AND {_OPEN}",
-    "shortlisted": f"j.status = :shortlisted AND {_OPEN}",
-    "visa_list": f"j.status = :visa_list AND {_OPEN}",
+    "shortlisted": f"j.status = :shortlisted AND {_WAITING}",
+    "visa_list": f"j.status = :visa_list AND {_WAITING}",
     "tracked": "a.stage IS NOT NULL AND a.stage NOT IN (:new, :closed)",
     "closed": "a.stage = :closed",
     "rejected": "j.status = :rejected AND j.report_date IS NOT NULL",
@@ -34,7 +37,7 @@ JOB_VIEWS = {
 YEARS = {"lt3": "j.required_yoe < 3", "3-4": "j.required_yoe >= 3 AND j.required_yoe < 4",
          "4-5": "j.required_yoe >= 4 AND j.required_yoe < 5", "5+": "j.required_yoe >= 5",
          "none": "j.required_yoe IS NULL"}
-_NAMES = {"new": NEW, "closed": CLOSED, "shortlisted": SHORTLISTED, "visa_list": VISA_LIST, "rejected": REJECTED}
+_NAMES = {"new": NEW, "saved": SAVED, "closed": CLOSED, "shortlisted": SHORTLISTED, "visa_list": VISA_LIST, "rejected": REJECTED}
 
 
 def job_list(store: JobStore, view: str, q: str = "", yoe: str = "",

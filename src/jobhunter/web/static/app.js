@@ -179,8 +179,8 @@ async function renderJobs() {
     main.innerHTML = `
       <div class="filters">
         <select id="view">
-          <option value="shortlisted">Shortlisted</option>
-          <option value="visa_list">Visa list (EU/UK, sponsors visas)</option>
+          <option value="shortlisted">Shortlisted (not acted on yet)</option>
+          <option value="visa_list">Visa list (EU/UK, sponsors visas, not acted on yet)</option>
           <option value="tracked">Tracked (saved and after)</option>
           <option value="closed">Closed</option>
           <option value="rejected">Rejected (in a report)</option>

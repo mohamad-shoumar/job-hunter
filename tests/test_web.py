@@ -97,6 +97,14 @@ def test_applied_jobs_say_when_you_reached_out(client):
     assert jobs[2]["reached_out_at"] is None
 
 
+def test_shortlisted_list_drops_jobs_you_reached_out_on(client):
+    # Old jobs you already applied to read as new shortlisted ones; they live under Tracked.
+    client.patch("/api/jobs/1/application", json={"applied": True}, headers=AUTH)
+    client.post("/api/jobs/2/stage", json={"stage": "saved"}, headers=AUTH)
+    assert {j["id"] for j in client.get("/api/jobs?view=shortlisted").json()["jobs"]} == {2}
+    assert 1 in {j["id"] for j in client.get("/api/jobs?view=tracked").json()["jobs"]}
+
+
 def test_track_contact_draft_send(client):
     r = client.post("/api/jobs/1/stage", json={"stage": "saved"}, headers=AUTH)
     assert r.json()["application"]["stage"] == "saved"
