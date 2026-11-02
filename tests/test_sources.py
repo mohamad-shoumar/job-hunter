@@ -108,6 +108,26 @@ def test_himalayas_range_pages_until_it_passes_the_start():
     assert len(result.jobs) == 100  # not cut at `limit` (40) in a range run
 
 
+def test_himalayas_range_pages_by_pubdate_not_the_relisted_date():
+    from datetime import datetime
+
+    newest = int(datetime(2026, 9, 27, tzinfo=UTC).timestamp())
+    pages = []
+
+    def respond(params):
+        pages.append(params["page"])
+        data = _himalayas_page(newest - (params["page"] - 1) * 20 * 3600)
+        # A re-listed job on every page: first listed in July, so its own date is long before `since`.
+        data["jobs"][0]["expiryDate"] = data["jobs"][0]["pubDate"] + 3 * 86400 + 1234
+        return data
+
+    source = himalayas.HimalayasSource(["backend"], limit=40)
+    source.since = datetime(2026, 9, 23, tzinfo=UTC)
+    result = source.fetch(FakeHttp({himalayas.SEARCH: respond}))
+    assert pages == [1, 2, 3, 4, 5]  # not stopped on page 1 by the re-listed job's July date
+    assert min(j.posted_at for j in result.jobs).month == 7
+
+
 def test_hackernews_range_reads_every_overlapping_thread():
     hits = {"hits": [
         {"objectID": "9", "title": "Ask HN: Who is hiring? (September 2026)", "created_at": "2026-09-01T15:00:00Z"},

@@ -65,7 +65,8 @@ class HimalayasSource(Source):
                 if not raw_jobs or fetched >= (data.get("totalCount") or 0):
                     break
                 if self.since is not None:
-                    oldest = min((j.posted_at for j in jobs if j.posted_at), default=None)
+                    # The API orders by pubDate, re-listings' moved one too: page by that, not by listed_at.
+                    oldest = min(filter(None, (parse_datetime(r.get("pubDate")) for r in raw_jobs)), default=None)
                     if (oldest and oldest < self.since) or page >= MAX_PAGES_FOR_RANGE:
                         break
                 elif fetched >= self.limit or page >= self.limit // PAGE_SIZE + 1:

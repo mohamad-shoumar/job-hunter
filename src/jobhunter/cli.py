@@ -315,7 +315,8 @@ def cmd_dates(args) -> int:
                 row = store.get(job_id)
                 if row is None:
                     print(f"#{job_id}: no such job")
-                elif row["posted_at"] and not row["date_check_json"]:
+                elif row["posted_at"] and (not row["date_check_json"]
+                                           or json.loads(row["date_check_json"])["found_by"] == "himalayas"):
                     print(f"#{job_id}: skipped, its source gave a date ({row['posted_at'][:10]})")
                 else:
                     rows.append(row)
