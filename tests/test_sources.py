@@ -174,6 +174,20 @@ def test_himalayas_relisted_job_is_dated_from_its_expiry():
     assert first.posted_at == datetime.fromtimestamp(1793495272, UTC)
 
 
+def test_himalayas_relisted_job_is_too_old_even_when_its_estimate_is_fresh(filters):
+    from jobhunter.classify import classify
+
+    # Elm AI's, seen 2026-11-02: expiryDate - 60 days says Oct 25, its page says July 30.
+    raw = {"title": "Senior Product Engineer (Asia)", "companyName": "Elm AI", "locationRestrictions": ["Lebanon"],
+           "pubDate": 1793533574, "expiryDate": 1798094099,
+           "guid": "https://himalayas.app/companies/elm-ai/jobs/senior-product-engineer-asia"}
+    job = himalayas.parse_job(raw)
+    job.first_seen = datetime(2026, 11, 2, 7, 11, tzinfo=UTC)
+    cls = classify(enrich(job), filters, job.first_seen)
+    assert job.posted_at.date().isoformat() == "2026-10-25"
+    assert cls.reject_code == "too_old" and "52.8 days" in cls.reject_reason
+
+
 def test_himalayas_relisted_job_too_old_quotes_its_dates(filters):
     from jobhunter.classify import classify
 
@@ -181,7 +195,8 @@ def test_himalayas_relisted_job_too_old_quotes_its_dates(filters):
     job.first_seen = datetime(2026, 11, 1, 19, 0, tzinfo=UTC)
     cls = classify(enrich(job), filters, job.first_seen)
     assert cls.reject_code == "too_old"
-    assert cls.reject_reason.startswith("Posted 20 days before it was found (limit 14): Himalayas re-listed it")
+    assert cls.reject_reason.startswith("Re-listed, so first posted before the date it shows, most often weeks before: "
+                                        "Himalayas re-listed it")
     assert "(pubDate 2026-11-01T12:20:22+00:00, expiryDate 2026-12-11T03:26:58+00:00)" in cls.reject_reason
 
 

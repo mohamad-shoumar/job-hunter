@@ -6,12 +6,14 @@ Himalayas does not know, so those jobs carry no location and the local rules
 decide from the description.
 
 `pubDate` is not always the posting date: Himalayas re-lists old jobs with a new
-`pubDate` and leaves `expiryDate` alone (on 2026-11-01 it re-listed about 70% of
-its jobs, Hivex's from mid-October among them). A listing runs a whole number of
-days, almost always 60: so a `pubDate` that is not a whole number of days before
-`expiryDate` was moved, and the job was first listed about 60 days before it
-expires (`listed_at`, checked against 49 stored jobs: 40 exact, the rest within
-2 days or later than the real date).
+`pubDate` (on 2026-11-01 about 70% of its jobs, Hivex's from mid-October among
+them). A first listing expires a whole number of days after `pubDate`, almost
+always 60; a re-listing does not, since `expiryDate` is not reset with it. No
+feed gives the first date (only the job page, behind Cloudflare), so `listed_at`
+marks a re-listing with a DateCheck quoting both dates, and classify rejects it
+as too old: 73 of 83 re-listings checked were over 14 days old (the user's call,
+2026-11-02). Its `posted_at` is the latest it could have been first listed:
+60 days before it expires (Elm AI's: Oct 25, its page says July 30).
 """
 
 from __future__ import annotations
@@ -86,7 +88,7 @@ def listed_at(raw: dict):
         return pub, None
     first = min(pub, expiry - timedelta(days=LISTING_DAYS))
     reason = (f"Himalayas re-listed it: its pubDate is {span / 86400:.1f} days before its expiryDate, not a whole "
-              f"number of days, so it was first listed about {LISTING_DAYS} days before it expires.")
+              f"number of days, so it was first listed before that, no later than {LISTING_DAYS} days before it expires.")
     quote = f"pubDate {iso(pub)}, expiryDate {iso(expiry)}"
     return first, DateCheck(iso(first), quote, raw.get("guid") or "", RELISTED, reason)
 

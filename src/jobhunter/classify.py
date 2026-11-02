@@ -115,11 +115,17 @@ def classify(job: Job, filters: Filters, now: datetime, check_age: bool = True) 
     # reject jobs that were fresh when they were found.
     found = job.first_seen or now
     limit = filters.max_posting_age_days
+    # Himalayas re-lists old jobs under a new date and no feed gives the real one (Elm AI's page says July 30,
+    # its expiryDate allowed late October): 73 of 83 re-listings checked were over 14 days old (the user's
+    # call 2026-11-02: reject them all).
+    dated = job.date_check
+    if check_age and limit is not None and dated and dated.found_by == "himalayas":
+        reason = f"Re-listed, so first posted before the date it shows, most often weeks before: {dated.reason} ({dated.quote})"
+        return Classification(REJECTED, eligibility, relevance, score, reason, "too_old")
     if check_age and job.posted_at and limit is not None:
         age = (found - job.posted_at).days
         if age > limit:
             reason = f"Posted {age} days before it was found (limit {limit})"
-            dated = job.date_check
             if dated and dated.posted_at and dated.quote:
                 reason += f": {dated.reason} ({dated.quote})"
             return Classification(REJECTED, eligibility, relevance, score, reason, "too_old")
