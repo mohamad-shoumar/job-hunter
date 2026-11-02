@@ -20,8 +20,9 @@ jobs.ai_check_json is the AI web check's finding (ai_check.py). It is kept
 apart from the rule verdict so `reclassify` can combine the two again.
 jobs.fit_grade_json is the AI fit grade (fitgrade.py): only for sorting, never
 part of the status, so `reclassify` leaves it alone.
-jobs.date_check_json is where an undated job's posting date was found (posted_date.py); the date itself
-goes into posted_at, which a later sighting only fills when empty.
+jobs.date_check_json is where an undated job's posting date was found (posted_date.py), or why a source's
+own date was corrected (Himalayas' re-listings); the date itself goes into posted_at, which a later sighting
+only fills when empty.
 """
 
 from __future__ import annotations
@@ -69,6 +70,8 @@ def _job_values(job: Job) -> dict:
         "required_yoe": job.required_yoe,
         "skills_json": json.dumps(job.skills),
         "posted_at": iso(job.posted_at),
+        # A source that corrects its own date (Himalayas' re-listings) says why.
+        "date_check_json": json.dumps(asdict(job.date_check)) if job.date_check else None,
     }
 
 
@@ -267,6 +270,11 @@ class JobStore:
     def save_date_check(self, job_id: int, check: DateCheck) -> None:
         """The evidence, and the date it found when the job still has none."""
         self.conn.execute("UPDATE jobs SET date_check_json = ?, posted_at = COALESCE(posted_at, ?) WHERE id = ?",
+                          (json.dumps(asdict(check)), check.posted_at, job_id))
+
+    def correct_posted_date(self, job_id: int, check: DateCheck) -> None:
+        """Replace a posting date the source got wrong (a Himalayas re-listing), keeping the evidence."""
+        self.conn.execute("UPDATE jobs SET date_check_json = ?, posted_at = ? WHERE id = ?",
                           (json.dumps(asdict(check)), check.posted_at, job_id))
 
     def save_fit_grade(self, job_id: int, grade: dict) -> None:

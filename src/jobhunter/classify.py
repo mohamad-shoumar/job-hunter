@@ -119,6 +119,9 @@ def classify(job: Job, filters: Filters, now: datetime, check_age: bool = True) 
         age = (found - job.posted_at).days
         if age > limit:
             reason = f"Posted {age} days before it was found (limit {limit})"
+            dated = job.date_check
+            if dated and dated.posted_at and dated.quote:
+                reason += f": {dated.reason} ({dated.quote})"
             return Classification(REJECTED, eligibility, relevance, score, reason, "too_old")
 
     if relevance.verdict == IRRELEVANT:
@@ -141,8 +144,9 @@ def classify(job: Job, filters: Filters, now: datetime, check_age: bool = True) 
     # check and date lookup still reject the ones they find quoted evidence against.
     found = job.date_check
     if found and found.posted_at and job.posted_at:
+        where = "from Himalayas' expiry date" if found.found_by == "himalayas" else "found on a page"
         relevance = Assessment(relevance.verdict, [*relevance.reasons, f'Posting date {found.posted_at[:10]} '
-                                                   f'found on a page: "{found.quote}" ({found.source_url})'],
+                                                   f'{where}: "{found.quote}" ({found.source_url})'],
                                relevance.code)
     if not job.posted_at:
         # An unknown age is not a fresh one: some sources re-list months-old jobs undated.

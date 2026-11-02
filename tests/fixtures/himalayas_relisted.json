@@ -1,0 +1,92 @@
+{
+ "comments": "Trimmed from the live search API on 2026-11-02: Hivex's job re-listed on 2026-11-01 (pubDate moved, expiryDate kept), G2i's a first listing (expiryDate exactly 60 days after pubDate).",
+ "totalCount": 2,
+ "jobs": [
+  {
+   "title": "Python developer",
+   "excerpt": "We are looking for a talented and experienced Python Developer to join our creative team and contribute to the developme",
+   "companyName": "Hivex",
+   "companySlug": "hivex",
+   "companyLogo": "https://cdn-images.himalayas.app/tscbts3inxevaxnd6lj8tvl4xm7v",
+   "employmentType": "Full Time",
+   "minSalary": null,
+   "maxSalary": null,
+   "salaryPeriod": "annual",
+   "seniority": [
+    "Mid-level"
+   ],
+   "currency": null,
+   "locationRestrictions": [],
+   "timezoneRestrictions": [
+    -11,
+    -10,
+    -9.5,
+    -9
+   ],
+   "categories": [
+    "Python-Developer",
+    "Backend-Engineer",
+    "Software-Developer",
+    "Software-Engineer",
+    "Web-Developer",
+    "Python-Development",
+    "Python-Django-Developer",
+    "AI-Python-Developer",
+    "Django-Python-Developer",
+    "Python-Programmer",
+    "Python-Developer-(Freelance)",
+    "Developer"
+   ],
+   "parentCategories": [
+    "Developer"
+   ],
+   "description": "<p>We are looking for a talented and experienced <strong>Python Developer</strong> to join our creative team and contribute to the development of cutting-edge solutions that align with our commitment to excellence. </p><p>\ufeff<strong>Requirements:</strong></p><ul>\n<li>\ufeff\ufeff3+ years of commercial experienc",
+   "pubDate": 1793535622,
+   "expiryDate": 1796959618,
+   "applicationLink": "https://himalayas.app/companies/hivex/jobs/python-developer-1783009587?utm_source=api",
+   "guid": "https://himalayas.app/companies/hivex/jobs/python-developer-1783009587"
+  },
+  {
+   "title": "Remote Python Senior Software Engineer, AI Training",
+   "excerpt": "Contract | Remote, worldwide | $100-$200/hour depending on experience and location | 10-20 hrs/week Please note that eli",
+   "companyName": "G2i",
+   "companySlug": "g2i",
+   "companyLogo": "https://cdn-images.himalayas.app/49kfobngoz7995mexnwgqsabr7ah",
+   "employmentType": "Contractor",
+   "minSalary": 100,
+   "maxSalary": 200,
+   "salaryPeriod": "hourly",
+   "seniority": [
+    "Senior"
+   ],
+   "currency": "USD",
+   "locationRestrictions": [],
+   "timezoneRestrictions": [
+    -11,
+    -10,
+    -9.5,
+    -9
+   ],
+   "categories": [
+    "Remote-Senior-AI-Engineer",
+    "Senior-Python-Developer-AI-ML",
+    "Senior-Python-Software-Engineer",
+    "Senior-Python-Engineer",
+    "Remote-AI-Engineer",
+    "Remote-AI-Training-Specialist",
+    "Senior-AI-Software-Engineer",
+    "Python-AI-Engineer",
+    "Senior-Software-AI-Engineer",
+    "Python-Developer"
+   ],
+   "parentCategories": [
+    "Developer"
+   ],
+   "description": "<p>Contract | Remote, worldwide | $100-$200/hour depending on experience and location | 10-20 hrs/week</p><p>Please note that eligibility may vary depending on your location, as some regions may not be supported by the client.</p><p><strong>Check out this Loom video for more details: </strong></p><p",
+   "pubDate": 1793495272,
+   "expiryDate": 1798679272,
+   "applicationLink": "https://himalayas.app/companies/g2i/jobs/remote-python-senior-software-engineer-ai-training?utm_source=api",
+   "guid": "https://himalayas.app/companies/g2i/jobs/remote-python-senior-software-engineer-ai-training"
+  }
+ ]
+}

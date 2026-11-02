@@ -123,7 +123,8 @@ def test_the_daily_run_watches_and_then_fetches_the_board(tmp_path, filters):
     (tmp_path / "config").mkdir()
     raw = fixture_json("himalayas_search.json")["jobs"][0]
     raw.update(companyName="Fingerprint", title="AI Engineer", locationRestrictions=["Worldwide"],
-               pubDate=int(NOW.timestamp()) - 3600, applicationLink="https://himalayas.app/companies/fp/jobs/ai")
+               pubDate=int(NOW.timestamp()) - 3600, expiryDate=int(NOW.timestamp()) - 3600 + 60 * 86400,
+               applicationLink="https://himalayas.app/companies/fp/jobs/ai")
     board = fixture_json("greenhouse_gitlab.json")
     http = FakeHttp({himalayas.SEARCH: lambda params: {"jobs": [raw]} if params["page"] == 1 else {"jobs": []},
                      greenhouse.API.format(token="fingerprint"): board})

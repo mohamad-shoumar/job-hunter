@@ -4,17 +4,30 @@ The search endpoint takes `country=LB` and then only returns jobs whose
 location restrictions include Lebanon or are empty. Empty often just means
 Himalayas does not know, so those jobs carry no location and the local rules
 decide from the description.
+
+`pubDate` is not always the posting date: Himalayas re-lists old jobs with a new
+`pubDate` and leaves `expiryDate` alone (on 2026-11-01 it re-listed about 70% of
+its jobs, Hivex's from mid-October among them). A listing runs a whole number of
+days, almost always 60: so a `pubDate` that is not a whole number of days before
+`expiryDate` was moved, and the job was first listed about 60 days before it
+expires (`listed_at`, checked against 49 stored jobs: 40 exact, the rest within
+2 days or later than the real date).
 """
 
 from __future__ import annotations
 
-from ..models import REMOTE, Job
-from ..text import html_to_text, parse_datetime
+from datetime import timedelta
+
+from ..models import REMOTE, DateCheck, Job
+from ..text import html_to_text, iso, parse_datetime
 from .base import Source, SourceResult, describe_error, parse_each, section_enabled
 
 SEARCH = "https://himalayas.app/jobs/api/search"
 PAGE_SIZE = 20
 MAX_PAGES_FOR_RANGE = 25  # 500 jobs per query: a safety stop for very long ranges
+LISTING_DAYS = 60  # how long Himalayas lists a job (120 of 130 first listings checked on 2026-11-02)
+WHOLE_DAY_SLACK = 60  # seconds: a first listing's span is a whole number of days to within ~30s
+RELISTED = "himalayas"  # DateCheck.found_by for a date read from expiryDate
 
 
 class HimalayasSource(Source):
@@ -61,6 +74,22 @@ class HimalayasSource(Source):
         return result
 
 
+def listed_at(raw: dict):
+    """(when the job was first listed, the evidence when that is not `pubDate`, else None)."""
+    pub, expiry = parse_datetime(raw.get("pubDate")), parse_datetime(raw.get("expiryDate"))
+    if not pub or not expiry or expiry <= pub:
+        return pub, None
+    span = (expiry - pub).total_seconds()
+    off = span % 86400
+    if min(off, 86400 - off) <= WHOLE_DAY_SLACK:
+        return pub, None
+    first = min(pub, expiry - timedelta(days=LISTING_DAYS))
+    reason = (f"Himalayas re-listed it: its pubDate is {span / 86400:.1f} days before its expiryDate, not a whole "
+              f"number of days, so it was first listed about {LISTING_DAYS} days before it expires.")
+    quote = f"pubDate {iso(pub)}, expiryDate {iso(expiry)}"
+    return first, DateCheck(iso(first), quote, raw.get("guid") or "", RELISTED, reason)
+
+
 def parse_job(raw: dict) -> Job:
     # An empty locationRestrictions list means Himalayas does not know, not
     # "any country": it shows "Worldwide" for US-only roles too (Medallion,
@@ -69,6 +98,7 @@ def parse_job(raw: dict) -> Job:
     offsets = [float(o) for o in raw.get("timezoneRestrictions") or [] if isinstance(o, (int, float))]
     period = (raw.get("salaryPeriod") or "").lower()
     link = raw.get("applicationLink") or raw.get("guid") or ""
+    posted_at, date_check = listed_at(raw)
     return Job(
         source="himalayas",
         source_job_id=raw.get("guid") or link,
@@ -87,7 +117,8 @@ def parse_job(raw: dict) -> Job:
         salary_currency=raw.get("currency") if raw.get("minSalary") or raw.get("maxSalary") else None,
         salary_period="year" if period in ("annual", "yearly", "year") else (period or None),
         tags=[str(c) for c in raw.get("categories") or []],
-        posted_at=parse_datetime(raw.get("pubDate")),
+        posted_at=posted_at,
+        date_check=date_check,
     )
 
 

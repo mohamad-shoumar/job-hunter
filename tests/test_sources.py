@@ -140,6 +140,37 @@ def test_serpapi_real_response_shape(monkeypatch):
     assert second.salary_raw == "82K–111K a year"
 
 
+def test_himalayas_relisted_job_is_dated_from_its_expiry():
+    # Real jobs from 2026-11-02: Hivex's was re-listed on 2026-11-01 (pubDate moved,
+    # expiryDate kept); G2i's is a first listing, expiring exactly 60 days after pubDate.
+    relisted, first = (himalayas.parse_job(raw) for raw in fixture_json("himalayas_relisted.json")["jobs"])
+    assert relisted.company == "Hivex"
+    assert relisted.posted_at == datetime(2026, 10, 12, 3, 26, 58, tzinfo=UTC)  # expiryDate - 60 days
+    check = relisted.date_check
+    assert check.found_by == "himalayas" and check.posted_at.startswith("2026-10-12")
+    assert check.quote == "pubDate 2026-11-01T12:20:22+00:00, expiryDate 2026-12-11T03:26:58+00:00"
+    assert "39.6 days" in check.reason
+    assert first.company == "G2i" and first.date_check is None
+    assert first.posted_at == datetime.fromtimestamp(1793495272, UTC)
+
+
+def test_himalayas_relisted_job_too_old_quotes_its_dates(filters):
+    from jobhunter.classify import classify
+
+    job = himalayas.parse_job(fixture_json("himalayas_relisted.json")["jobs"][0])
+    job.first_seen = datetime(2026, 11, 1, 19, 0, tzinfo=UTC)
+    cls = classify(enrich(job), filters, job.first_seen)
+    assert cls.reject_code == "too_old"
+    assert cls.reject_reason.startswith("Posted 20 days before it was found (limit 14): Himalayas re-listed it")
+    assert "(pubDate 2026-11-01T12:20:22+00:00, expiryDate 2026-12-11T03:26:58+00:00)" in cls.reject_reason
+
+
+def test_himalayas_without_expiry_keeps_pubdate():
+    raw = {"title": "x", "companyName": "y", "pubDate": 1793535622, "guid": "g"}
+    job = himalayas.parse_job(raw)
+    assert job.posted_at == datetime.fromtimestamp(1793535622, UTC) and job.date_check is None
+
+
 def test_himalayas_asks_for_lebanon_and_pages():
     seen = []
 
