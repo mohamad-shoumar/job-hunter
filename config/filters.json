@@ -12,7 +12,8 @@
     {"name": "Tailscale", "why": "roles need residence in Canada, the US or the UK"},
     {"name": "Reddit", "why": "remote roles are US-only"},
     {"name": "WorkHero", "why": "international engineering roles closed; the rest are US-only"},
-    {"name": "Canonical", "why": "you skipped 9 Canonical roles and asked to add it to rejected companies (2026-11-01)"}
+    {"name": "Canonical", "why": "you skipped 9 Canonical roles and asked to add it to rejected companies (2026-11-01)"},
+    {"name": "MixRank", "why": "you skipped its roles and asked to add it to rejected companies (2026-10-25)"}
   ],
 
   "_agencies": "Staffing agencies and talent marketplaces: they repost other companies' jobs, sell vetted developers or pay per task. Rejected (code agency) with what matched: a name below, a whole word in the company name, or a phrase in the posting. not_agencies: real companies a name word would catch. Checked against the stored jobs 2026-10-10: 'our clients', 'talent pool' and 'talent network' are left out because real companies (Zscaler, Percona, GitLab) use them.",
