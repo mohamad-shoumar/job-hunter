@@ -377,7 +377,8 @@ def cv_headline(title: str) -> str | None:
     """The posting's title as a CV headline, or None when it does not read as one engineering role.
     'Senior Software Engineer, Payments Platform' -> 'Senior Software Engineer', 'Senior Backend & Platform
     Engineer' -> 'Senior Backend Engineer', 'Senior/Lead Software Engineer' -> 'Senior Software Engineer',
-    'Senior+ Full-Stack Engineer' -> 'Senior Full-Stack Engineer', 'Software Engineer II' -> 'Software Engineer'."""
+    'Senior+ Full-Stack Engineer' -> 'Senior Full-Stack Engineer', 'Software Engineer II' -> 'Software Engineer',
+    'Back End Developer' -> 'Backend Engineer'."""
     text = re.sub(r"^\s*[\[(][^\])]*[\])]\s*", "", " ".join((title or "").split()))  # "[UAE] Forward Deployed..."
     text = re.sub(r"^(.+?),\s*(senior|staff|principal|lead)$", r"\2 \1", text, flags=re.I)  # "Software Engineer, Senior"
     head, colon, tail = text.partition(":")  # "Graduate Programme 2027: Applied AI Engineer"
@@ -407,7 +408,9 @@ def cv_headline(title: str) -> str | None:
         return None
     if words[-1].lower().endswith("s"):  # "Software Engineers"
         words[-1] = words[-1][:-1]
-    return " ".join(words)
+    if words[-1].lower() == "developer":  # every CV title says Engineer (the user's call, 2026-11-04)
+        words[-1] = "Engineer"
+    return re.sub(r"\b(Back|Front)[ -]End\b", r"\1end", " ".join(words), flags=re.I)  # "Back End" -> "Backend"
 
 
 # --- what the model asked for, after the checks ---------------------------------------
