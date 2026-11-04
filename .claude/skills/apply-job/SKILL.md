@@ -1,6 +1,6 @@
 ---
 name: apply-job
-description: Work through the "To apply" column of the jobhunter app in Chrome - get a checked tailored CV, fill the job's application form on the company site or in LinkedIn Easy Apply, find one LinkedIn contact per job (CEO at a small company, else the hiring manager, else HR, else a team lead) and write a note of at most 300 characters with two achievements - and stop before the final Apply/Submit, never pressing Connect or Message. Use when the user says "apply to my jobs", "go through To apply", or names a job to apply to.
+description: Work through the "To apply" column of the jobhunter app in Chrome - get a checked tailored CV, fill the job's application form on the company site or in LinkedIn Easy Apply, find one LinkedIn contact per job (a fellow AUB grad, else a software engineer with an Arab or Muslim name, else the CEO at a small company, the hiring manager, HR, a team lead) and write a note of at most 300 characters with two achievements - and stop before the final Apply/Submit, never pressing Connect or Message. Use when the user says "apply to my jobs", "go through To apply", or names a job to apply to.
 ---
 
 # Apply to jobs from the "To apply" column
@@ -238,29 +238,43 @@ Outreach goes through LinkedIn now, not email (the user's call, 2026-10-29). Don
 Find contact, Write with AI or Gmail drafts in this step. Search only on LinkedIn, where the user is
 already signed in.
 - **One person per job** (the user's call, 2026-10-29). Go down this list and stop at the first
-  group where you find someone:
-  1. **The CEO / founder, only at a small company:** at most 50 employees on the company's LinkedIn
-     page ("11-50 employees"), the same line the app uses (`small_company_max_employees` in
-     `config/outreach.json`). A size you can't find counts as small, as in the app. A bigger
-     company starts at 2.
-  2. **The hiring manager:** the engineering manager or head of the team the role sits in.
-  3. **HR / recruiter / talent acquisition** at the company (one who hires engineers, or in the
-     job's region, if you can tell).
-  4. **An engineer, team lead or tech lead** on that team.
-  Leave out people who have left the company. Leave out agency recruiters too, unless an agency
-  posted the job and hides the client: then the agency's recruiter for it is the one person.
-- **Inside a group, pick the one with a link to the user:** a 1st or 2nd-degree connection, or
-  shared connections ("X mutual connections"); a fellow alum of the American University of Beirut
-  (AUB) or Software Engineering Factory; an Arab background the profile shows (studied, worked or
-  lives in Lebanon or another Arab country, or lists Arabic). Go by what the profile shows, not a
-  guess from the name alone. A link never moves someone above an earlier group.
+  step where you find someone. Steps A and B come first at every company, big or small (the
+  user's call, 2026-11-04: a shared background gets more replies than a title):
+  - **A. A fellow AUB grad, any role:** anyone at the company who studied at the American
+    University of Beirut (AUB): software engineer, HR, recruiter, manager, anyone. Search: the
+    company's People tab, "Where they studied" filter set to American University of Beirut (or
+    the keyword "American University of Beirut"). Several found: take the one highest in the
+    groups 1-4 below, then the one closest to the role's team.
+  - **B. A software engineer with an Arab or Muslim name:** an engineer, developer, team lead or
+    tech lead at the company whose name sounds Arab or Muslim (Mohamad, Ahmad, Omar, Khaled,
+    Fatima, Layla, Haddad, Khoury, ...). Search: the People tab with the keyword "software
+    engineer" (or the role's own word: "backend", "developer"), and read the names on the first
+    page. A name alone is enough here. Several found: prefer one on the role's team, then a lead,
+    then one whose profile shows Lebanon or an Arab country.
+  - **C. The usual order**, when A and B find nobody:
+    1. **The CEO / founder, only at a small company:** at most 50 employees on the company's
+       LinkedIn page ("11-50 employees"), the same line the app uses
+       (`small_company_max_employees` in `config/outreach.json`). A size you can't find counts as
+       small, as in the app. A bigger company starts at 2.
+    2. **The hiring manager:** the engineering manager or head of the team the role sits in.
+    3. **HR / recruiter / talent acquisition** at the company (one who hires engineers, or in the
+       job's region, if you can tell).
+    4. **An engineer, team lead or tech lead** on that team.
+  Leave out people who have left the company (in every step). Leave out agency recruiters too,
+  unless an agency posted the job and hides the client: then skip A and B, and the agency's
+  recruiter for it is the one person.
+- **Inside a group of C, pick the one with a link to the user:** a 1st or 2nd-degree connection,
+  or shared connections ("X mutual connections"); a fellow alum of Software Engineering Factory; an
+  Arab background the profile shows (studied, worked or lives in Lebanon or another Arab country,
+  or lists Arabic). A link never moves someone above an earlier group.
 - **How to search:** the company's LinkedIn page, People tab, with a keyword (CEO, founder,
-  engineering manager, recruiter, talent, HR, tech lead, team lead); its "Where they studied" filter
-  finds AUB alumni. Or people search:
+  engineering manager, recruiter, talent, HR, tech lead, team lead) or its "Where they studied"
+  filter. Or people search:
   `https://www.linkedin.com/search/results/people/?keywords=<company> recruiter`.
   Read only the first page of results. Opening a profile is fine (they will see the user viewed it).
-- **Pace:** the Easy Apply rules apply here too: slowly, at most 4 searches and 5 profiles per
-  company, and any "unusual activity" warning stops all LinkedIn work for the run.
+- **Pace:** the Easy Apply rules apply here too: slowly, at most 6 searches and 5 profiles per
+  company (A and B take one search each, leaving 4 for C), and any "unusual activity" warning
+  stops all LinkedIn work for the run.
 - **Email:** only when it is public, on the person's LinkedIn Contact info or the company's own site.
   Never guess one.
 - **The note** (the user's rules, 2026-10-29):
@@ -281,7 +295,9 @@ already signed in.
     | **AWS:** Built an AWS event-driven system handling 800+ concurrent jobs. | Backend, cloud, distributed systems |
     | **Leadership:** Lead a backend team of 3 engineers. | Lead and senior roles |
 
-  - **The template for the person's group** ([Achievements] is the one sentence above). These
+  - **The template for the person's role** ([Achievements] is the one sentence above): an AUB grad
+    (step A) gets the template for their own role and the line "Fellow AUB alum." after the
+    greeting; an engineer from step B gets the engineer template. These
     are a starting shape, not a script: reword so it reads naturally for this person and job, but
     keep the parts (who you are writing to, the role, the two achievements, one easy ask). Name the
     role only, never the company: no "at [Company]", "at your company" or "on [Company]'s team" (the
@@ -321,7 +337,7 @@ already signed in.
 Report one line per job: company, role, grade, where you applied (the URL of the tab left open), CV
 used (mirrored or not; if mirrored, the posting's must-haves the profile doesn't have, so the user
 can add any that are true), salary entered and anything you guessed. Under it, its one LinkedIn contact: name, title, profile
-URL, group and why (the company size for a CEO, the link to the user if any), email if public, and
+URL, step/group and why (AUB grad, Arab or Muslim name, the company size for a CEO, the link to the user if any), email if public, and
 the note ready to paste with its character count. Say how many rows you added to the outreach tracker.
 
 Then, in the chat answer itself (not only in a file), **why you skipped each job**: every job you
