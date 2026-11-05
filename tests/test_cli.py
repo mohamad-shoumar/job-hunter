@@ -69,6 +69,27 @@ def test_show_an_unknown_job(home, capsys):
     assert capsys.readouterr().err == "no job #99\n"
 
 
+def test_linkedin_sets_the_person_and_the_note_for_a_job(home, capsys):
+    """What the apply-job skill fills in after it finds the one person (the user's call, 2026-11-05)."""
+    note = "Hi Ana, I just applied for the Backend Engineer role. I lead a backend team of 3 engineers."
+    assert jobhunter(home, "linkedin", "1", "--url", "www.linkedin.com/in/ana-ruiz", "--note", note) == 0
+    out = capsys.readouterr().out
+    assert "LinkedIn: https://www.linkedin.com/in/ana-ruiz" in out and f"Note ({len(note)} characters): {note}" in out
+    # With nothing to set it only shows what the job has.
+    assert jobhunter(home, "linkedin", "1") == 0
+    assert "https://www.linkedin.com/in/ana-ruiz" in capsys.readouterr().out
+    # A note over LinkedIn's limit is stored, and says so.
+    assert jobhunter(home, "linkedin", "1", "--note", "x" * 301) == 0
+    assert "Note (301 characters, over the 300 LinkedIn allows)" in capsys.readouterr().out
+
+
+def test_linkedin_refuses_a_link_that_is_not_linkedin(home, capsys):
+    assert jobhunter(home, "linkedin", "1", "--url", "https://example.com/in/ana") == 1
+    assert "not a LinkedIn link" in capsys.readouterr().err
+    assert jobhunter(home, "linkedin", "99", "--url", "linkedin.com/in/ana") == 1
+    assert capsys.readouterr().err == "no job #99\n"
+
+
 def test_report_rebuilds_one_day_s_file(home, capsys):
     assert jobhunter(home, "report", "--date", DAY) == 0
     path = home / "reports" / f"{DAY}.md"

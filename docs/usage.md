@@ -62,6 +62,7 @@ that holds `config/`) and `-v` (debug logging).
 | `jobhunter run --no-outreach` | no contact lookups, drafts, CVs, cover letters or inbox check |
 | `jobhunter run --no-report` | store and classify only |
 | `jobhunter serve` | the web app: jobs, who to email, drafts, sending, tracking (`--port`, `--no-open`) |
+| `jobhunter linkedin <id>` | the job's one LinkedIn person and the note to send them (`--url`, `--note`; nothing given: shows what is stored) |
 | `jobhunter contacts` | find who to email for shortlisted jobs without a contact, best fit first (`--limit N`, `--no-claude`, or job ids) |
 | `jobhunter tailor <id>` | a CV tailored to that job, in `resume/output/` (`--replace-edits` to redo one you edited) |
 | `jobhunter rebuild-cv <id>` | after you edit a job's CV text in `resume/versions/`, rebuild its PDF (no AI) and list lines that say more than your profile |
@@ -273,7 +274,26 @@ grades.
   Email someone column), Replied, Interviewing, Offer and Closed (rejected, ghosted or skipped, on the card).
 - **Stats**: your own reply rate, by who you emailed and by company size.
 
+### The LinkedIn note
+
+Outreach is one LinkedIn note per job ([decision 20](decisions.md#20-the-linkedin-note-lives-on-the-job)). A
+job's card has a **LinkedIn** box with two things: the link to the one person to write to ("Open profile ↗"),
+and the note to send with the connection request, with its character count (LinkedIn allows 300). Both boxes
+save themselves when you click away, so there is no Save, Edit or Copy button, and nothing is ever sent from
+here: you press Connect on LinkedIn yourself. The job list shows a "LinkedIn note" chip once a job has one.
+
+The `apply-job` skill fills both after it finds the person, with
+`jobhunter linkedin <id> --url <profile> --note "<the note>"`. You can also paste them into the card.
+
+Jobs you reached out to before 2026-11-05 keep their old email draft and get no note (nothing was copied
+over): the box starts empty, and you fill it when you next write to someone there.
+
 ### Who to email
+
+> Email outreach is not on the job card any more (decision 20). The lookup, drafts and sending below are
+> still in the code and reachable from `jobhunter contacts` and the API; the inbox check still reads replies,
+> bounces and rejections for the emails already sent.
+
 
 `src/jobhunter/contacts.py`. Looked up once per company.
 

@@ -34,7 +34,7 @@ from urllib.parse import urlsplit
 
 from . import tracking
 from .config import OutreachConfig
-from .errors import NotFound
+from .errors import BadRequest, NotFound
 from .hunter import Account, Hunter, HunterError, size_upper_bound
 from .identity import company_key
 from .llm import Usage, error_line, find_quote, forced_tool_choice, pages_read, plain
@@ -303,6 +303,25 @@ def save_manual_contact(store: JobStore, job_id: int, full_name: str, email: str
     update_application(store, job_id, {"contact_id": contact_id}, now)
     add_event(store, job_id, "contact", f"Contact set by hand: {full_name} <{email}>", now)
     return contact_id
+
+
+# Outreach is one LinkedIn note per job (the user's call, 2026-11-05): the person's profile link and the note
+# are kept on the job itself (applications.linkedin_url / linkedin_note), and the user sends it by hand.
+LINKEDIN_NOTE_LIMIT = 300  # LinkedIn's own limit on a connection note
+
+
+def clean_linkedin(url: str) -> str | None:
+    """A LinkedIn profile link as it is stored (None when the box is empty). A link that is not on
+    linkedin.com is refused, so a half-pasted address never reads as a contact found."""
+    url = (url or "").strip()
+    if not url:
+        return None
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+    host = urlsplit(url).netloc.lower()
+    if host != "linkedin.com" and not host.endswith(".linkedin.com"):
+        raise BadRequest(f"linkedin_url: not a LinkedIn link: {url}")
+    return url
 
 
 def chosen_contact(store: JobStore, job: sqlite3.Row, config: OutreachConfig) -> sqlite3.Row | None:

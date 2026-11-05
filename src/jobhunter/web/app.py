@@ -45,9 +45,9 @@ from ..cv import (
     build_cv_writer, build_pdf, check_version, save_version, tailor_for_job, tailor_note, tailored_of, version_of,
 )
 from ..contacts import (
-    ROLE_LABELS, ContactFinder, chosen_contact, chosen_contacts, clean_company_name, company_ref, domain_from_links,
-    ensure_company, job_company, rank_contacts, save_manual_contact, set_domain, set_job_board, skip_list_match,
-    targets_for, verify_email,
+    ROLE_LABELS, ContactFinder, chosen_contact, chosen_contacts, clean_company_name, clean_linkedin, company_ref,
+    domain_from_links, ensure_company, job_company, rank_contacts, save_manual_contact, set_domain, set_job_board,
+    skip_list_match, targets_for, verify_email,
 )
 from ..errors import AppError, BadRequest, Conflict, NotFound, UpstreamError
 from ..fitgrade import grade_of
@@ -62,7 +62,9 @@ from ..pitch import PitchWriter, build_writer, cv_for, cv_options, draft_for_job
 from ..profile import load_profile
 from ..report import salary_text
 from ..store import JobStore
-from ..store.applications import events_for, get_application, set_application_contact, set_cv_file
+from ..store.applications import (
+    add_event, events_for, get_application, set_application_contact, set_cv_file, set_linkedin,
+)
 from ..store.companies import company_contacts, contact_at, forget_lookup
 from ..store.lists import JOB_VIEWS, YEARS, job_list
 from ..store.mail import company_contacted, mail_for_job
@@ -97,6 +99,8 @@ class ApplicationChange(_Body):
     cv_file: str | None = None
     subject: str | None = None
     body: str | None = None
+    linkedin_url: str | None = None  # the one person to send a LinkedIn note to
+    linkedin_note: str | None = None  # the note itself; code never sends it
     draft_version: int | None = None  # the version the page showed, so an edit never overwrites a newer draft
 
 
@@ -357,6 +361,14 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
                 raise BadRequest(f"no CV named {choice} in {config.cv_dir}")
             set_cv_file(store, job_id, choice or None)
             reassemble(store, job_id, me, t, config)
+        if "linkedin_url" in sent or "linkedin_note" in sent:
+            app_row = get_application(store, job_id)
+            url = clean_linkedin(change.linkedin_url) if "linkedin_url" in sent else app_row["linkedin_url"]
+            note = change.linkedin_note if "linkedin_note" in sent else app_row["linkedin_note"]
+            set_linkedin(store, job_id, url, (note or "").strip() or None, t)
+            if "linkedin_url" in sent and url != app_row["linkedin_url"]:
+                add_event(store, job_id, "linkedin",
+                          f"LinkedIn contact: {url}" if url else "LinkedIn contact cleared", t)
         if "subject" in sent or "body" in sent:
             app_row = get_application(store, job_id)
             if change.draft_version is not None and change.draft_version != app_row["draft_version"]:
@@ -565,6 +577,7 @@ def _job_summary(row: sqlite3.Row, contact: sqlite3.Row | None, config: Outreach
         "replied_at": row["replied_at"], "next_follow_up_at": row["next_follow_up_at"],
         "reached_out_at": tracking.reached_out_at(row) if row["stage"] not in (None, NEW, SAVED) else None,
         "job_board": skip_list_match(row["company"], config),
+        "linkedin": bool(row["linkedin_url"]),
         "contact": {"name": contact["full_name"], "role": ROLE_LABELS.get(contact["role"], contact["role"]),
                     "email_status": contact["email_status"] if contact["email"] else None} if contact else None,
     }

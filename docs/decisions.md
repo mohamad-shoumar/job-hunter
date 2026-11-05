@@ -24,6 +24,7 @@ Sentences marked "(draft: check)" give a reason I have not written down anywhere
 17. [LinkedIn through its logged-out search, slowly](#17-linkedin-through-its-logged-out-search-slowly)
 18. [No review list: a job is shortlisted or rejected](#18-no-review-list-a-job-is-shortlisted-or-rejected)
 19. [The old review list is cleared, and the Pipeline has fewer columns](#19-the-old-review-list-is-cleared-and-the-pipeline-has-fewer-columns)
+20. [The LinkedIn note lives on the job](#20-the-linkedin-note-lives-on-the-job)
 
 ---
 
@@ -268,3 +269,15 @@ The model never writes a Summary: the Summary paragraph is mine and is copied wo
 **Why:** The jobs in review are old now, and new unclear jobs go to the shortlist anyway. Outreach goes through LinkedIn now: I send a LinkedIn note for every job I apply to (the apply-job skill finds the person and writes it), so a column of "jobs nobody was emailed about" no longer says what to do next. (draft: check) Fewer columns, and one place for each job.
 
 **Trade-off:** A cleared job that was worth applying to is gone from my lists. They are still stored, under "Rejected (in a report)" in the Jobs tab and "Cleared from the old review list" in their day's report, and a database copy from before the change is in `data/backups/`.
+
+## 20. The LinkedIn note lives on the job
+
+**Date:** 2026-11-05
+
+**Context:** Since 2026-10-29 I reach out on LinkedIn, not by email: one person per job, one note of at most 300 characters. The apply-job skill wrote those into a Markdown file (`reports/linkedin_notes_2026-10-31.md`), one row per job, while the job's own card still showed a "Who to contact" box and an email composer (subject, body, Fill template, Save edits, Copy, Send) I no longer use.
+
+**Decision:** The person's LinkedIn link and the note live on the job itself (`applications.linkedin_url` and `linkedin_note`, migration 3). The card's "Who to contact" and "Email" boxes are gone; in their place one **LinkedIn** box: the link to the person, the note, and a character count. Both boxes save when I click away, so there are no buttons, and nothing is sent from the app: I press Connect on LinkedIn myself. The apply-job skill fills them with `jobhunter linkedin <id> --url ... --note ...` instead of adding a row to the file. Jobs I already applied to and reached out on keep whatever they had; nothing was copied over.
+
+**Why:** The note lives next to the job it is about, so I open one card and see the CV, the posting, the person and the note. The Markdown file meant two places to look, and the email boxes on the card were dead weight I kept scrolling past. The lookup, drafts and sending code stays: the inbox check still reads replies, bounces and rejections for the emails I sent before.
+
+**Trade-off:** The file's "Why this person" column (fellow AUB grad, an Arab or Muslim name, CEO at a small company) is not on the card: the skill still says it in its report. The jobs from Oct 24 to Nov 5 stay only in the file, so the week-one review on about 2026-11-07 reads both.
