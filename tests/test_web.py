@@ -193,6 +193,33 @@ def test_editing_the_application_changes_only_the_keys_sent(client):
     assert patch(applied=False)["applied_at"] is None
 
 
+def test_the_linkedin_person_and_note_live_on_the_job(client):
+    """Outreach is one LinkedIn note per job (the user's call, 2026-11-05): the card keeps the person's
+    profile link and the note, and nothing sends them."""
+    r = client.patch("/api/jobs/1/application", headers=AUTH, json={
+        "linkedin_url": "www.linkedin.com/in/ana-ruiz", "linkedin_note": "  Hi Ana, I just applied for the role.  "})
+    app = r.json()["application"]
+    assert app["linkedin_url"] == "https://www.linkedin.com/in/ana-ruiz"  # typed without https://
+    assert app["linkedin_note"] == "Hi Ana, I just applied for the role."  # stored trimmed
+    assert "LinkedIn contact: https://www.linkedin.com/in/ana-ruiz" in [e["detail"] for e in r.json()["events"]]
+    # The job list says which jobs have a note ready.
+    jobs = {j["id"]: j for j in client.get("/api/jobs?view=shortlisted").json()["jobs"]}
+    assert jobs[1]["linkedin"] is True and jobs[2]["linkedin"] is False
+    # One box changes without touching the other.
+    app = client.patch("/api/jobs/1/application", headers=AUTH, json={"linkedin_note": "Hey Ana, same role."}).json()["application"]
+    assert app["linkedin_url"] == "https://www.linkedin.com/in/ana-ruiz" and app["linkedin_note"] == "Hey Ana, same role."
+    # An empty link clears the person.
+    app = client.patch("/api/jobs/1/application", headers=AUTH, json={"linkedin_url": ""}).json()["application"]
+    assert app["linkedin_url"] is None and app["linkedin_note"] == "Hey Ana, same role."
+
+
+def test_a_link_that_is_not_linkedin_is_refused(client):
+    r = client.patch("/api/jobs/1/application", headers=AUTH, json={"linkedin_url": "https://example.com/in/ana"})
+    assert r.status_code == 400 and "not a LinkedIn link" in r.json()["error"]
+    app = client.get("/api/jobs/1").json()["application"]
+    assert app["linkedin_url"] is None and app["linkedin_note"] is None  # nothing stored
+
+
 def test_manual_contact_must_be_an_email(client):
     r = client.put("/api/jobs/1/contact", json={"full_name": "Ana", "email": "not-an-email"}, headers=AUTH)
     assert r.status_code == 400 and "not an email" in r.json()["error"]

@@ -118,16 +118,6 @@ async function submitSkip(picker, reason, button) {
   toast(message);
   return render();
 }
-const EMAIL_BADGE = {
-  verified: ["good", "verified"], manual: ["good", "added by you"], found: ["info", "found (not verified)"],
-  accept_all: ["warn", "accept-all: can't be checked"], guessed: ["warn", "guessed"], bounced: ["bad", "bounced"],
-  invalid: ["bad", "invalid"],
-};
-function emailBadge(status) {
-  if (!status) return `<span class="chip">no email</span>`;
-  const [cls, text] = EMAIL_BADGE[status] || ["", status];
-  return `<span class="chip ${cls}">${esc(text)}</span>`;
-}
 function statusChip(status, eligibility) {
   if (status === "shortlisted") return `<span class="chip good">shortlisted · ${esc(eligibility)}</span>`;
   if (status === "visa_list") return `<span class="chip info">visa list · ${esc(eligibility === "visa_sponsor" ? "sponsors visas" : eligibility)}</span>`;
@@ -237,11 +227,9 @@ async function loadJobs() {
   }).join("");
 }
 
-function contactChip(j) {
+function linkedinChip(j) {
   if (j.job_board) return `<span class="chip">job board: apply via link</span>`;
-  if (!j.contact) return `<span class="chip">no contact yet</span>`;
-  return `<span class="chip ${j.contact.email_status === "bounced" ? "bad" : "info"}">${esc(j.contact.role)}: ${esc(j.contact.name)}</span>` +
-    (j.contact.email_status ? emailBadge(j.contact.email_status) : "");
+  return j.linkedin ? `<span class="chip info">LinkedIn note</span>` : "";
 }
 
 function jobRow(j) {
@@ -250,8 +238,7 @@ function jobRow(j) {
       <div>
         <div class="job-title">${esc(j.title)}</div>
         <div class="muted">${esc(j.company)} · <span class="small">${esc(j.reason)}</span></div>
-        <div class="job-meta" style="margin-top:4px">${statusChip(j.status, j.eligibility)} ${stageChip(j.stage, j.closed_reason, j.skip_reason)} ${contactChip(j)}
-          ${j.has_draft ? `<span class="chip ${j.draft_blocked ? "bad" : ""}">${j.draft_blocked ? "draft needs edit" : "draft ready"}</span>` : ""}
+        <div class="job-meta" style="margin-top:4px">${statusChip(j.status, j.eligibility)} ${stageChip(j.stage, j.closed_reason, j.skip_reason)} ${linkedinChip(j)}
           ${j.has_cv ? `<span class="chip">CV tailored</span>` : ""}${j.has_cover ? ` <span class="chip">cover letter</span>` : ""}</div>
       </div>
       <div class="job-side">
@@ -328,8 +315,7 @@ function renderDrawer() {
     </div>
     ${cvSection(d)}
     ${coverSection(d)}
-    ${contactSection(d)}
-    ${emailSection(d)}
+    ${linkedinSection(d)}
     ${trackingSection(d)}
     ${whySection(d)}
     <div class="section"><details><summary>Job description</summary><div class="description" style="margin-top:8px">${esc(j.description || "(none)")}</div></details></div>`;
@@ -449,105 +435,27 @@ function coverSection(d) {
     </div>`;
 }
 
-function contactSection(d) {
-  const co = d.company, c = d.contact;
-  const s = state.status || {};
-  if (co.is_job_board || co.skip_listed) {
-    return `
-      <div class="section">
-        <h3>Who to contact</h3>
-        <p>${esc(co.name)} is a job board or agency, so there is nobody to pitch: apply through the posting.</p>
-        ${co.skip_listed ? `<p class="small muted">On the skip list in config/outreach.json.</p>`
-          : `<button class="btn small" data-action="job-board" data-value="0">It's a real employer</button>`}
-      </div>`;
-  }
-  const others = d.contacts.filter((x) => !c || x.id !== c.id);
-  const canFind = s.hunter || s.anthropic;
-  return `
-    <div class="section">
-      <h3>Who to contact</h3>
-      <div class="small">${esc(co.why)}</div>
-      <div class="small muted" style="margin-top:4px">
-        ${co.domain ? `Domain: <b>${esc(co.domain)}</b> <span class="muted">(${esc(co.domain_source || "")})</span>`
-          : co.suggested_domain ? `Domain: <b>${esc(co.suggested_domain)}</b> <span class="muted">(from the posting)</span>` : "Domain unknown"}
-        · <a data-action="edit-domain">${co.domain ? "change" : "set it"}</a>
-        ${co.size_range || co.size_count ? ` · Size: <b>${esc(co.size_count || co.size_range)}</b>` : ""}
-        ${co.looked_up_at ? ` · looked up ${esc(ago(co.looked_up_at))}${co.credits ? `, ${co.credits} credits` : ""}${co.cost_usd ? `, $${co.cost_usd.toFixed(3)}` : ""}` : ""}
-      </div>
-      ${co.note ? `<div class="small muted">${esc(co.note)}</div>` : ""}
-      ${c ? personCard(c, true) : `<div class="chosen muted">Nobody found yet.</div>`}
-      ${d.earlier_at_company.length ? `<div class="warnings">Already emailed at this company: ${d.earlier_at_company.map((e) => `${esc(e.to_addr)} on ${esc(day(e.sent_at))} (“${esc(e.title)}”)`).join("; ")}</div>` : ""}
-      ${others.length ? `<details><summary>${others.length} other ${others.length === 1 ? "person" : "people"}</summary>${others.map((x) => personCard(x, false)).join("")}</details>` : ""}
-      <div class="row" style="margin-top:10px">
-        <button class="btn" data-action="find-contact" ${canFind ? "" : "disabled title='Add HUNTER_API_KEY or ANTHROPIC_API_KEY to .env'"}>${co.looked_up_at ? "Look up again" : "Find contact"}</button>
-        ${s.anthropic ? `<button class="btn" data-action="find-contact" data-claude="1" title="Claude searches the web (about $0.03-0.05)">Search the web with Claude</button>` : ""}
-        <button class="btn" data-action="show-manual">Add by hand</button>
-        <button class="btn small" data-action="job-board" data-value="1" title="Job boards and agencies get no pitch">Not a real employer</button>
-      </div>
-      <form class="inline" id="manual" hidden>
-        <input type="text" name="full_name" placeholder="Name">
-        <input type="email" name="email" placeholder="Email">
-        <input type="text" name="position" placeholder="Title (e.g. CTO)">
-        <button class="btn primary" type="submit">Save</button>
-      </form>
-    </div>`;
-}
+// The one LinkedIn person for this job and the note to send them (the user's call, 2026-11-05: outreach is
+// LinkedIn now, so there is no "who to contact" box, no subject line and no Send button). Both boxes are
+// saved when you click away, like the tracking notes. Nothing is ever sent from here: you press Connect
+// on LinkedIn yourself.
+const NOTE_LIMIT = 300; // LinkedIn's own limit on a connection note
 
-function personCard(c, chosen) {
-  const canVerify = c.email && ["found", "guessed", "accept_all"].includes(c.email_status) && state.status?.hunter;
-  return `
-    <div class="${chosen ? "chosen" : "person"}">
-      <div class="grow">
-        <div><span class="name">${esc(c.full_name)}</span> <span class="chip ${c.is_target ? "info" : ""}">${esc(c.role_label)}</span>
-          ${c.position ? `<span class="small muted">${esc(c.position)}</span>` : ""}</div>
-        <div class="row small" style="margin-top:3px">
-          ${c.email ? `<span class="mono">${esc(c.email)}</span>` : ""} ${emailBadge(c.email ? c.email_status : null)}
-          ${c.confidence ? `<span class="muted">${c.confidence}% sure</span>` : ""}
-          ${c.linkedin_url ? `<a href="${esc(c.linkedin_url)}" target="_blank" rel="noopener">LinkedIn</a>` : ""}
-          <span class="muted">via ${esc(c.source)}${c.verified ? "" : ", not confirmed"}</span>
-        </div>
-        ${c.evidence_quote || c.evidence_url ? `<div class="quote">${esc(c.evidence_quote || "")} ${c.evidence_url ? `<a href="${esc(c.evidence_url)}" target="_blank" rel="noopener">proof</a>` : ""}</div>` : ""}
-      </div>
-      <div class="row">
-        ${canVerify ? `<button class="btn small" data-action="verify" data-id="${c.id}" title="Hunter Email Verifier, 0.5 credit">Verify</button>` : ""}
-        ${chosen ? "" : `<button class="btn small" data-action="use-contact" data-id="${c.id}">Use</button>`}
-      </div>
-    </div>`;
-}
+const noteCount = (note) => `${note.length}/${NOTE_LIMIT} characters${note.length > NOTE_LIMIT ? " — too long for LinkedIn" : ""}`;
 
-function emailSection(d) {
+function linkedinSection(d) {
   const app = d.application || {};
-  const out = d.outgoing;
-  const s = state.status || {};
-  const warnings = app.warnings || [];
-  const sentFirst = d.sent.some((m) => m.kind === "first" && m.state === "sent");
-  const meta = app.draft_meta;
-  const composer = !sentFirst ? `
-      <div class="email-to muted">To: ${out ? `<span class="mono">${esc(out.to)}</span>` : esc(d.outgoing_error || "no contact yet")}</div>
-      <input type="text" id="subject" value="${esc(app.subject || "")}" placeholder="Subject" style="margin-top:6px">
-      <textarea id="body" rows="12" style="margin-top:6px" placeholder="${s.drafts ? "Click “Write with AI”, or write your own." : "Write your email, or add an AI key to .env for drafts."}">${esc(app.body || "")}</textarea>
-      <div class="row small muted" style="margin-top:6px">Attaches: ${d.cv.file ? `<b>${esc(d.cv.file)}</b> ${cvLink(d.cv.file)}` : "no CV"} <span>(change it in the CV box)</span></div>
-      <div class="row small muted"><span id="wc"></span>${meta ? `<span>· drafted by ${esc(meta.model)}${meta.cost_usd ? `, $${meta.cost_usd.toFixed(3)}` : ""}${app.draft_edited ? ", edited by you" : ""}</span>` : ""}</div>` : "";
-  const followUp = sentFirst && out ? `
-      <div class="small muted">${out.kind === "follow_up" ? `Follow-up ${out.seq}` : ""} to <span class="mono">${esc(out.to)}</span>
-        ${app.next_follow_up_at ? ` · due ${esc(day(app.next_follow_up_at))}` : ""}</div>
-      <div class="subject" style="margin-top:6px">${esc(out.subject)}</div>
-      <div class="description" style="margin-top:6px">${esc(out.body)}</div>` : sentFirst ? `<div class="muted">${esc(d.outgoing_error || "")}</div>` : "";
-  const sendLabel = sentFirst ? (out ? `Send follow-up ${out.seq}` : "") : "Send";
+  const url = app.linkedin_url || "", note = app.linkedin_note || "";
   return `
     <div class="section">
-      <h3>${sentFirst ? "Follow-up" : "Email"}</h3>
-      ${warnings.length ? `<div class="warnings ${app.draft_blocked ? "block" : ""}">${app.draft_blocked ? "Can't send until you edit it:" : "Check these:"}<ul>${warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></div>` : ""}
-      ${composer}${followUp}
-      <div class="row" style="margin-top:10px">
-        ${!sentFirst ? `<button class="btn" data-action="draft" ${s.drafts ? "" : "disabled title='Add the AI key to .env'"}>${s.draft_mode === "ai" ? (app.body ? "Rewrite with AI" : "Write with AI") : (app.body ? "Reset to template" : "Fill template")}</button>
-          <button class="btn" data-action="save-draft">Save edits</button>
-          <button class="btn" data-action="copy">Copy</button>` : ""}
-        <span class="grow"></span>
-        ${out ? `<button class="btn" data-action="send" data-test="1" ${s.gmail ? "" : "disabled title='Set up Gmail in .env'"}>Send test to me</button>
-          <button class="btn primary" data-action="send" ${s.gmail && !(app.draft_blocked && !sentFirst) ? "" : "disabled"}>${esc(sendLabel)}</button>` : ""}
+      <h3>LinkedIn</h3>
+      <div class="small">
+        <a id="linkedin-open" href="${esc(url)}" target="_blank" rel="noopener" ${url ? "" : "hidden"}>Open profile ↗</a>
+        <span id="linkedin-none" class="muted" ${url ? "hidden" : ""}>Nobody picked yet: paste the person's profile link.</span>
       </div>
-      ${!s.gmail ? `<div class="small muted" style="margin-top:6px">Sending needs GMAIL_ADDRESS and GMAIL_APP_PASSWORD in .env (an app password from myaccount.google.com/apppasswords).</div>` : ""}
+      <input type="text" id="linkedin-url" value="${esc(url)}" placeholder="https://www.linkedin.com/in/…" style="margin-top:6px">
+      <textarea id="linkedin-note" rows="6" style="margin-top:6px" placeholder="The note to send with the request">${esc(note)}</textarea>
+      <div class="small muted" id="note-count">${esc(noteCount(note))}</div>
     </div>`;
 }
 
@@ -585,39 +493,6 @@ async function drawerAction(action, el) {
   if (action === "applied") {
     const detail = await busy(el, "…", () => api(`/api/jobs/${id}/application`, { method: "PATCH", body: { applied: el.dataset.value === "1" } }));
     return setDetail(detail, el.dataset.value === "1" ? "Marked as applied" : "Applied date cleared");
-  }
-  if (action === "find-contact") {
-    const claude = el.dataset.claude === "1";
-    const detail = await busy(el, "Looking…", () => api(`/api/jobs/${id}/find-contact`, {
-      method: "POST", body: { force: Boolean(d.company.looked_up_at) || claude, use_claude: claude || !state.status.hunter },
-    }));
-    const l = detail.lookup || {};
-    return setDetail(detail, `${l.status === "found" ? "Found" : l.status === "nobody" ? "Nobody found" : l.status}${l.note ? ": " + l.note : ""}`);
-  }
-  if (action === "show-manual") { $("#manual").hidden = !$("#manual").hidden; return; }
-  if (action === "use-contact") {
-    const detail = await busy(el, "…", () => api(`/api/jobs/${id}/application`, { method: "PATCH", body: { contact_id: Number(el.dataset.id) } }));
-    return setDetail(detail, "Contact changed");
-  }
-  if (action === "verify") {
-    const r = await busy(el, "…", () => api(`/api/contacts/${el.dataset.id}/verify`, { method: "POST" }));
-    toast(`Email status: ${r.email_status}`);
-    return openJob(id, false);
-  }
-  if (action === "job-board") {
-    const detail = await busy(el, "…", () => api(`/api/jobs/${id}/company`, { method: "POST", body: { is_job_board: el.dataset.value === "1" } }));
-    return setDetail(detail);
-  }
-  if (action === "edit-domain") {
-    const value = prompt("Company website domain (e.g. acme.com). Leave empty to clear.", d.company.domain || "");
-    if (value === null) return;
-    const detail = await api(`/api/jobs/${id}/company`, { method: "POST", body: { domain: value } });
-    return setDetail(detail, "Domain saved: click Look up again to use it");
-  }
-  if (action === "draft") {
-    if (d.application?.draft_edited && !confirm("Replace your edited email with a fresh draft?")) return;
-    const detail = await busy(el, "Writing…", () => api(`/api/jobs/${id}/draft`, { method: "POST" }));
-    return setDetail(detail, detail.application?.draft_blocked ? "Drafted, but it needs an edit" : "Draft ready");
   }
   if (action === "tailor") {
     const edited = Boolean(d.cv.tailored?.edited_at);
@@ -661,54 +536,6 @@ async function drawerAction(action, el) {
     link.click();
     setTimeout(() => URL.revokeObjectURL(link.href), 1000);
     return toast(`Saved ${link.download}`);
-  }
-  if (action === "save-draft") return saveDraft(el);
-  if (action === "copy") {
-    await navigator.clipboard.writeText(`Subject: ${$("#subject").value}\n\n${$("#body").value}`);
-    return toast("Copied");
-  }
-  if (action === "send") return send(el, el.dataset.test === "1");
-}
-
-function draftChanged() {
-  const app = state.detail?.application || {};
-  const subject = $("#subject"), body = $("#body");
-  return subject && body && (subject.value !== (app.subject || "") || body.value !== (app.body || ""));
-}
-
-async function saveDraft(el) {
-  const app = state.detail.application || {};
-  const detail = await busy(el, "Saving…", () => api(`/api/jobs/${state.jobId}/application`, {
-    method: "PATCH", body: { subject: $("#subject").value, body: $("#body").value, draft_version: app.draft_version ?? null },
-  }));
-  setDetail(detail, "Saved");
-  return detail;
-}
-
-async function send(el, test) {
-  if (draftChanged()) {
-    if (!confirm("Save your edits first? (Send uses the saved version.)")) return;
-    await saveDraft(null);
-  }
-  const d = state.detail;
-  const out = d.outgoing;
-  if (!out) return toast(d.outgoing_error || "Nothing to send", true);
-  const to = test ? state.status.gmail_address : out.to;
-  if (!confirm(`${test ? "Send a test copy to yourself" : `Send “${out.subject}”`} to ${to}?`)) return;
-  const confirmations = [];
-  for (;;) {
-    try {
-      const detail = await busy(el, "Sending…", () => api(`/api/jobs/${state.jobId}/send`, {
-        method: "POST", body: { test, draft_version: state.detail.application.draft_version, seq: out.seq, confirm: confirmations },
-      }));
-      return setDetail(detail, test ? `Test sent to ${to}` : `Sent to ${to}. Follow-up reminder set.`);
-    } catch (err) {
-      if (err.status === 409 && err.confirm && !confirmations.includes(err.confirm) && confirm(err.message)) {
-        confirmations.push(err.confirm);
-        continue;
-      }
-      return;
-    }
   }
 }
 
@@ -892,18 +719,39 @@ document.addEventListener("change", async (e) => {
   }
 });
 
+// The boxes that save themselves when you click away: the tracking notes, and the LinkedIn link and note
+// (the user's call, 2026-11-05: no Save, Edit or Copy buttons on the card).
+const SAVE_ON_BLUR = {
+  notes: ["notes", "Notes saved"],
+  "linkedin-url": ["linkedin_url", "LinkedIn profile saved"],
+  "linkedin-note": ["linkedin_note", "Note saved"],
+};
+
 document.addEventListener("focusout", async (e) => {
-  if (e.target.id !== "notes" || !state.detail) return;
-  const notes = e.target.value;
-  if (notes === (state.detail.application?.notes || "")) return;
+  const field = SAVE_ON_BLUR[e.target.id];
+  if (!field || !state.detail) return;
+  const [key, message] = field;
+  const value = e.target.value;
+  if (value === (state.detail.application?.[key] || "")) return;
   try {
-    state.detail = await api(`/api/jobs/${state.jobId}/application`, { method: "PATCH", body: { notes } });
-    toast("Notes saved");
+    state.detail = await api(`/api/jobs/${state.jobId}/application`, { method: "PATCH", body: { [key]: value } });
+    toast(message);
+    // What the server stored, put back in place (it trims, and tidies a link into https://…), so the
+    // card is never re-rendered under you while you are typing in the other box.
+    const app = state.detail.application || {};
+    if (key === "linkedin_note") e.target.value = app.linkedin_note || "";
+    if (key === "linkedin_url") {
+      const url = app.linkedin_url || "";
+      $("#linkedin-url").value = url;
+      $("#linkedin-open").href = url;
+      $("#linkedin-open").hidden = !url;
+      $("#linkedin-none").hidden = Boolean(url);
+    }
   } catch (err) { toast(err.message, true); }
 });
 
 document.addEventListener("input", (e) => {
-  if (e.target.id === "body" || e.target.id === "subject") updateWordCount();
+  if (e.target.id === "linkedin-note" && $("#note-count")) $("#note-count").textContent = noteCount(e.target.value);
   if (e.target.id === "cv-edit" && state.cvEdit) {
     state.cvEdit.text = e.target.value;
     if (!state.cvEdit.dirty) {
@@ -914,16 +762,6 @@ document.addEventListener("input", (e) => {
   }
 });
 
-document.addEventListener("submit", async (e) => {
-  if (e.target.id !== "manual") return;
-  e.preventDefault();
-  const form = new FormData(e.target);
-  try {
-    const detail = await api(`/api/jobs/${state.jobId}/contact`, { method: "PUT", body: Object.fromEntries(form) });
-    setDetail(detail, "Contact saved");
-  } catch (err) { toast(err.message, true); }
-});
-
 document.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && e.target.matches(".skip-note") && e.target.value.trim()) {
     e.preventDefault();
@@ -932,15 +770,6 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && state.jobId) closeDrawer();
 });
 $("#scrim").addEventListener("click", () => closeDrawer());
-
-function updateWordCount() {
-  const body = $("#body");
-  if (!body || !$("#wc")) return;
-  const words = (body.value.match(/[A-Za-z0-9]+/g) || []).length;
-  $("#wc").textContent = `${words} words${words > 125 ? " (long: 50–125 gets the most replies)" : ""}`;
-}
-const observer = new MutationObserver(updateWordCount);
-observer.observe($("#drawer-body"), { childList: true });
 
 window.addEventListener("hashchange", route);
 loadStatus().then(route).catch((err) => { $("#main").innerHTML = `<div class="empty">${esc(err.message)}</div>`; });

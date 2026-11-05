@@ -152,7 +152,9 @@ CREATE TABLE IF NOT EXISTS applications (
     cv_tailored_json TEXT,
     cover_letter_json TEXT,
     skip_reason TEXT,
-    skip_note TEXT
+    skip_note TEXT,
+    linkedin_url TEXT,
+    linkedin_note TEXT
 );
 
 CREATE TABLE IF NOT EXISTS events (
@@ -254,9 +256,16 @@ def _v2_review_cleared(conn: sqlite3.Connection) -> None:
     )
 
 
+def _v3_linkedin_note(conn: sqlite3.Connection) -> None:
+    """Outreach is one LinkedIn note per job now (the user's call, 2026-11-05): the person's profile link and
+    the note live on the job itself, instead of a Markdown tracker. Jobs reached out to before today keep
+    whatever email draft they had; nothing is copied over."""
+    _add_columns(conn, "applications", {"linkedin_url": "TEXT", "linkedin_note": "TEXT"})
+
+
 # Migration n is MIGRATIONS[n - 1]. Only ever add to the end; each one must be safe to run on a database
 # that SCHEMA has just created, since a new database runs them all too.
-MIGRATIONS = [_v1_added_columns, _v2_review_cleared]
+MIGRATIONS = [_v1_added_columns, _v2_review_cleared, _v3_linkedin_note]
 LATEST_VERSION = len(MIGRATIONS)
 
 

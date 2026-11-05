@@ -88,6 +88,22 @@ def test_migration_2_clears_the_old_review_list(tmp_path):
     assert (rows[2]["status"], rows[2]["reject_code"]) == ("shortlisted", None)
 
 
+def test_migration_3_adds_the_linkedin_boxes_and_leaves_old_jobs_alone(tmp_path):
+    """Outreach is a LinkedIn note per job now (2026-11-05). A job you already reached out to keeps its
+    email draft and gets no note: the user's call was to start with the new jobs."""
+    db = old_database(tmp_path, V0)
+    conn = sqlite3.connect(db)
+    conn.execute("INSERT INTO jobs (id, fingerprint, company, title, source, remote_status, first_seen, last_seen, "
+                 "status, eligibility, relevance) VALUES (1, 'f1', 'Initech', 'Backend Engineer', 'test', 'remote', "
+                 "'2026-10-20', '2026-10-20', 'shortlisted', 'clear', 'relevant')")
+    conn.execute("INSERT INTO applications (job_id, stage, body, created_at, updated_at) "
+                 "VALUES (1, 'reached_out', 'Hi Ana, ...', '2026-10-20', '2026-10-20')")
+    conn.commit()
+    conn.close()
+    row = JobStore(db).conn.execute("SELECT * FROM applications WHERE job_id = 1").fetchone()
+    assert row["body"] == "Hi Ana, ..." and row["linkedin_url"] is None and row["linkedin_note"] is None
+
+
 def test_a_new_database_is_at_the_latest_version(tmp_path):
     assert user_version(JobStore(":memory:").conn) == LATEST_VERSION
     store = JobStore(tmp_path / "data" / "jobs.sqlite")

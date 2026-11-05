@@ -601,6 +601,48 @@ def cmd_contacts(args) -> int:
     return 0
 
 
+def cmd_linkedin(args) -> int:
+    """The one LinkedIn person for a job and the note to send them, shown on the job's card in the app.
+    Nothing is ever sent: the user presses Connect themselves (the user's call, 2026-11-05)."""
+    from . import tracking
+    from .contacts import LINKEDIN_NOTE_LIMIT, clean_linkedin
+    from .errors import BadRequest
+    from .store.applications import add_event, get_application, set_linkedin
+
+    paths, _, _ = _load(args)
+    now = utcnow()
+    store = JobStore(paths.db_file)
+    try:
+        row = store.get(args.job_id)
+        if not row:
+            print(f"no job #{args.job_id}", file=sys.stderr)
+            return 1
+        if args.url is None and args.note is None:  # nothing given: only show what the job has
+            app = get_application(store, args.job_id)
+        else:
+            app = tracking.ensure_application(store, args.job_id, now)
+            try:
+                url = clean_linkedin(args.url) if args.url is not None else app["linkedin_url"]
+            except BadRequest as exc:
+                print(str(exc), file=sys.stderr)
+                return 1
+            note = args.note if args.note is not None else app["linkedin_note"]
+            set_linkedin(store, args.job_id, url, (note or "").strip() or None, now)
+            if args.url is not None and url != app["linkedin_url"]:
+                add_event(store, args.job_id, "linkedin",
+                          f"LinkedIn contact: {url}" if url else "LinkedIn contact cleared", now)
+            store.commit()
+            app = get_application(store, args.job_id)
+    finally:
+        store.close()
+    print(f"#{row['id']}  {row['title']} — {row['company']}")
+    print(f"LinkedIn: {(app['linkedin_url'] if app else None) or '-'}")
+    text = (app["linkedin_note"] if app else None) or ""
+    over = f", over the {LINKEDIN_NOTE_LIMIT} LinkedIn allows" if len(text) > LINKEDIN_NOTE_LIMIT else ""
+    print(f"Note ({len(text)} characters{over}): {text or '-'}")
+    return 0
+
+
 def cmd_inbox(args) -> int:
     """Check Gmail for replies and bounces to the emails sent from the app."""
     from .config import OutreachConfig
@@ -719,6 +761,17 @@ def main(argv: list[str] | None = None) -> int:
     )
     p.add_argument("job_ids", type=int, nargs="+")
     p.set_defaults(func=cmd_cover)
+
+    p = sub.add_parser(
+        "linkedin",
+        help="set the one LinkedIn person for a job and the note to send them (shown on the job's card)",
+        description="Outreach is one LinkedIn note per job (the user's call, 2026-11-05). Code never sends it: "
+        "you press Connect yourself. Without --url or --note, prints what the job has.",
+    )
+    p.add_argument("job_id", type=int)
+    p.add_argument("--url", help="the person's LinkedIn profile link (empty string clears it)")
+    p.add_argument("--note", help="the connection note, at most 300 characters")
+    p.set_defaults(func=cmd_linkedin)
 
     p = sub.add_parser("inbox", help="check Gmail for replies, bounces and rejections (also runs in the daily run)")
     p.add_argument("--dry-run", action="store_true", help="only list the jobs rejection emails would close")

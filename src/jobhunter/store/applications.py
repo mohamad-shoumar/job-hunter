@@ -51,6 +51,12 @@ def set_cv_file(store: JobStore, job_id: int, cv_file: str | None) -> None:
     store.conn.execute("UPDATE applications SET cv_file = ? WHERE job_id = ?", (cv_file, job_id))
 
 
+def set_linkedin(store: JobStore, job_id: int, url: str | None, note: str | None, now: datetime) -> None:
+    """The one LinkedIn person for this job and the note to send them (the user's call, 2026-11-05).
+    Code never sends it: the user presses Connect themselves."""
+    update_application(store, job_id, {"linkedin_url": url, "linkedin_note": note}, now)
+
+
 # --- what is made for a job: the draft, the CV, the cover letter ----------------
 
 

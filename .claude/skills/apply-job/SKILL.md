@@ -234,9 +234,9 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
 - Finish at the final **Apply/Submit** button. Don't press it. Leave the tab open.
 
 ### 4. One LinkedIn contact (find and write, never send)
-Outreach goes through LinkedIn now, not email (the user's call, 2026-10-29). Don't use the app's
-Find contact, Write with AI or Gmail drafts in this step. Search only on LinkedIn, where the user is
-already signed in.
+Outreach goes through LinkedIn now, not email (the user's call, 2026-10-29), so the job's card has a
+**LinkedIn** box (the person's profile link and the note) and no contact lookup or email composer at all.
+Search only on LinkedIn, where the user is already signed in; never use an email tool for this step.
 - **One person per job** (the user's call, 2026-10-29). Go down this list and stop at the first
   step where you find someone. Steps A and B come first at every company, big or small (the
   user's call, 2026-11-04: a shared background gets more replies than a title):
@@ -322,16 +322,19 @@ already signed in.
     referral. Tone: confident, human, direct; no stiff lines like "I'd love to discuss how I could
     contribute to your team".
 - Nobody found in any group: note "no LinkedIn contact" and the searches you tried.
-- **Add the job to the outreach tracker** (the user's call, 2026-10-31), right after its contact is
-  found: append one row to `~/job-hunter/reports/linkedin_notes_2026-10-31.md` (git-ignored) at the
-  end of the first table (above `## Old jobs`, the jobs applied Oct 24-29 with no request sent),
-  numbering on from that table's last row. Columns, in this order: `# | Company | Role | Contact |
-  LinkedIn | Why this person | Gmail | Note`. Role is a link to the posting, LinkedIn is
-  `[profile](url)` (or `-`), Gmail is what the inbox shows for the job so far ("received Oct 31",
-  "nothing found"), Note is the note as written (or `-` with no contact). Escape any `|` as `\|`.
-  A week after the first rows (around 2026-11-07) the user reviews how many accepted and replied, to
-  decide whether to target less senior people or change the note, so add a row for every job,
-  including "no LinkedIn contact" ones.
+- **Put the person and the note on the job** (the user's call, 2026-11-05), right after you write the
+  note, so both sit on the job's card in the app instead of a Markdown file:
+  ```
+  cd ~/job-hunter && .venv/bin/jobhunter linkedin <job id> --url "<profile URL>" --note "<the note>"
+  ```
+  It prints the note back with its character count: check that count is the one you reported and at
+  most 300. The card's **LinkedIn** box then shows "Open profile ↗" and the note (both boxes also take
+  a paste by hand, and save when you click away). The box is the message itself: nothing else goes in
+  it. With nobody found, leave it empty and write what you searched in the card's **Tracking** notes
+  box instead, so the week-one review can see the job was tried.
+  The old tracker file (`reports/linkedin_notes_2026-10-31.md`) is not written any more; it stays as
+  the record of the jobs from Oct 24 to Nov 5, which the week-one review (around 2026-11-07) reads
+  next to the app.
 
 ## At the end
 
@@ -339,7 +342,8 @@ Report one line per job: company, role, grade, where you applied (the URL of the
 used (mirrored or not; if mirrored, the posting's must-haves the profile doesn't have, so the user
 can add any that are true), salary entered and anything you guessed. Under it, its one LinkedIn contact: name, title, profile
 URL, step/group and why (AUB grad, Arab or Muslim name, the company size for a CEO, the link to the user if any), email if public, and
-the note ready to paste with its character count. Say how many rows you added to the outreach tracker.
+the note ready to paste with its character count. Say which jobs you filled the LinkedIn box on (the
+`jobhunter linkedin` runs), since "Why this person" is not stored on the card.
 
 Then, in the chat answer itself (not only in a file), **why you skipped each job**: every job you
 pressed Skip on in this run, whether you looked at its form or not, one short line each with the
