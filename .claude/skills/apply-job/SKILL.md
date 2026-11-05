@@ -66,8 +66,14 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
     CV, then upload the rebuilt PDF. Do it thoroughly, not as a quick pass. Don't ask anything
     during it: the `.bak` lets the user undo. If mirroring can't end at one page with
     `check_version` printing `[]`, restore the `.bak`, rebuild, upload that and note it.
-  - **Grade 1-3 or no grade:** use the tailored CV as it is. No hand edits, unless the user
-    asked to mirror this job.
+  - **Grade 1-3 or no grade:** use the tailored CV as it is (no mirroring), unless the user
+    asked to mirror this job. The one hand edit allowed is the one-page fix below.
+- **Every CV, any grade, must be one page with no stray short line** (the user's call,
+  2026-11-05: the tailoring step often leaves 2 pages, with only the Zapier certification on
+  page 2, and lines like "hour." alone). Run the stray-line check from `mirror-cv` (step 5) on
+  the PDF before uploading it, and fix what it finds the way `mirror-cv` step 4 "Page count"
+  says (trim a word or two, drop the least relevant skill, hide the multi-position bullet).
+  Never upload a 2-page CV.
   - A CV the user edited by hand (`edited_at` in `cv_tailored_json`) is mirrored too, but
     their own lines are kept as they wrote them: only reorder around them.
 - The PDF is already on disk in `~/job-hunter/resume/output/`, so upload it from there. Press
