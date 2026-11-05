@@ -323,8 +323,9 @@ already signed in.
     contribute to your team".
 - Nobody found in any group: note "no LinkedIn contact" and the searches you tried.
 - **Add the job to the outreach tracker** (the user's call, 2026-10-31), right after its contact is
-  found: append one row to `~/job-hunter/reports/linkedin_notes_2026-10-31.md` (git-ignored) under
-  its table, numbering on from the last row. Columns, in this order: `# | Company | Role | Contact |
+  found: append one row to `~/job-hunter/reports/linkedin_notes_2026-10-31.md` (git-ignored) at the
+  end of the first table (above `## Old jobs`, the jobs applied Oct 24-29 with no request sent),
+  numbering on from that table's last row. Columns, in this order: `# | Company | Role | Contact |
   LinkedIn | Why this person | Gmail | Note`. Role is a link to the posting, LinkedIn is
   `[profile](url)` (or `-`), Gmail is what the inbox shows for the job so far ("received Oct 31",
   "nothing found"), Note is the note as written (or `-` with no contact). Escape any `|` as `\|`.
