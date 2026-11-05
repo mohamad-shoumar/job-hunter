@@ -71,18 +71,38 @@ word for the posting's spelling of the same thing. It never adds a fact.
      Go bullet by bullet, don't stop after the first few.
    - **Cut bullets** (lines starting with `// `): un-hide one if it matches a main duty of the
      posting. Lines whose tags didn't match this job (`// [fullstack] ...`) stay hidden.
-   - **Page count**: the app keeps CVs to one page. A long bullet can take 3 printed lines, so
-     un-hiding one can need two or three lines out. Make room by hiding (`// `) the printed
-     bullets that match the fewest posting terms (often a trading-only feature, or "Standardized
-     the local development workflow"). Never hide the newest role's first bullet, a role's only
-     bullet, or a certification. Name every hidden line in the report. The user can undo from
-     the `.bak`.
+   - **Page count: one page is a hard rule** (the user's call, 2026-11-05), and so is **no
+     stray short line**: no printed line that holds only one or two words left over from the
+     line above ("hour." at the end of a bullet, "deploy gates.", or one skill such as
+     "Testsprite" alone at the end of a skills row). A long bullet can take 3 printed lines, so
+     un-hiding one can need two or three lines out. Fix in this order:
+     1. Trim one or two words from the bullet that leaves the stray line, so its last line
+        pulls up (the user's examples: drop "for **9 engineers**" from "Standardized the local
+        development workflow", drop "version-controlled" from the LLM automation flow bullet).
+        Never drop a technology or the bullet's result ("under 1 hour", "800+ concurrent
+        jobs").
+     2. A skills row that leaves one item alone on its last line: drop the row's least relevant
+        item for this job (TradingView or Testsprite for most jobs; keep TradingView for
+        trading jobs).
+     3. Still 2 pages: hide (`// `) the printed bullets that match the fewest posting terms
+        (the multi-position scaling feature first, then the slippage model, then
+        "Standardized the local development workflow"). Never hide the newest role's first
+        bullet, a role's only bullet, or a certification.
+     Name every trimmed word, dropped skill and hidden line in the report. The user can undo
+     from the `.bak`.
 5. **Rebuild** from `~/job-hunter`: `.venv/bin/jobhunter rebuild-cv <id>` (no model, just the
    PDF). It prints the page count ("(1 page)" or "2 pages ... cut a line").
    - To see what spilled onto page 2, save this as `p.swift` in the scratchpad and run
      `swift p.swift <pdf>`:
      `import PDFKit; let d = PDFDocument(url: URL(fileURLWithPath: CommandLine.arguments[1]))!; for i in 0..<d.pageCount { print("=== page \(i+1)"); print(d.page(at: i)!.string ?? "") }`
-   - Check the file against the profile. This must print `[]`:
+   - **Stray-line check** (the page count alone misses it): save this as `widow.swift` in the
+     scratchpad and run `swift widow.swift <pdf>`. It prints the page count and every line of
+     at most two words that follows a long line; section titles (Summary, Skills, ...) and
+     dates are fine, anything else must be fixed (step 4, "Page count"), then rebuild:
+     `import PDFKit; for p in CommandLine.arguments.dropFirst() { let d = PDFDocument(url: URL(fileURLWithPath: p))!; print("\(p): \(d.pageCount) page(s)"); var prev = ""; for i in 0..<d.pageCount { for l in (d.page(at: i)!.string ?? "").components(separatedBy: "\n") { let t = l.trimmingCharacters(in: .whitespaces); let n = t.split(separator: " ").count; if n > 0 && n <= 2 && prev.count > 70 { print("  short line: \(t)") }; prev = t } } }`
+   - Check the file against the profile. This must print `[]`, with one exception the user
+     allowed (2026-11-05): a "drops 2 of its words" note caused only by a trim that fixes a
+     stray line (it counts "version-controlled" as two words). Say so in the report:
      `.venv/bin/python -c "from pathlib import Path; from jobhunter.cv import check_version; print(check_version(Path('resume/versions/<name>.md').read_text(), Path('profile/master_profile.md')))"`
      Each line it lists says more than the profile. Undo that change.
    - **Recruiter pass.** Read page 1 of the PDF as a recruiter who has 6 seconds and the
