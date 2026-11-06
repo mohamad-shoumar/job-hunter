@@ -134,6 +134,8 @@ class Filters:
     stretch_yoe_at_least: int | None
     dedupe_window_days: int
     title_include: list[str]
+    # Keywords from title_include that need an engineering role noun in the title too (relevance.py).
+    title_include_needs_role: list[str]
     title_exclude: list[str]
     title_exclude_unless_python: list[str]
     title_exclude_single_role: list[str]
@@ -160,6 +162,7 @@ class Filters:
             stretch_yoe_at_least=data.get("stretch_yoe_at_least"),
             dedupe_window_days=int(data.get("dedupe_window_days", 60)),
             title_include=words("title_include"),
+            title_include_needs_role=words("title_include_needs_role"),
             title_exclude=words("title_exclude"),
             title_exclude_unless_python=words("title_exclude_unless_python"),
             title_exclude_single_role=words("title_exclude_single_role"),
