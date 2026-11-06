@@ -13,6 +13,10 @@ Three kinds of exclusion:
                               when the title names a second role that is a
                               target: "Frontend / Backend Engineer" passes.
 
+A title_include keyword listed in title_include_needs_role ("forward deployed")
+counts only when the title also names an engineering role, so "Forward Deployed
+Engineer" is a target and "Forward-Deployed Banker" is not.
+
 AI and forward-deployed roles (junior_only) are wanted only at junior level: a
 "senior"/"lead" title or a lower years ask rejects them, quoted.
 """
@@ -35,10 +39,29 @@ _GENDER_MARKER = re.compile(r"\(\s*(?:[mfwdxh]\s*/\s*){1,3}[mfwdxh]\s*\)|\(\s*al
 # left alone: "Software Engineer, Frontend" is one role and its team.
 _ROLE_SPLIT = re.compile(r"\s+(?:/|&|\+|and|or)\s+|\s*/\s*|\s*;\s*|\s+\|\s+", re.I)
 _ROLE_NOUN = re.compile(r"\b(?:engineer|developer|programmer|swe)\b")
+# Wider than _ROLE_NOUN (which splits a title into roles): "Forward Deployed ML Engineering
+# Expert" is an engineering role, "Forward-Deployed Banker" is not.
+_ENGINEERING_ROLE = re.compile(r"\b(?:engineer|engineering|developer|programmer|swe)\b")
 
 
 def _first(title: str, keywords: list[str]) -> str | None:
     return next((k for k in keywords if has_phrase(title, k)), None)
+
+
+def _first_include(title: str, filters: Filters) -> str | None:
+    """The first title_include keyword the title names.
+
+    A keyword in title_include_needs_role only counts when the title also names
+    an engineering role: "Forward Deployed Engineer" passes, "Forward-Deployed
+    Banker" does not.
+    """
+    for keyword in filters.title_include:
+        if not has_phrase(title, keyword):
+            continue
+        if keyword in filters.title_include_needs_role and not _ENGINEERING_ROLE.search(title):
+            continue
+        return keyword
+    return None
 
 
 def _role_parts(raw_title: str) -> list[str]:
@@ -79,7 +102,7 @@ def check_title(raw_title: str, filters: Filters) -> tuple[bool, str, str]:
         if specialty:
             blocked = blocked or specialty
             continue
-        keyword = _first(candidate, filters.title_include)
+        keyword = _first_include(candidate, filters)
         suffix = " (one of several roles in the title)" if i else ""
         if keyword:
             return True, f'Title matches "{keyword}"{suffix}', ""

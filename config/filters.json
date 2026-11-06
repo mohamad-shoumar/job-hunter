@@ -122,6 +122,9 @@
     "quant developer", "quantitative developer"
   ],
 
+  "_title_include_needs_role": "Keywords from title_include that only count when the title also names an engineering role (engineer, developer, programmer, swe). \"Forward Deployed Engineer\" passes; \"Forward-Deployed Banker\" and \"Forward Deployed AI Scientist\" are not target roles (title_not_target). The user's call, 2026-11-06: both were skipped by hand as not-my-role.",
+  "title_include_needs_role": ["forward deployed"],
+
   "_junior_only": "AI and forward-deployed roles you apply to only at junior level (decision 2026-10-20, see docs/decisions.md; backend, software and solutions roles keep the years rules above). A title is one when it has a word from `roles` or is an AI engineering role (relevance.py), unless it also names one of `unless_title_names` ('Senior Python / AI Backend Engineer' is a backend role). Rejected (code junior_only), quoted: a word from `title_words` in the title, or a stated years ask at or above reject_if_required_yoe_at_least. The years can be in any field ('3+ years of software, 1+ with LLMs' counts as 3). No years stated is kept.",
   "junior_only": {
     "roles": [

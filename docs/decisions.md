@@ -281,3 +281,15 @@ The model never writes a Summary: the Summary paragraph is mine and is copied wo
 **Why:** The note lives next to the job it is about, so I open one card and see the CV, the posting, the person and the note. The Markdown file meant two places to look, and the email boxes on the card were dead weight I kept scrolling past. The lookup, drafts and sending code stays: the inbox check still reads replies, bounces and rejections for the emails I sent before.
 
 **Trade-off:** The file's "Why this person" column (fellow AUB grad, an Arab or Muslim name, CEO at a small company) is not on the card: the skill still says it in its report. The jobs from Oct 24 to Nov 5 stay only in the file, so the week-one review on about 2026-11-07 reads both.
+
+## 21. Forward-deployed stays a target role, but only as an engineering title
+
+**Date:** 2026-11-06
+
+**Context:** I wondered whether to drop forward-deployed (FDE) roles, or keep them only for the UAE and Qatar: in Europe the role is client-facing, so it often wants the local language at native level, and I am junior, which makes visa sponsorship harder. The stored jobs said otherwise. Of the 28 FDE jobs that reached the visa list, about 24 are London or Dublin, where the language is English; only 3 are Amsterdam. The 12 FDE jobs that did ask for German or Dutch were already rejected with the sentence quoted (`language_required`). And FDE is one of my most active searches: 15 of 18 shortlisted FDE jobs are in the UAE or Qatar with 7 reached out, and in the UK I reached out on Women Building Bio and OJ Digital and applied to Palantir FDSE UK Government. What did keep showing up wrongly were FDE titles that are not engineering at all: "Forward-Deployed Banker" and "Forward Deployed AI Scientist", both of which I skipped by hand as not my role.
+
+**Decision:** FDE stays a target role everywhere, with no country restriction. "forward deployed" moves into a new list, `title_include_needs_role` in `config/filters.json`: a keyword there counts only when the title also names an engineering role (engineer, engineering, developer, programmer, swe; not "development", which would let "Forward Deployed Business Development Representative" through). "Forward Deployed Engineer" and "Forward Deployed ML Engineering Expert" still pass; "Forward-Deployed Banker", "Forward Deployed Data Scientist" and "Deployment Strategist - Forward Deployed" are `title_not_target`. Checked against the stored jobs: the title rule changes its answer on 28 of 27,065, all of them banker, investor, consultant, scientist, analyst, lawyer or strategist titles, and only 4 rows were still live.
+
+**Why:** The worry was real but the rules already covered it: a posting that wants German says so, and the language rule quotes it. Cutting FDE to the Gulf, or dropping it, would have hidden the London roles I actually applied to. The junior-plus-sponsorship doubt is about the visa list as a whole, not this one title, so it is not settled here.
+
+**Trade-off:** An FDE posting that is engineering work under a non-engineering title ("Forward Deployed Builder") is now rejected without being read.

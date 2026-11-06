@@ -15,6 +15,8 @@ from .conftest import make_job
         "Software Engineer II",
         "Applied AI Engineer",
         "Forward Deployed Engineer",
+        "Forward Deployed Software Engineer - UK Government",
+        "Forward-Deployed Full-Stack AI Engineer",
         "Full-Stack Engineer",
         "Fullstack SWE",
         "Python Developer",
@@ -59,6 +61,11 @@ def test_target_titles_pass(title, filters):
         ("AI Growth Ops", "title_not_target"),
         ("Machine Learning Engineer", "title_not_target"),
         ("Technical Lead", "title_not_target"),
+        # "forward deployed" needs an engineering role noun too (the user's call, 2026-11-06):
+        # both of these were shortlisted, then skipped by hand as not-my-role.
+        ("Forward-Deployed Banker", "title_not_target"),
+        ("Forward Deployed AI Scientist, United Arab Emirates", "title_not_target"),
+        ("Deployment Strategist - Germany Forward Deployed", "title_not_target"),
     ],
 )
 def test_other_titles_are_rejected(title, code, filters):
