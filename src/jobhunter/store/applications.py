@@ -57,6 +57,25 @@ def set_linkedin(store: JobStore, job_id: int, url: str | None, note: str | None
     update_application(store, job_id, {"linkedin_url": url, "linkedin_note": note}, now)
 
 
+def set_linkedin_followup(store: JobStore, job_id: int, text: str | None, now: datetime) -> None:
+    """The message to send once they accept the invite (the user's call, 2026-11-07). Written by the
+    apply-job skill, edited by hand on the card, and sent by the user - never by code. It is not checked
+    against the profile here: apply-job grounds it when it writes it, like the note."""
+    update_application(store, job_id, {"linkedin_followup": text}, now)
+
+
+# Where a job is on LinkedIn. The step names are the app's words; only code ever names the column.
+LINKEDIN_STEPS = {"sent": "linkedin_sent_at", "accepted": "linkedin_accepted_at", "replied": "linkedin_replied_at"}
+
+
+def set_linkedin_step(store: JobStore, job_id: int, step: str, when: datetime | None, now: datetime) -> None:
+    """Record (or clear, with `when=None`) one of LINKEDIN_STEPS for this job. Ticked by hand: only the
+    user knows when someone accepted or wrote back."""
+    if step not in LINKEDIN_STEPS:
+        raise KeyError(f"unknown LinkedIn step {step!r}")
+    update_application(store, job_id, {LINKEDIN_STEPS[step]: iso(when) if when else None}, now)
+
+
 # --- what is made for a job: the draft, the CV, the cover letter ----------------
 
 

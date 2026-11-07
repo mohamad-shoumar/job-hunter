@@ -64,6 +64,7 @@ from ..report import salary_text
 from ..store import JobStore
 from ..store.applications import (
     add_event, events_for, get_application, set_application_contact, set_cv_file, set_linkedin,
+    set_linkedin_followup, set_linkedin_step,
 )
 from ..store.companies import company_contacts, contact_at, forget_lookup
 from ..store.lists import JOB_VIEWS, YEARS, job_list
@@ -90,6 +91,11 @@ class StageChange(_Body):
     skip_note: str | None = None
 
 
+# The LinkedIn steps as the timeline words them. The keys are code's own, never the request's.
+_LINKEDIN_STEP_LABELS = {"sent": "LinkedIn: invite sent", "accepted": "LinkedIn: invite accepted",
+                         "replied": "LinkedIn: they replied"}
+
+
 class ApplicationChange(_Body):
     """Only the keys sent are changed (model_fields_set)."""
     notes: str | None = None
@@ -101,6 +107,10 @@ class ApplicationChange(_Body):
     body: str | None = None
     linkedin_url: str | None = None  # the one person to send a LinkedIn note to
     linkedin_note: str | None = None  # the note itself; code never sends it
+    linkedin_followup: str | None = None  # the message to send once they accept; code never sends it either
+    linkedin_sent: bool | None = None  # ticked when you pressed Connect
+    linkedin_accepted: bool | None = None  # ticked when they accepted
+    linkedin_replied: bool | None = None  # ticked when they wrote back
     draft_version: int | None = None  # the version the page showed, so an edit never overwrites a newer draft
 
 
@@ -369,6 +379,14 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
             if "linkedin_url" in sent and url != app_row["linkedin_url"]:
                 add_event(store, job_id, "linkedin",
                           f"LinkedIn contact: {url}" if url else "LinkedIn contact cleared", t)
+        if "linkedin_followup" in sent:
+            set_linkedin_followup(store, job_id, (change.linkedin_followup or "").strip() or None, t)
+        for step, label in _LINKEDIN_STEP_LABELS.items():
+            key = f"linkedin_{step}"
+            if key in sent:
+                ticked = bool(getattr(change, key))
+                set_linkedin_step(store, job_id, step, t if ticked else None, t)
+                add_event(store, job_id, "linkedin", label if ticked else f"{label} - cleared", t)
         if "subject" in sent or "body" in sent:
             app_row = get_application(store, job_id)
             if change.draft_version is not None and change.draft_version != app_row["draft_version"]:
@@ -578,6 +596,8 @@ def _job_summary(row: sqlite3.Row, contact: sqlite3.Row | None, config: Outreach
         "reached_out_at": tracking.reached_out_at(row) if row["stage"] not in (None, NEW, SAVED) else None,
         "job_board": skip_list_match(row["company"], config),
         "linkedin": bool(row["linkedin_url"]),
+        "linkedin_accepted_at": row["linkedin_accepted_at"], "linkedin_replied_at": row["linkedin_replied_at"],
+        "linkedin_sent_at": row["linkedin_sent_at"],
         "contact": {"name": contact["full_name"], "role": ROLE_LABELS.get(contact["role"], contact["role"]),
                     "email_status": contact["email_status"] if contact["email"] else None} if contact else None,
     }

@@ -328,10 +328,37 @@ Search only on LinkedIn, where the user is already signed in; never use an email
     referral. Tone: confident, human, direct; no stiff lines like "I'd love to discuss how I could
     contribute to your team".
 - Nobody found in any group: note "no LinkedIn contact" and the searches you tried.
-- **Put the person and the note on the job** (the user's call, 2026-11-05), right after you write the
-  note, so both sit on the job's card in the app instead of a Markdown file:
+- **The follow-up** (the user's call, 2026-11-07), written at the same time as the note and sent only
+  after the person accepts. The week-one review found the invite working (25% accepted, of the batch
+  that had had time to land) and nothing happening afterwards: 8 of the 10 who accepted were never
+  written to again, and both replies came from the other person opening the conversation. So the
+  follow-up is a separate message with a different job to do.
+  - **One closed question**, the kind a stranger answers in five seconds: "Is the [Role] role still
+    open?", "Is it still open, or has it moved to interviews?", "Are you the right person to ask, or
+    should I speak to someone else?". Never the invite note's open ask ("I'd love to hear what your
+    team is building next and how I could help"): that is what went unanswered 36 times.
+  - **No second pitch.** They have already read the two achievements in the note. At most one of
+    them may come back, and only when it answers the question being asked.
+  - **Answer the objection behind the silence**: that someone in Beirut will not actually move.
+    - Gulf job (UAE, Qatar): "I'm in Beirut and would relocate to [the UAE / Doha] for it."
+    - Visa-list job (NL, DE, FI, UK, IE, ES, IT): check `data/sponsors/` first
+      (`grep -i "<company>" ~/job-hunter/data/sponsors/{uk,nl,ie}.json`). On the register, say so and
+      ask about the role, not the policy: "I see HEMA B.V. is an IND recognised sponsor - would this
+      role be open to someone relocating from Beirut on a knowledge migrant permit?" Not on it (or no
+      list for that country), ask plainly whether the role comes with sponsorship.
+  - **An easy out** ("If not I'll leave it there", "no problem either way"): it makes replying
+    cheaper than ignoring.
+  - No character limit (it is a message, not an invite), but keep it to 2-3 sentences.
+  - **Timing, for the report, not for code:** the user sends it 4-6 working days after the person
+    accepts, Tuesday to Thursday, 08:30-10:00 **their** local time, **once**. Beirut is UTC+2 in
+    winter, so their 09:00 is 07:00 Beirut in the UAE, 08:00 in Qatar, 10:00 in the Netherlands and
+    11:00 in the UK. Never Saturday, Sunday or Monday morning.
+- **Put the person, the note and the follow-up on the job** (the user's calls, 2026-11-05 and
+  2026-11-07), right after you write them, so they sit on the job's card in the app instead of a
+  Markdown file:
   ```
-  cd ~/job-hunter && .venv/bin/jobhunter linkedin <job id> --url "<profile URL>" --note "<the note>"
+  cd ~/job-hunter && .venv/bin/jobhunter linkedin <job id> --url "<profile URL>" --note "<the note>" \
+      --followup "<the follow-up>"
   ```
   It prints the note back with its character count: check that count is the one you reported and at
   most 300. The card's **LinkedIn** box then shows "Open profile ↗" and the note (both boxes also take
@@ -339,8 +366,13 @@ Search only on LinkedIn, where the user is already signed in; never use an email
   it. With nobody found, leave it empty and write what you searched in the card's **Tracking** notes
   box instead, so the week-one review can see the job was tried.
   The old tracker file (`reports/linkedin_notes_2026-10-31.md`) is not written any more; it stays as
-  the record of the jobs from Oct 24 to Nov 5, which the week-one review (around 2026-11-07) reads
-  next to the app.
+  the record of the jobs from Oct 24 to Nov 5, which the week-one review (2026-11-07) read next to
+  the app. That review is in `reports/linkedin_review_2026-11-07.md`.
+- **Never tick the LinkedIn steps yourself.** The card's Invite sent / Accepted / Replied boxes are
+  the user's: only they know when they pressed Connect or when someone wrote back. A job whose invite
+  was accepted and that has had no reply shows an "accepted · follow up" chip and sits in the Jobs
+  tab's "LinkedIn: accepted, waiting on you" view. `--sent-at/--accepted-at/--replied-at` exist only
+  to backfill when the user tells you a date.
 
 ## At the end
 

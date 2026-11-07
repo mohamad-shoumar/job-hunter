@@ -116,3 +116,27 @@ def test_without_migrate_nothing_is_created(tmp_path):
     store = JobStore(db, migrate=False)
     assert store.conn.execute("SELECT COUNT(*) FROM sqlite_master").fetchone()[0] == 0
     assert user_version(store.conn) == 0
+
+
+def test_migration_4_adds_the_followup_boxes_and_leaves_the_note_alone(tmp_path):
+    """The follow-up message and the three LinkedIn dates (2026-11-07). A job that already has a note keeps
+    it and starts with nothing recorded: only the user knows when an invite went out or was accepted."""
+    db = old_database(tmp_path, V0)
+    conn = sqlite3.connect(db)
+    conn.execute("INSERT INTO jobs (id, fingerprint, company, title, source, remote_status, first_seen, last_seen, "
+                 "status, eligibility, relevance) VALUES (1, 'f1', 'Initech', 'Backend Engineer', 'test', 'remote', "
+                 "'2026-11-01', '2026-11-01', 'shortlisted', 'clear', 'relevant')")
+    conn.execute("INSERT INTO applications (job_id, stage, created_at, updated_at) "
+                 "VALUES (1, 'reached_out', '2026-11-01', '2026-11-01')")
+    conn.commit()
+    conn.close()
+    conn = sqlite3.connect(db)
+    conn.executescript("ALTER TABLE applications ADD COLUMN linkedin_url TEXT;"
+                       "ALTER TABLE applications ADD COLUMN linkedin_note TEXT;"
+                       "UPDATE applications SET linkedin_note = 'Hi Naresh, ...' WHERE job_id = 1;")
+    conn.commit()
+    conn.close()
+    row = JobStore(db).conn.execute("SELECT * FROM applications WHERE job_id = 1").fetchone()
+    assert row["linkedin_note"] == "Hi Naresh, ..."
+    assert row["linkedin_followup"] is None
+    assert (row["linkedin_sent_at"], row["linkedin_accepted_at"], row["linkedin_replied_at"]) == (None, None, None)

@@ -213,6 +213,26 @@ def test_the_linkedin_person_and_note_live_on_the_job(client):
     assert app["linkedin_url"] is None and app["linkedin_note"] == "Hey Ana, same role."
 
 
+def test_an_accepted_invite_waits_on_you_until_they_reply(client):
+    """The second message is the step that was missing (the user's call, 2026-11-07): ticking Accepted puts
+    the job in the waiting list, and ticking Replied takes it out."""
+    waiting = lambda: [j["id"] for j in client.get("/api/jobs?view=linkedin_waiting").json()["jobs"]]  # noqa: E731
+    assert waiting() == []
+    r = client.patch("/api/jobs/1/application", headers=AUTH, json={
+        "linkedin_followup": "  Hi Ana, is the role still open?  ", "linkedin_sent": True, "linkedin_accepted": True})
+    app = r.json()["application"]
+    assert app["linkedin_followup"] == "Hi Ana, is the role still open?"  # stored trimmed
+    assert app["linkedin_sent_at"] and app["linkedin_accepted_at"] and app["linkedin_replied_at"] is None
+    assert "LinkedIn: invite accepted" in [e["detail"] for e in r.json()["events"]]
+    assert waiting() == [1]
+    app = client.patch("/api/jobs/1/application", headers=AUTH, json={"linkedin_replied": True}).json()["application"]
+    assert app["linkedin_replied_at"] and waiting() == []
+    # Unticking puts it back, and the follow-up text is untouched by any of it.
+    app = client.patch("/api/jobs/1/application", headers=AUTH, json={"linkedin_replied": False}).json()["application"]
+    assert app["linkedin_replied_at"] is None and app["linkedin_followup"] == "Hi Ana, is the role still open?"
+    assert waiting() == [1]
+
+
 def test_a_link_that_is_not_linkedin_is_refused(client):
     r = client.patch("/api/jobs/1/application", headers=AUTH, json={"linkedin_url": "https://example.com/in/ana"})
     assert r.status_code == 400 and "not a LinkedIn link" in r.json()["error"]
