@@ -174,3 +174,16 @@ def test_a_skip_keeps_its_reason_and_note_until_you_unskip(store, filters):
     assert (row["skip_reason"], row["skip_note"]) == ("wrong_stack", None)
     row = tracking.set_stage(store, job_id, SAVED, NOW)
     assert (row["skip_reason"], row["skip_note"]) == (None, None)
+
+
+def test_an_unknown_linkedin_step_is_refused(store, filters):
+    """The step names are code's own (sent, accepted, replied): a name from a request never reaches SQL."""
+    from jobhunter.store.applications import LINKEDIN_STEPS, set_linkedin_step
+
+    job_id = store_job(store, filters)
+    tracking.ensure_application(store, job_id, NOW)
+    assert set(LINKEDIN_STEPS) == {"sent", "accepted", "replied"}
+    with pytest.raises(KeyError):
+        set_linkedin_step(store, job_id, "linkedin_url = 'x'", NOW, NOW)
+    set_linkedin_step(store, job_id, "accepted", NOW, NOW)
+    assert get_application(store, job_id)["linkedin_accepted_at"] == iso(NOW)

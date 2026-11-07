@@ -25,6 +25,9 @@ OUTREACH_COLUMNS = f"""
 # reached out on lives under Tracked (the user's call, 2026-11-01: old reached-out jobs read as new shortlisted ones).
 _OPEN = "COALESCE(a.stage, :new) != :closed"
 _WAITING = "COALESCE(a.stage, :new) IN (:new, :saved)"
+# Accepted your LinkedIn invite and has had nothing since (the user's call, 2026-11-07): the first week's
+# review found 8 of 10 accepts never written to again. A closed job drops out, so the list stays short.
+_LINKEDIN_WAITING = "a.linkedin_accepted_at IS NOT NULL AND a.linkedin_replied_at IS NULL"
 JOB_VIEWS = {
     "active": f"j.status = :shortlisted AND {_OPEN}",
     "shortlisted": f"j.status = :shortlisted AND {_WAITING}",
@@ -32,7 +35,13 @@ JOB_VIEWS = {
     "tracked": "a.stage IS NOT NULL AND a.stage NOT IN (:new, :closed)",
     "closed": "a.stage = :closed",
     "rejected": "j.status = :rejected AND j.report_date IS NOT NULL",
+    "linkedin_waiting": f"{_LINKEDIN_WAITING} AND {_OPEN}",
 }
+# Longest wait first, so the one most overdue a follow-up is at the top.
+_ORDER_BY_VIEW = {"linkedin_waiting": "a.linkedin_accepted_at ASC, j.id DESC"}
+_DEFAULT_ORDER = """COALESCE(j.report_date, substr(j.first_seen, 1, 10)) DESC,
+                 CASE j.status WHEN :shortlisted THEN 0 ELSE 1 END,
+                 COALESCE(json_extract(j.fit_grade_json, '$.grade'), 3) DESC, j.fit_score DESC, j.id DESC"""
 # Years asked, in brackets that don't overlap: a job that doesn't say is only in "none".
 YEARS = {"lt3": "j.required_yoe < 3", "3-4": "j.required_yoe >= 3 AND j.required_yoe < 4",
          "4-5": "j.required_yoe >= 4 AND j.required_yoe < 5", "5+": "j.required_yoe >= 5",
@@ -59,13 +68,11 @@ def job_list(store: JobStore, view: str, q: str = "", yoe: str = "",
         SELECT j.*, a.stage, a.closed_reason, a.skip_reason, a.body IS NOT NULL AS has_draft, a.draft_blocked,
                a.next_follow_up_at, a.emailed_at, a.applied_at, a.replied_at,
                a.cv_tailored_json IS NOT NULL AS has_cv, a.cover_letter_json IS NOT NULL AS has_cover,
-               a.linkedin_url,
+               a.linkedin_url, a.linkedin_sent_at, a.linkedin_accepted_at, a.linkedin_replied_at,
                {OUTREACH_COLUMNS}
         FROM jobs j LEFT JOIN applications a ON a.job_id = j.id
         WHERE {where}
-        ORDER BY COALESCE(j.report_date, substr(j.first_seen, 1, 10)) DESC,
-                 CASE j.status WHEN :shortlisted THEN 0 ELSE 1 END,
-                 COALESCE(json_extract(j.fit_grade_json, '$.grade'), 3) DESC, j.fit_score DESC, j.id DESC
+        ORDER BY {_ORDER_BY_VIEW.get(view, _DEFAULT_ORDER)}
         LIMIT 500
         """,
         params,

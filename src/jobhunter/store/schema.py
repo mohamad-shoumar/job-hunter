@@ -154,7 +154,11 @@ CREATE TABLE IF NOT EXISTS applications (
     skip_reason TEXT,
     skip_note TEXT,
     linkedin_url TEXT,
-    linkedin_note TEXT
+    linkedin_note TEXT,
+    linkedin_followup TEXT,
+    linkedin_sent_at TEXT,
+    linkedin_accepted_at TEXT,
+    linkedin_replied_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS events (
@@ -263,9 +267,18 @@ def _v3_linkedin_note(conn: sqlite3.Connection) -> None:
     _add_columns(conn, "applications", {"linkedin_url": "TEXT", "linkedin_note": "TEXT"})
 
 
+def _v4_linkedin_followup(conn: sqlite3.Connection) -> None:
+    """The second message - the one sent after they accept - and where each job is on LinkedIn (the user's
+    call, 2026-11-07). The first week's review showed the invite working (25% accepted on the batch that had
+    had time to land) and nothing happening afterwards: 8 of 10 who accepted were never written to again.
+    The three dates are ticked by hand in the app; nothing here is ever sent by code."""
+    _add_columns(conn, "applications", {"linkedin_followup": "TEXT", "linkedin_sent_at": "TEXT",
+                                        "linkedin_accepted_at": "TEXT", "linkedin_replied_at": "TEXT"})
+
+
 # Migration n is MIGRATIONS[n - 1]. Only ever add to the end; each one must be safe to run on a database
 # that SCHEMA has just created, since a new database runs them all too.
-MIGRATIONS = [_v1_added_columns, _v2_review_cleared, _v3_linkedin_note]
+MIGRATIONS = [_v1_added_columns, _v2_review_cleared, _v3_linkedin_note, _v4_linkedin_followup]
 LATEST_VERSION = len(MIGRATIONS)
 
 

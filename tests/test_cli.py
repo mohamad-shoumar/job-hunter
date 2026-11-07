@@ -83,6 +83,22 @@ def test_linkedin_sets_the_person_and_the_note_for_a_job(home, capsys):
     assert "Note (301 characters, over the 300 LinkedIn allows)" in capsys.readouterr().out
 
 
+def test_linkedin_records_the_followup_and_backfills_the_dates(home, capsys):
+    """The step that was missing (the user's call, 2026-11-07): apply-job writes the follow-up with
+    --followup, and --accepted-at backfills an invite that was accepted days ago."""
+    assert jobhunter(home, "linkedin", "1", "--followup", "  Hi Ana, is the role still open?  ",
+                     "--sent-at", "2026-11-01", "--accepted-at", "2026-11-02") == 0
+    out = capsys.readouterr().out
+    assert "Follow-up: Hi Ana, is the role still open?" in out
+    assert "sent=2026-11-01" in out and "accepted=2026-11-02" in out and "replied=-" in out
+    # An empty string clears one step; the follow-up and the other steps stay.
+    assert jobhunter(home, "linkedin", "1", "--accepted-at", "") == 0
+    out = capsys.readouterr().out
+    assert "accepted=-" in out and "sent=2026-11-01" in out and "Hi Ana, is the role still open?" in out
+    assert jobhunter(home, "linkedin", "1", "--replied-at", "whenever") == 1
+    assert "--replied-at: not a date: whenever" in capsys.readouterr().err
+
+
 def test_linkedin_refuses_a_link_that_is_not_linkedin(home, capsys):
     assert jobhunter(home, "linkedin", "1", "--url", "https://example.com/in/ana") == 1
     assert "not a LinkedIn link" in capsys.readouterr().err

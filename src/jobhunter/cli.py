@@ -605,9 +605,13 @@ def cmd_linkedin(args) -> int:
     """The one LinkedIn person for a job and the note to send them, shown on the job's card in the app.
     Nothing is ever sent: the user presses Connect themselves (the user's call, 2026-11-05)."""
     from . import tracking
+    from .tracking import local_day
     from .contacts import LINKEDIN_NOTE_LIMIT, clean_linkedin
     from .errors import BadRequest
-    from .store.applications import add_event, get_application, set_linkedin
+    from .store.applications import (
+        LINKEDIN_STEPS, add_event, get_application, set_linkedin, set_linkedin_followup, set_linkedin_step,
+    )
+    from .text import parse_datetime
 
     paths, _, _ = _load(args)
     now = utcnow()
@@ -617,8 +621,9 @@ def cmd_linkedin(args) -> int:
         if not row:
             print(f"no job #{args.job_id}", file=sys.stderr)
             return 1
-        if args.url is None and args.note is None:  # nothing given: only show what the job has
-            app = get_application(store, args.job_id)
+        steps = {step: getattr(args, f"{step}_at") for step in LINKEDIN_STEPS}
+        if all(v is None for v in (args.url, args.note, args.followup, *steps.values())):
+            app = get_application(store, args.job_id)  # nothing given: only show what the job has
         else:
             app = tracking.ensure_application(store, args.job_id, now)
             try:
@@ -631,6 +636,18 @@ def cmd_linkedin(args) -> int:
             if args.url is not None and url != app["linkedin_url"]:
                 add_event(store, args.job_id, "linkedin",
                           f"LinkedIn contact: {url}" if url else "LinkedIn contact cleared", now)
+            if args.followup is not None:
+                set_linkedin_followup(store, args.job_id, args.followup.strip() or None, now)
+            for step, given in steps.items():  # a date to backfill, or "" to clear the step
+                if given is None:
+                    continue
+                when = parse_datetime(given) if given.strip() else None
+                if given.strip() and when is None:
+                    print(f"--{step}-at: not a date: {given}", file=sys.stderr)
+                    return 1
+                set_linkedin_step(store, args.job_id, step, when, now)
+                add_event(store, args.job_id, "linkedin",
+                          f"LinkedIn {step}: {local_day(when)}" if when else f"LinkedIn {step} cleared", now)
             store.commit()
             app = get_application(store, args.job_id)
     finally:
@@ -640,6 +657,10 @@ def cmd_linkedin(args) -> int:
     text = (app["linkedin_note"] if app else None) or ""
     over = f", over the {LINKEDIN_NOTE_LIMIT} LinkedIn allows" if len(text) > LINKEDIN_NOTE_LIMIT else ""
     print(f"Note ({len(text)} characters{over}): {text or '-'}")
+    print(f"Follow-up: {(app['linkedin_followup'] if app else None) or '-'}")
+    where = " ".join(f"{step}={(app[column] if app else None) or '-'}"
+                     for step, column in LINKEDIN_STEPS.items())
+    print(f"Where: {where}")
     return 0
 
 
@@ -771,6 +792,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("job_id", type=int)
     p.add_argument("--url", help="the person's LinkedIn profile link (empty string clears it)")
     p.add_argument("--note", help="the connection note, at most 300 characters")
+    p.add_argument("--followup", help="the message to send once they accept (one closed question, no second pitch)")
+    for step in ("sent", "accepted", "replied"):
+        p.add_argument(f"--{step}-at", help=f"the day the invite was {step} (a date, or an empty string to clear)")
     p.set_defaults(func=cmd_linkedin)
 
     p = sub.add_parser("inbox", help="check Gmail for replies, bounces and rejections (also runs in the daily run)")

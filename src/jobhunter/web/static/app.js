@@ -172,6 +172,7 @@ async function renderJobs() {
           <option value="shortlisted">Shortlisted (not acted on yet)</option>
           <option value="visa_list">Visa list (EU/UK, sponsors visas, not acted on yet)</option>
           <option value="tracked">Tracked (saved and after)</option>
+          <option value="linkedin_waiting">LinkedIn: accepted, waiting on you</option>
           <option value="closed">Closed</option>
           <option value="rejected">Rejected (in a report)</option>
         </select>
@@ -227,6 +228,11 @@ async function loadJobs() {
   }).join("");
 }
 
+function linkedinWaitingChip(j) {
+  if (!j.linkedin_accepted_at || j.linkedin_replied_at) return "";
+  return `<span class="chip warn">accepted · follow up</span>`;
+}
+
 function linkedinChip(j) {
   if (j.job_board) return `<span class="chip">job board: apply via link</span>`;
   return j.linkedin ? `<span class="chip info">LinkedIn note</span>` : "";
@@ -238,7 +244,7 @@ function jobRow(j) {
       <div>
         <div class="job-title">${esc(j.title)}</div>
         <div class="muted">${esc(j.company)} · <span class="small">${esc(j.reason)}</span></div>
-        <div class="job-meta" style="margin-top:4px">${statusChip(j.status, j.eligibility)} ${stageChip(j.stage, j.closed_reason, j.skip_reason)} ${linkedinChip(j)}
+        <div class="job-meta" style="margin-top:4px">${statusChip(j.status, j.eligibility)} ${stageChip(j.stage, j.closed_reason, j.skip_reason)} ${linkedinChip(j)} ${linkedinWaitingChip(j)}
           ${j.has_cv ? `<span class="chip">CV tailored</span>` : ""}${j.has_cover ? ` <span class="chip">cover letter</span>` : ""}</div>
       </div>
       <div class="job-side">
@@ -443,9 +449,21 @@ const NOTE_LIMIT = 300; // LinkedIn's own limit on a connection note
 
 const noteCount = (note) => `${note.length}/${NOTE_LIMIT} characters${note.length > NOTE_LIMIT ? " — too long for LinkedIn" : ""}`;
 
+// Where a job is on LinkedIn. You tick these yourself: only you know when someone accepted or wrote back.
+const LINKEDIN_STEPS = [
+  ["sent", "Invite sent", "linkedin_sent_at"],
+  ["accepted", "Accepted", "linkedin_accepted_at"],
+  ["replied", "Replied", "linkedin_replied_at"],
+];
+
 function linkedinSection(d) {
   const app = d.application || {};
-  const url = app.linkedin_url || "", note = app.linkedin_note || "";
+  const url = app.linkedin_url || "", note = app.linkedin_note || "", followup = app.linkedin_followup || "";
+  const steps = LINKEDIN_STEPS.map(([step, label, column]) => `
+        <label class="small" style="margin-right:12px">
+          <input type="checkbox" data-linkedin-step="${step}" ${app[column] ? "checked" : ""}>
+          ${esc(label)}${app[column] ? ` <span class="muted">${esc(day(app[column]))}</span>` : ""}
+        </label>`).join("");
   return `
     <div class="section">
       <h3>LinkedIn</h3>
@@ -456,7 +474,17 @@ function linkedinSection(d) {
       <input type="text" id="linkedin-url" value="${esc(url)}" placeholder="https://www.linkedin.com/in/…" style="margin-top:6px">
       <textarea id="linkedin-note" rows="6" style="margin-top:6px" placeholder="The note to send with the request">${esc(note)}</textarea>
       <div class="small muted" id="note-count">${esc(noteCount(note))}</div>
+      <div class="row" style="margin-top:10px">${steps}</div>
+      ${followupHint(app)}
+      <label class="small muted" style="margin-top:6px;display:block">After they accept — send it yourself, Tue–Thu morning their time</label>
+      <textarea id="linkedin-followup" rows="4" placeholder="The message to send once they accept">${esc(followup)}</textarea>
     </div>`;
+}
+
+// The gap the first week's review found: accepted, then nothing. Shown until you tick Replied.
+function followupHint(app) {
+  if (!app.linkedin_accepted_at || app.linkedin_replied_at) return "";
+  return `<div class="warnings" style="margin-top:8px">Accepted ${esc(ago(app.linkedin_accepted_at))} — waiting on your follow-up.</div>`;
 }
 
 function trackingSection(d) {
@@ -705,6 +733,11 @@ document.addEventListener("change", async (e) => {
       const detail = await api(`/api/jobs/${state.jobId}/application`, { method: "PATCH", body: { cv_file: e.target.value } });
       return setDetail(detail, e.target.value === "none" ? "No CV will be attached" : "CV updated");
     }
+    if (e.target.matches("[data-linkedin-step]")) {
+      const step = e.target.dataset.linkedinStep;
+      const detail = await api(`/api/jobs/${state.jobId}/application`, { method: "PATCH", body: { [`linkedin_${step}`]: e.target.checked } });
+      return setDetail(detail, e.target.checked ? `Marked ${step}` : `${step} cleared`);
+    }
     if (e.target.matches("[data-move]")) {
       const col = BOARD.find((c) => c.key === e.target.value);
       const stage = col.stage;
@@ -725,6 +758,7 @@ const SAVE_ON_BLUR = {
   notes: ["notes", "Notes saved"],
   "linkedin-url": ["linkedin_url", "LinkedIn profile saved"],
   "linkedin-note": ["linkedin_note", "Note saved"],
+  "linkedin-followup": ["linkedin_followup", "Follow-up saved"],
 };
 
 document.addEventListener("focusout", async (e) => {
@@ -740,6 +774,7 @@ document.addEventListener("focusout", async (e) => {
     // card is never re-rendered under you while you are typing in the other box.
     const app = state.detail.application || {};
     if (key === "linkedin_note") e.target.value = app.linkedin_note || "";
+    if (key === "linkedin_followup") e.target.value = app.linkedin_followup || "";
     if (key === "linkedin_url") {
       const url = app.linkedin_url || "";
       $("#linkedin-url").value = url;
