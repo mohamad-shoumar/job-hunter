@@ -293,3 +293,15 @@ The model never writes a Summary: the Summary paragraph is mine and is copied wo
 **Why:** The worry was real but the rules already covered it: a posting that wants German says so, and the language rule quotes it. Cutting FDE to the Gulf, or dropping it, would have hidden the London roles I actually applied to. The junior-plus-sponsorship doubt is about the visa list as a whole, not this one title, so it is not settled here.
 
 **Trade-off:** An FDE posting that is engineering work under a non-engineering title ("Forward Deployed Builder") is now rejected without being read.
+
+## 22. The Pipeline has a Rejected column again
+
+**Date:** 2026-11-11
+
+**Context:** Decision 19 folded Rejected into Closed, so one column held three different things: companies that said no, jobs I chose to skip, and jobs that went quiet. By today there are 579 closed applications: 54 rejections and 525 jobs I skipped. When I asked for "the jobs I got rejected from in the past week" there was no column to move them to: the two the inbox check closed (Aurora Energy Research, Airwallex) landed in Closed next to the 21 jobs I had skipped the day before.
+
+**Decision:** Rejected is a column again, between Offer and Closed. It holds the applications closed with reason `rejected`; Closed keeps `skipped` and `ghosted`, with the reason still on the card. This is display only: both are the stage `closed`, told apart by `closed_reason`, so there is no new stage, no migration, and nothing changes in `tracking.py`, the reports or the Jobs tab. Moving a card into Rejected closes it with reason "rejected" and stops asking me why, which is what the generic Closed column prompts for.
+
+**Why:** A rejection is the one closing I did not choose, and it is the number I want to see without reading chips: how many said no this week, against how many I skipped myself. Mixing them made the Closed count meaningless.
+
+**Trade-off:** Two columns to scroll past instead of one, and the board now shows every rejection ever (54 today), not just this week's. Decision 19's reason for dropping the column still stands for Saved and Email someone, which stay gone.

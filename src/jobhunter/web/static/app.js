@@ -592,16 +592,21 @@ async function renderToday() {
 
 // Board columns. "To apply" is shortlisted jobs you haven't acted on (stage new) or saved, plus visa-list jobs
 // posted today or yesterday, newest posting first. Reached out is newest reached out first: every job there gets
-// a LinkedIn note now, so there is no Email someone column (the user's call, 2026-10-29), and no Saved or
-// Rejected column either. Closed holds every reason (rejected, ghosted, skipped), shown on the card.
+// a LinkedIn note now, so there is no Email someone column (the user's call, 2026-10-29), and no Saved column.
+// Rejected is back (the user's call, 2026-11-11): a rejection is the one closing you did not choose, so it has
+// its own column, and Closed keeps the ones you decided (skipped) or that went quiet (ghosted). Both are the
+// same stage `closed`, told apart by `closed_reason`: display only, no new stage and no migration. Moving a card
+// into Rejected closes it with reason "rejected" (`reason` below), the way the inbox check does.
 const BOARD = [
   { key: "to_apply", label: "To apply", stage: "new" },
   ...["reached_out", "replied", "interviewing", "offer"].map((s) => ({ key: s, stage: s })),
+  { key: "rejected", label: "Rejected", stage: "closed", reason: "rejected" },
   { key: "closed", label: "Closed", stage: "closed" },
 ];
 const toApplyStage = (j) => !j.stage || j.stage === "new" || j.stage === "saved";
 function boardKey(j) {
-  return toApplyStage(j) ? "to_apply" : j.stage;
+  if (toApplyStage(j)) return "to_apply";
+  return j.stage === "closed" && j.closed_reason === "rejected" ? "rejected" : j.stage;
 }
 // Newest first, by the local day the card shows; the same day keeps the grade order.
 const localDay = (iso) => { const d = new Date(iso); return isNaN(d) ? String(iso || "").slice(0, 10) : d.toLocaleDateString("sv"); };

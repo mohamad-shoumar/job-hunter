@@ -271,7 +271,9 @@ grades.
 - **Pipeline**: every tracked job by stage. **To apply** holds shortlisted jobs you haven't acted on or
   saved, plus visa-list jobs posted today or yesterday (with a "visa" chip), newest posting first, one per
   company. Then Reached out (newest first: every job there gets a LinkedIn note, so there is no separate
-  Email someone column), Replied, Interviewing, Offer and Closed (rejected, ghosted or skipped, on the card).
+  Email someone column), Replied, Interviewing, Offer, **Rejected** (they said no) and Closed (the ones you
+  skipped or that went quiet, the reason on the card). Dragging a card into Rejected closes it with the reason
+  "rejected", the same thing the inbox check does when a rejection email arrives.
 - **Stats**: your own reply rate, by who you emailed and by company size.
 
 ### The LinkedIn note
