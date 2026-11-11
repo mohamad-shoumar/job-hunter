@@ -34,7 +34,7 @@ The agent sees only its prompt, so the brief must carry everything:
    For a job not in the database, the posting tab's text.
 3. The facts: tell it to read `~/job-hunter/profile/master_profile.md` from `## Summary of
    experience` to just before `## Work authorization and logistics`, plus `## Motivations (my own
-   words)` if that section exists. Never lines before `## Summary of experience` (contact details)
+   words)` (it exists since 2026-11-11). Never lines before `## Summary of experience` (contact details)
    and never the logistics or self-identification sections.
 4. The Vibe Taxi text from apply-job's standard answers, the only fact outside the profile.
 5. The role level he is applying at (mid for "Mid & Senior"), and the visa or relocation situation
@@ -56,8 +56,9 @@ the user can read it without opening the form.
    for what the CV cannot say. Never two bullets back to back. Strip the bullet's metric unless it
    is the one number the answer uses.
 3. **At most one number per answer, and no fact used twice on the same form.** Assign the facts to
-   the questions before writing. Don't use "800+ concurrent jobs" (not confirmed in the profile);
-   "~70%" and "~1-2%" stay estimates.
+   the questions before writing. "800+ concurrent jobs" was measured in a scripted stress test
+   (confirmed 2026-11-11): in prose say "in a load test", never as production traffic; "~70%"
+   and "~1-2%" stay estimates.
 4. **What each question wants:**
    - *What motivated you to apply:* one concrete thing in the posting (a requirement, a team, a
      way of working) and the work of his it matches, stated as the match, not as a feeling: "The
@@ -71,8 +72,10 @@ the user can read it without opening the form.
      never invent an attachment to the company or its mission.
    - *Why a fit:* their requirement words mapped to his facts, in a list-like shape, plus the
      tools he would learn. The only question where a CV-style answer is right.
-   - *Why are you looking / what next:* only from `## Motivations (my own words)`. If the
-     section is missing, say so to the user and write from the posting and his work only.
+   - *Why are you looking / what next:* only from `## Motivations (my own words)` (written
+     2026-11-11). Lines there marked "for me; never in an answer" are context for you, never
+     text for a form: no pay, no stress, no private reasons. If the section is missing, say so
+     to the user and write from the posting and his work only.
    - *AI or other opinion questions:* the one view he has stated (agents draft, code checks every
      output before it ships; AI to go faster without losing reliability), in his meaning, tied
      to the work it came from. No belief he hasn't stated.
@@ -85,8 +88,11 @@ the user can read it without opening the form.
    part of what makes the role interesting", "Right now I'm obsessed with". End on a fact, a
    gap, or the visa line.
 7. **The profile's motivations are the only motives.** `## Motivations (my own words)` holds the
-   user's own lines (why looking now, what next, what he doesn't want, London or Gulf, what he's
-   proud of). Use their meaning, never embellish them. Without that section, write no motive.
+   user's own lines (why looking now, what next, what he doesn't want, why the Netherlands, London
+   or the Gulf, what he's proud of, what he believes about AI agents). Use their meaning, never
+   embellish them, and never the lines marked "for me; never in an answer". A motive is used
+   only where the question asks for one and the company matches it (a Dutch company may hear
+   why the Netherlands; a trading firm never hears "a domain other than trading").
 8. **Name gaps honestly**: a tool the posting wants that isn't in the profile's Skills is "new to
    me" in one clause ("What I have not used is Kafka or Scala"). Never explain a gap away.
 9. **Concrete over abstract.** Not "technical direction", "failure-prone data flows", "the product
