@@ -754,7 +754,7 @@ document.addEventListener("change", async (e) => {
     if (e.target.matches("[data-move]")) {
       const col = BOARD.find((c) => c.key === e.target.value);
       const stage = col.stage;
-      const reason = col.reason || (stage === "closed" ? prompt("Why closed? rejected, ghosted or skipped", "skipped") : undefined);
+      const reason = col.reason || (stage === "closed" ? prompt("Why closed? ghosted or skipped (a rejection goes in the Rejected column)", "skipped") : undefined);
       if (stage === "closed" && !reason) return renderPipeline();
       await api(`/api/jobs/${e.target.dataset.move}/stage`, { method: "POST", body: { stage, reason } });
       toast(`Moved to ${col.label || stageLabel(stage, reason)}`);
