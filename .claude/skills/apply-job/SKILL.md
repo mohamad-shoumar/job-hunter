@@ -217,18 +217,21 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
   - **Open questions:** be objective. Answer the question itself, on its merits, the way an
     engineer would explain it: 2-4 short sentences, plain words, no pitch. Don't bend the answer
     toward the user's experience. The user found answers that fit a CV achievement into every
-    reply "too AI".
+    reply "too AI" (2026-10-13) and a week of the longer ones "very bad" (2026-11-11).
     - Use a CV bullet or achievement only where it makes sense: the question asks about the
       user's experience ("What experience do you have ...", "Tell us about a challenge"), or a
       real example actually makes the point clearer. Otherwise leave the CV out. Never invent.
     - **An open question the profile, memory and the standard answers above can't answer**
-      ("Why this company?", "Why this role?", "Why are you looking?", "What are you looking for
-      next?", "Why are you a fit?", "What excites you ...", AI/AGI or other opinion questions):
-      follow the `job-application-answers` skill and fill it in (the user's call, 2026-10-31).
-      Its length rule (100-130 words, or the form's limit) wins here. List each one in the report
-      as "written by job-application-answers" so the user reads it before pressing Apply.
-    - Avoid pitch phrases such as "My rule of thumb is", "What excites me is", "That is how I work
-      today", and avoid stacking numbers (115+, 370+, 800+) into one answer.
+      ("What motivated you to apply?", "Tell us about yourself", "Why do you want to join us?",
+      "Why are you a fit?", "Why are you looking?", "What are you looking for next?", "What
+      excites you ...", AI/AGI or other opinion questions): follow the `job-application-answers`
+      skill. It has a Fable agent write all of a form's open answers in one go from the posting
+      and the profile's facts (one agent per form, `model: "fable"`), 2-4 sentences each, and
+      you paste them. Put the full text of each answer in the report under the job, with the
+      agent's list of claims it could not ground, so the user reads them before pressing Apply.
+    - Never the same CV bullet in two answers on one form, at most one number per answer, and no
+      closing wish the user hasn't stated ("is the step I'm looking for"). Avoid pitch phrases
+      such as "My rule of thumb is", "What excites me is", "That is how I work today".
 - **Unsure about a field?** Pick the most reasonable answer, note it for the report, keep going.
 - **Stuck?** If a page freezes, an upload fails or a button doesn't respond, reload and try again
   (up to 2 retries per step). If it still fails, leave the tab as it is, note it and go to the next
