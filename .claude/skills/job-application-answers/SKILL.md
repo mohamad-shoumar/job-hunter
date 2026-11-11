@@ -24,8 +24,8 @@ three-step order, "choose a credible reason"). The review is in
 ## Who writes the answer
 
 Not you. Spawn one agent per form with the Agent tool, `model: "fable"`, `subagent_type`
-`general-purpose`, and paste the answers it returns. (Fable through the Agent tool runs on the
-Claude Code plan, not the API, so it costs nothing extra: the user's rule is no Anthropic API.)
+`general-purpose`, and paste the answers it returns. (Fable through the Agent tool is Claude
+Code usage, not Anthropic API billing: the user's rule is no Anthropic API.)
 The agent sees only its prompt, so the brief must carry everything:
 
 1. Every open question on the form, exactly as worded, with its word or character limit. One
@@ -59,8 +59,11 @@ the user can read it without opening the form.
    the questions before writing. Don't use "800+ concurrent jobs" (not confirmed in the profile);
    "~70%" and "~1-2%" stay estimates.
 4. **What each question wants:**
-   - *What motivated you to apply:* one specific thing in the posting he reacted to, and the one
-     fact that shows why. Not a fit pitch.
+   - *What motivated you to apply:* one concrete thing in the posting (a requirement, a team, a
+     way of working) and the work of his it matches, stated as the match, not as a feeling: "The
+     posting asks for a considered view on AI tools; that is what I built at CoinQuant." No
+     "made me apply", "I want", "I'm looking for" unless `## Motivations` says so. Not a full
+     fit pitch: one match, then stop.
    - *Tell us about yourself:* where he is, how he got here (psychology at AUB, bootcamp, founding
      engineer at CoinQuant), what he builds now, one thing outside work. Plain narrative, no selling.
    - *Why join us:* one thing about this company (a team, a product line, a way of working the
@@ -112,9 +115,9 @@ the user can read it without opening the form.
   been building ever since." Good: "I studied psychology at AUB, did a bootcamp, and joined
   CoinQuant as its founding engineer."
 - Invented view. Bad: "Deciding when an agent may act, without adding friction for the people
-  using it, is the part of AI engineering I most want to go deeper on." Good: "My rule at work is
-  that agents draft and code checks every output before it ships. That is the view on AI tools I
-  would bring."
+  using it, is the part of AI engineering I most want to go deeper on." Good: "At work, agents
+  draft and code checks every output before it ships. That is the view on AI tools I would
+  bring."
 
 ## Final test
 
