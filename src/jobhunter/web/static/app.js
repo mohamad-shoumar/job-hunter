@@ -616,8 +616,13 @@ const newestReachedOut = (a, b) => (Date.parse(b.reached_out_at) || 0) - (Date.p
 
 
 async function renderPipeline() {
-  const [open, visa, tracked, closed] = await Promise.all([
-    api("/api/jobs?view=shortlisted"), api("/api/jobs?view=visa_list&days=2"), api("/api/jobs?view=tracked"), api("/api/jobs?view=closed"),
+  // Rejections are asked for on their own (view=closed_rejected): the closed list stops at 500 rows and
+  // hundreds of them are jobs I skipped, which would hide the oldest rejections from their column. A browser
+  // that already has this file while `jobhunter serve` still runs the older code gets a 400 here: then the
+  // column falls back to the rejections inside the closed list, so the board draws either way.
+  const [open, visa, tracked, closed, rejected] = await Promise.all([
+    api("/api/jobs?view=shortlisted"), api("/api/jobs?view=visa_list&days=2"), api("/api/jobs?view=tracked"),
+    api("/api/jobs?view=closed"), api("/api/jobs?view=closed_rejected").catch(() => null),
   ]);
   const grade = (j) => j.fit_grade?.grade;
   // A saved job is in the tracked list too (and a visa-list one may be older than the two days): it shows once, in To apply.
@@ -625,7 +630,10 @@ async function renderPipeline() {
   const ids = new Set(waiting.map((j) => j.id));
   const toApply = onePerCompany([...waiting, ...tracked.jobs.filter((j) => j.stage === "saved" && !ids.has(j.id))], grade, newestDay(postedAt));
   const reachedOut = tracked.jobs.filter((j) => j.stage === "reached_out").sort(newestReachedOut);
-  const jobs = [...toApply, ...reachedOut, ...tracked.jobs.filter((j) => !toApplyStage(j) && j.stage !== "reached_out"), ...closed.jobs];
+  // The closed list holds rejections too: they come from their own list instead, so no card shows twice.
+  const isRejected = (j) => j.closed_reason === "rejected";
+  const jobs = [...toApply, ...reachedOut, ...tracked.jobs.filter((j) => !toApplyStage(j) && j.stage !== "reached_out"),
+    ...(rejected ? rejected.jobs : closed.jobs.filter(isRejected)), ...closed.jobs.filter((j) => !isRejected(j))];
   const options = (current) => BOARD
     .map((c) => `<option value="${c.key}" ${c.key === current ? "selected" : ""}>${esc(c.label || stageLabel(c.stage))}</option>`).join("");
   $("#main").innerHTML = `<div class="board">${BOARD.map((col) => {

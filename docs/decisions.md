@@ -304,4 +304,4 @@ The model never writes a Summary: the Summary paragraph is mine and is copied wo
 
 **Why:** A rejection is the one closing I did not choose, and it is the number I want to see without reading chips: how many said no this week, against how many I skipped myself. Mixing them made the Closed count meaningless.
 
-**Trade-off:** Two columns to scroll past instead of one, and the board now shows every rejection ever (54 today), not just this week's. Decision 19's reason for dropping the column still stands for Saved and Email someone, which stay gone.
+**Trade-off:** Two columns to scroll past instead of one, and the board now shows every rejection ever (54 today), not just this week's. The column asks for its own list (`closed_rejected`), because the job list stops at 500 rows and 525 skipped jobs would otherwise push the oldest rejections out of sight. Decision 19's reason for dropping the column still stands for Saved and Email someone, which stay gone.

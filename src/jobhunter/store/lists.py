@@ -34,6 +34,10 @@ JOB_VIEWS = {
     "visa_list": f"j.status = :visa_list AND {_WAITING}",
     "tracked": "a.stage IS NOT NULL AND a.stage NOT IN (:new, :closed)",
     "closed": "a.stage = :closed",
+    # Closed because they said no: the Pipeline's own column (the user's call, 2026-11-11) asks for these
+    # apart from the rest of Closed, so the LIMIT below, which hundreds of skipped jobs fill, can never hide
+    # a rejection. Note `:rejected` is the same word for a job's status and for a closing's reason.
+    "closed_rejected": "a.stage = :closed AND a.closed_reason = :rejected",
     "rejected": "j.status = :rejected AND j.report_date IS NOT NULL",
     "linkedin_waiting": f"{_LINKEDIN_WAITING} AND {_OPEN}",
 }

@@ -265,6 +265,19 @@ def test_today_stats_and_status(client):
     assert status["gmail"] and not status["hunter"] and status["caps"]["total"] == 15
 
 
+def test_rejections_are_their_own_view_for_the_pipeline_column(client):
+    """The Pipeline's Rejected column asks for closed_rejected, so a rejection is never hidden among
+    the skipped jobs that fill the closed list (the user's call, 2026-11-11)."""
+    client.post("/api/jobs/1/stage", json={"stage": "closed", "reason": "rejected"}, headers=AUTH)
+    client.post("/api/jobs/2/stage", json={"stage": "closed", "reason": "skipped"}, headers=AUTH)
+    rejected = client.get("/api/jobs?view=closed_rejected").json()["jobs"]
+    assert [(j["id"], j["closed_reason"]) for j in rejected] == [(1, "rejected")]
+    # Closed still holds both: the column drops the rejected ones itself, so no card shows twice.
+    assert {j["id"]: j["closed_reason"] for j in client.get("/api/jobs?view=closed").json()["jobs"]} == {
+        1: "rejected", 2: "skipped"}
+    assert client.get("/api/jobs?view=closed_rejcted").status_code == 400
+
+
 def test_the_visa_list_is_its_own_view(client, home, filters):
     from datetime import timedelta
 
