@@ -302,6 +302,6 @@ The model never writes a Summary: the Summary paragraph is mine and is copied wo
 
 **Decision:** Rejected is a column again, between Offer and Closed. It holds the applications closed with reason `rejected`; Closed keeps `skipped` and `ghosted`, with the reason still on the card. This is display only: both are the stage `closed`, told apart by `closed_reason`, so there is no new stage, no migration, and nothing changes in `tracking.py`, the reports or the Jobs tab. Moving a card into Rejected closes it with reason "rejected" and stops asking me why, which is what the generic Closed column prompts for.
 
-**Why:** A rejection is the one closing I did not choose, and it is the number I want to see without reading chips: how many said no this week, against how many I skipped myself. Mixing them made the Closed count meaningless.
+**Why:** (draft: check) A rejection is the one closing I did not choose, and it is the number I want to see without reading chips: how many said no this week, against how many I skipped myself. Mixing them made the Closed count meaningless.
 
 **Trade-off:** Two columns to scroll past instead of one, and the board now shows every rejection ever (54 today), not just this week's. The column asks for its own list (`closed_rejected`), because the job list stops at 500 rows and 525 skipped jobs would otherwise push the oldest rejections out of sight. Decision 19's reason for dropping the column still stands for Saved and Email someone, which stay gone.
