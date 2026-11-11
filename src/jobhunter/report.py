@@ -230,6 +230,15 @@ def render(day: str, rows: list[sqlite3.Row], sightings: dict[int, list[sqlite3.
         for name, s in sorted(summary.get("sources", {}).items()):
             out.append(f"| {name} | {s['fetched']} | {s['new']} | {len(s['errors'])} |")
         out.append("")
+        back = summary.get("rejudged") or []
+        if back:
+            out += [f"**Listed somewhere else** ({len(back)} rejected job(s) judged again on a new "
+                    "listing's own words):", ""]
+            out += [f"- {_cell(r['company'])} - {_cell(r['title'])} (job #{r['job_id']}): "
+                    f"{_cell(r['where_was'] or 'no location')} ({r['was']}) -> "
+                    f"{_cell(r['where_now'] or 'no location')} on {r['source']}: {r['now_is']}"
+                    for r in back]
+            out += [""]
         dates = summary.get("date_check")
         if dates:
             found = ", ".join(f"{n} {v}" for v, n in sorted(dates["found"].items())) or "none"

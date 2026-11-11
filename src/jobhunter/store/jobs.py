@@ -226,8 +226,12 @@ class JobStore:
         self._add_sighting(cur.lastrowid, job, now)
         return cur.lastrowid
 
-    def touch(self, job_id: int, job: Job, now: datetime) -> None:
-        """Record another sighting of a stored job and fill fields it was missing."""
+    def touch(self, job_id: int, job: Job, now: datetime) -> sqlite3.Row:
+        """Record another sighting of a stored job and fill fields it was missing.
+
+        Returns the stored row as it was before this sighting, so the caller can see where
+        the job was listed until now (see `pipeline._rejudge`).
+        """
         existing = self.conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
         new = _job_values(job)
         updates = {"last_seen": iso(now)}
@@ -247,6 +251,25 @@ class JobStore:
         assignments = ", ".join(f"{k} = :{k}" for k in updates)
         self.conn.execute(f"UPDATE jobs SET {assignments} WHERE id = :id", {**updates, "id": job_id})
         self._add_sighting(job_id, job, now)
+        return existing
+
+    def adopt_listing(self, job_id: int, job: Job, cls: Classification, now: datetime) -> None:
+        """Make a stored job follow another listing of itself, judged on that listing's own words.
+
+        Dedup matches on company and title alone, so the same role in another country lands on
+        the stored job; this is how that job stops showing the first country's verdict. Every
+        field the classifier reads comes from the new listing, so `reclassify` reproduces the
+        verdict, and the links point at the posting that was judged. The AI check and the date
+        check belonged to the old listing, so they are dropped. `company`, `title` and the
+        identity keys stay: the old listing still matches this row instead of coming back as a
+        new job.
+        """
+        values = {k: v for k, v in _job_values(job).items() if k not in ("company", "title")}
+        values.update(_classification_values(cls))
+        values.update({"source": job.source, "source_url": job.source_url, "last_seen": iso(now),
+                       "ai_check_json": None, "date_check_json": None})
+        assignments = ", ".join(f"{k} = :{k}" for k in values)
+        self.conn.execute(f"UPDATE jobs SET {assignments} WHERE id = :id", {**values, "id": job_id})
 
     def _add_sighting(self, job_id: int, job: Job, now: datetime) -> None:
         self.conn.execute(

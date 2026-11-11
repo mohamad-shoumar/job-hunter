@@ -12,7 +12,7 @@ from jobhunter import http as http_module
 from jobhunter.ai_check import CheckRun
 from jobhunter.config import Filters, Paths
 from jobhunter.fitgrade import GradeRun
-from jobhunter.models import CLOSED, REJECTED, SAVED, SHORTLISTED
+from jobhunter.models import CLOSED, ONSITE, REJECTED, SAVED, SHORTLISTED
 from jobhunter.posted_date import DateRun
 from jobhunter.report import write_report
 from jobhunter.sources import Source, SourceResult
@@ -488,3 +488,96 @@ def test_waiting_for_the_network(monkeypatch):
     attempts.clear()
     monkeypatch.setattr(http_module.socket, "create_connection", lambda *a, **k: (_ for _ in ()).throw(OSError()))
     assert http_module.wait_for_network(timeout=0) is None
+
+
+def test_a_rejected_job_follows_a_listing_in_another_place(filters):
+    """Dedup matches on company and title, so the same role elsewhere lands on the stored job.
+
+    Virtusa's "Lead Software Engineer" was stored from London and rejected, then Doha listings
+    were folded into it and never judged (reports/linkedin_alert_check_2026-11-11.md).
+    """
+    store = JobStore(":memory:")
+    us_only = make_job(source="greenhouse", source_job_id="us-1", location_raw="New York, United States",
+                       allowed_locations=["United States"])
+    first = ingest(store, filters, SourceResult("greenhouse", [us_only]))
+    assert first.new_by_status == {REJECTED: 1}
+    assert store.get(1)["reject_code"] == "location_restricted"
+
+    elsewhere = make_job(source="linkedin", source_job_id="4483087682",
+                         source_url="https://www.linkedin.com/jobs/view/4483087682",
+                         application_url="https://www.linkedin.com/jobs/view/4483087682",
+                         location_raw="Remote, Worldwide", allowed_locations=["Worldwide"])
+    second = ingest(store, filters, SourceResult("linkedin", [elsewhere]), now=NOW + timedelta(days=1))
+
+    assert job_count(store) == 1 and second.new == 0
+    row = store.get(1)
+    assert row["status"] == SHORTLISTED and row["reject_code"] is None
+    # The row follows the listing it was judged on, so `reclassify` reproduces the verdict.
+    assert row["location_raw"] == "Remote, Worldwide"
+    assert row["source"] == "linkedin" and row["source_url"].endswith("4483087682")
+    assert [(r.job_id, r.was, r.now_is) for r in second.rejudged] == [(1, "location_restricted", SHORTLISTED)]
+
+
+def test_a_listing_in_the_same_place_is_not_judged_again(filters):
+    store = JobStore(":memory:")
+    ingest(store, filters, SourceResult("greenhouse", [make_job(source="greenhouse", source_job_id="us-1",
+                                                                location_raw="New York, United States",
+                                                                allowed_locations=["United States"])]))
+    same = make_job(source="linkedin", source_job_id="9", location_raw="New York, United States",
+                    allowed_locations=["Worldwide"])
+    second = ingest(store, filters, SourceResult("linkedin", [same]), now=NOW + timedelta(days=1))
+    assert second.rejudged == [] and store.get(1)["status"] == REJECTED
+
+
+def test_a_shortlisted_job_is_never_pushed_down_by_another_listing(filters):
+    store = JobStore(":memory:")
+    ingest(store, filters, SourceResult("greenhouse", [make_job(source="greenhouse", source_job_id="w-1",
+                                                                location_raw="Remote, Worldwide",
+                                                                allowed_locations=["Worldwide"])]))
+    narrow = make_job(source="linkedin", source_job_id="9", location_raw="New York, United States",
+                      allowed_locations=["United States"])
+    second = ingest(store, filters, SourceResult("linkedin", [narrow]), now=NOW + timedelta(days=1))
+    assert second.rejudged == []
+    assert store.get(1)["status"] == SHORTLISTED and store.get(1)["location_raw"] == "Remote, Worldwide"
+
+
+def test_one_posting_listed_twice_never_undoes_a_rule_about_its_words(filters):
+    """Two listings of ONE posting differ in their location text, so only place codes re-judge.
+
+    "Dubai - United Arab Emirates" (SerpApi) and "Dubai, Dubai, United Arab Emirates"
+    (LinkedIn) are the same place; a `too_senior` rejection must survive both.
+    """
+    store = JobStore(":memory:")
+    years = make_job(source="serpapi", source_job_id="s-1", location_raw="Dubai - United Arab Emirates",
+                     remote_status=ONSITE, description="We need 9+ years of backend experience.")
+    first = ingest(store, filters, SourceResult("serpapi", [years]))
+    assert first.new_by_status == {REJECTED: 1} and store.get(1)["reject_code"] == "too_senior"
+    # The second listing is the same posting, trimmed: SerpApi and the aggregators often cut
+    # the text, so the years are gone and only the place is left to judge on.
+    same = make_job(source="linkedin", source_job_id="l-1", location_raw="Dubai, Dubai, United Arab Emirates",
+                    remote_status=ONSITE, description="Backend engineer for our Dubai team.")
+    second = ingest(store, filters, SourceResult("linkedin", [same]), now=NOW + timedelta(days=1))
+    assert second.rejudged == [] and store.get(1)["reject_code"] == "too_senior"
+
+
+def test_a_listing_with_no_text_cannot_bring_a_job_back(filters):
+    """Getro and a failed LinkedIn job page give a location and no description."""
+    store = JobStore(":memory:")
+    ingest(store, filters, SourceResult("greenhouse", [make_job(source="greenhouse", source_job_id="us-1",
+                                                                location_raw="New York, United States",
+                                                                allowed_locations=["United States"])]))
+    bare = make_job(source="getro", source_job_id="g-1", description="",
+                    location_raw="Dubai, United Arab Emirates", remote_status=ONSITE)
+    second = ingest(store, filters, SourceResult("getro", [bare]), now=NOW + timedelta(days=1))
+    assert second.rejudged == [] and store.get(1)["status"] == REJECTED
+
+
+def test_jobs_cleared_from_the_old_review_list_stay_rejected(filters):
+    store = JobStore(":memory:")
+    job_id = store_job(store, filters, status=REJECTED, reject_code="review_cleared",
+                       source="greenhouse", source_job_id="r-1", location_raw="New York, United States")
+    store.conn.commit()
+    elsewhere = make_job(source="linkedin", source_job_id="9", location_raw="Remote, Worldwide",
+                         allowed_locations=["Worldwide"])
+    second = ingest(store, filters, SourceResult("linkedin", [elsewhere]), now=NOW + timedelta(days=1))
+    assert second.rejudged == [] and store.get(job_id)["status"] == REJECTED

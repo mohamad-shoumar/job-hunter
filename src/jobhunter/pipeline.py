@@ -31,16 +31,34 @@ from .config import Filters, OutreachConfig
 from .extract import enrich
 from .fitgrade import FitGrader, GradeRun, build_grader, grade_jobs, to_grade
 from .http import Http, wait_for_network
-from .models import SHORTLISTED, UNCLEAR, Job
+from .models import REJECTED, SHORTLISTED, UNCLEAR, Classification, Job
 from .posted_date import DateFinder, DateRun, build_finder, find_dates
 from .outreach import run_outreach
 from .report import write_report
 from .sources import Source, SourceResult, build_sources
 from .sources.base import describe_error
 from .store import JobStore, row_to_job
-from .text import iso, parse_datetime, utcnow
+from .text import iso, normalize_words, parse_datetime, utcnow
 
 log = logging.getLogger(__name__)
+
+
+@dataclass
+class Rejudged:
+    """A rejected job another listing of it, somewhere else, brought back (see `_rejudge`)."""
+
+    job_id: int
+    company: str
+    title: str
+    was: str | None
+    where_was: str | None
+    now_is: str
+    where_now: str | None
+    source: str
+    classification: Classification
+
+    def to_dict(self) -> dict:
+        return {k: v for k, v in asdict(self).items() if k != "classification"}
 
 
 @dataclass
@@ -91,6 +109,8 @@ class RunSummary:
     # Job ids this run touched (new or seen again), and the new ones. Not saved.
     seen_ids: set[int] = field(default_factory=set)
     new_ids: list[int] = field(default_factory=list)
+    # Rejected jobs a listing somewhere else brought back (see _rejudge).
+    rejudged: list[Rejudged] = field(default_factory=list)
 
     @property
     def fetched(self) -> int:
@@ -108,6 +128,7 @@ class RunSummary:
             "new_by_status": dict(self.new_by_status),
             "reject_codes": dict(self.reject_codes),
             "config_notes": self.config_notes,
+            "rejudged": [r.to_dict() for r in self.rejudged],
             "ai_check": _as_dict(self.ai_check),
             "date_check": _as_dict(self.date_check),
             "fit_grade": _as_dict(self.fit_grade),
@@ -126,6 +147,56 @@ _CONNECTION_ERRORS = ("ConnectError", "ConnectTimeout")
 
 def _lost_connection(result: SourceResult) -> bool:
     return any(kind in error for error in result.errors for kind in _CONNECTION_ERRORS)
+
+
+# Reject codes that are about WHERE the job is: another listing in another place can change
+# their answer. Every other code rests on the posting's own words, which a second listing of
+# the same posting does not change (see `_rejudge`). `review_cleared` is not here on purpose.
+_PLACE_CODES = frozenset({"not_remote", "local_only", "location_restricted", "location_conflict",
+                          "residency_required", "timezone_restricted", "no_sponsor", "no_visa_evidence",
+                          "below_relocation_pay"})
+
+
+def _same_place(left: str | None, right: str | None) -> bool:
+    """True unless both listings name a place and the two texts are different places."""
+    if not left or not right:
+        return True
+    return normalize_words(left) == normalize_words(right)
+
+
+def _rejudge(previous, job: Job, filters: Filters, now: datetime) -> Rejudged | None:
+    """A job rejected for WHERE it is, listed somewhere else, judged again on that listing's words.
+
+    Dedup matches on company and title only (`identity.fingerprint`), so the same role in
+    another country lands on the stored job and `touch` never judges it: Virtusa's "Lead
+    Software Engineer" was stored from London and rejected `no_visa_evidence`, then five Doha
+    listings and a Dubai one were folded into it, none ever judged as Gulf jobs
+    (reports/linkedin_alert_check_2026-11-11.md). Three guards keep this narrow, because two
+    listings of ONE posting also differ in their location text ("Dubai - United Arab Emirates"
+    against "Dubai, Dubai, United Arab Emirates"):
+
+    - only a reject code about the place (`_PLACE_CODES`), so a thin second listing can never
+      undo `too_old`, `too_senior` or a title rule, whose evidence is in the text;
+    - only a listing that brings its own text, since a source with none (Getro) would otherwise
+      turn a rejection into a shortlisting on the location alone;
+    - only upwards: one row holds one verdict, so a rejected job can follow the new listing but
+      a shortlisted one is never pushed down.
+
+    Jobs cleared out of the old review list (`review_cleared`) stay rejected, as in `reclassify`.
+    """
+    if previous["status"] != REJECTED or previous["reject_code"] not in _PLACE_CODES:
+        return None
+    if _same_place(previous["location_raw"], job.location_raw):
+        return None
+    if not (job.description or "").strip() and (previous["description"] or "").strip():
+        return None
+    cls = classify(job, filters, now)
+    if cls.status == REJECTED:
+        return None
+    return Rejudged(job_id=previous["id"], company=previous["company"], title=previous["title"],
+                    was=previous["reject_code"], where_was=previous["location_raw"],
+                    now_is=cls.status, where_now=job.location_raw, source=job.source,
+                    classification=cls)
 
 
 def fetch_all(sources: list[Source], http: Http, workers: int = 6, retry_after: float = 60.0) -> list[SourceResult]:
@@ -176,8 +247,14 @@ def ingest(store: JobStore, results: list[SourceResult], filters: Filters, run_i
                 enrich(job)
                 existing = store.find_match(job, now, filters.dedupe_window_days)
                 if existing is not None:
-                    store.touch(existing, job, now)
+                    previous = store.touch(existing, job, now)
                     summary.seen_ids.add(existing)
+                    again = _rejudge(previous, job, filters, now)
+                    if again is not None:
+                        store.adopt_listing(existing, job, again.classification, now)
+                        summary.rejudged.append(again)
+                        log.info("job %s follows its %s listing: %s -> %s",
+                                 existing, job.source, previous["reject_code"], again.classification.status)
                     continue
                 job.first_seen = now
                 cls = classify(job, filters, now)
@@ -414,8 +491,11 @@ def run(root_paths, sources_config: dict, filters: Filters,
             ), WatchRun)
         if opts.outreach:
             # Date-range runs never spend lookup credits: they would use up the month.
+            # A job a listing elsewhere brought back counts as new here: it gets a CV like any
+            # other job shortlisted today (see `_rejudge`).
             summary.outreach = _step("outreach", lambda: run_outreach(
-                store, root_paths, summary.new_ids, now, ai=opts.ai, lookups=opts.date_range is None,
+                store, root_paths, summary.new_ids + [r.job_id for r in summary.rejudged], now,
+                ai=opts.ai, lookups=opts.date_range is None,
             ), _outreach_failed)
         store.finish_run(run_id, summary.to_dict(), utcnow())
         paths = [
