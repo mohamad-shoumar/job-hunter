@@ -94,19 +94,6 @@ Which bullets and title a CV prints. Code (`cv.py`) and `build.py new` follow th
 - Printed title: the `[default]` one, unless the job matches another one's tag (`Tech Lead` for `lead` jobs).
 - Certifications are always printed.
 
-## Motivations (my own words)
-
-Read only by the job-application-answers skill ("why are you looking", "what next", "why join
-us"); code ignores this section and nothing here goes on a CV. Write each line yourself; the
-answers quote the meaning of these lines and never add a motive that is not here. `TODO` = unknown.
-
-- Why I'm looking now: TODO
-- What I want to work on next that I can't do here: TODO
-- Kinds of product or company I don't want, and why: TODO
-- What I believe about using AI agents in engineering (one sentence): TODO
-- One thing I'm proud of that is not on the CV: TODO
-- Why London, the Netherlands or the Gulf: TODO
-
 ## Work authorization and logistics
 
 - Lives in Beirut, Lebanon
