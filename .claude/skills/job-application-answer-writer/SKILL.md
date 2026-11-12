@@ -11,7 +11,7 @@ Create job-specific answers that make the candidate's fit easy to assess. Favor 
 ## Inputs
 - Job posting, role title, location, and application questions.
 - Company website or reputable company research, when available.
-- Candidate profile and evidence bank: `~/job-hunter/profile/master_profile.md`, from `## Summary of experience` to the end of `## Certifications` (never the Basics or logistics sections: contact details and pay). The Vibe Taxi and job-hunter repo texts in apply-job's standard answers are the only facts outside it.
+- Candidate profile and evidence bank: `~/job-hunter/profile/master_profile.md`, from `## Summary of experience` to the end of `## Certifications` (never the Basics or logistics sections: contact details and pay). The job-hunter repo text in apply-job's standard answers is the only fact outside it.
 - Word or character limits, if provided.
 - User corrections, which override older candidate-profile information.
 
