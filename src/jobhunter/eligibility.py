@@ -14,6 +14,10 @@ posting doubts ("Remote - Europe (UTC-1 to UTC+3)") stays `unclear`. `unclear`
 jobs are the ones an LLM or a human should look at.
 
 "Remote" alone never counts as international: it is `unclear`.
+
+A remote job listed in Kuwait or Bahrain is `unclear` too (gulf.py): countries whose companies
+you would work for from Lebanon but would not move to, so only their remote jobs are kept, for
+the AI check to settle.
 """
 
 from __future__ import annotations
@@ -33,7 +37,8 @@ from .geo import (
     timezone_signal,
     utc_offsets_allow_lebanon,
 )
-from .models import ELIGIBLE, HYBRID, LIKELY, NOT_ELIGIBLE, ONSITE, UNCLEAR, Assessment, Job
+from .gulf import GulfRemote
+from .models import ELIGIBLE, HYBRID, LIKELY, NOT_ELIGIBLE, ONSITE, REMOTE, UNCLEAR, Assessment, Job
 from .relocation import Relocation, assess_relocation
 from .visa import VisaRules, assess_visa
 
@@ -188,10 +193,13 @@ def _quote(matches: list[PlaceMatch]) -> str:
     return "; ".join(dict.fromkeys(f'"{m.evidence}"' for m in matches))
 
 
-def assess_eligibility(job: Job, relocation: Relocation | None = None, visa: VisaRules | None = None) -> Assessment:
+def assess_eligibility(job: Job, relocation: Relocation | None = None, visa: VisaRules | None = None,
+                       gulf: GulfRemote | None = None) -> Assessment:
     """`relocation`: the countries you would move to (relocation.py). Jobs there may be on-site.
 
     `visa`: the countries you would move to on a work visa (visa.py): judged on sponsorship evidence.
+
+    `gulf`: Gulf countries you would work for but not move to (gulf.py): only their remote jobs count.
     """
     field_texts = job.allowed_locations or ([job.location_raw] if job.location_raw else [])
     field_matches = [classify_place(t, field=True) for t in field_texts]
@@ -216,7 +224,7 @@ def assess_eligibility(job: Job, relocation: Relocation | None = None, visa: Vis
         where = job.location_raw or ", ".join(job.allowed_locations) or "no location given"
         return Assessment(NOT_ELIGIBLE, [f'Not remote ({job.remote_status}): "{where}"'], "not_remote")
 
-    remote = _assess_remote(job, field_texts, field_matches, title_matches)
+    remote = _assess_remote(job, field_texts, field_matches, title_matches, gulf)
     # "Middle East", but: location "UAE": limited to people living in the UAE, so the relocation rules decide.
     if place and remote.code == "location_conflict":
         return assess_relocation(job, place, relocation)
@@ -227,8 +235,25 @@ def assess_eligibility(job: Job, relocation: Relocation | None = None, visa: Vis
     return remote
 
 
+def _assess_gulf_remote(job: Job, restricted: list[PlaceMatch], desc: DescriptionSignals,
+                        gulf: GulfRemote, notes: list[str]) -> Assessment:
+    """A remote job listed in Kuwait or Bahrain: countries you would work for, not move to (gulf.py)."""
+    text = job.description or ""
+    m = gulf.local_only.search(text) if gulf.local_only else None
+    if m:
+        quote = _snippet(text, m.start(), m.end())
+        return Assessment(NOT_ELIGIBLE, [f'Restricted to {_quote(restricted)}, and only for people already '
+                                         f'there: "{quote}"'], "local_only")
+    if desc.restrictions:
+        return Assessment(NOT_ELIGIBLE, [f'Restricted to {_quote(restricted)}, and the description limits '
+                                         f'location: "{desc.restrictions[0]}"'], "location_restricted")
+    return Assessment(UNCLEAR, [f"Remote, listed in {_quote(restricted)}: a country you would work for from "
+                                f"Lebanon, not move to ({gulf.countries}). Can they hire someone living in "
+                                "Lebanon?"] + notes, "gulf_remote")
+
+
 def _assess_remote(job: Job, field_texts: list[str], field_matches: list[PlaceMatch],
-                   title_matches: list[PlaceMatch]) -> Assessment:
+                   title_matches: list[PlaceMatch], gulf: GulfRemote | None = None) -> Assessment:
     """A remote job (or one that does not say): can someone living in Lebanon be hired?"""
     tz_conflict = None
     if job.allowed_utc_offsets and not utc_offsets_allow_lebanon(job.allowed_utc_offsets):
@@ -278,6 +303,10 @@ def _assess_remote(job: Job, field_texts: list[str], field_matches: list[PlaceMa
         doubt = desc.specific_positive or (f"time zone window {tz_in_field}" if tz_in_field else None)
         if doubt:
             return Assessment(UNCLEAR, [f"Restricted to {_quote(restricted)}, but: {doubt}"] + notes, "conflict")
+        # Remote in a Gulf country you would work for but not move to: the AI check asks whether
+        # they can hire from Lebanon. Only remote, so on-site there stays rejected (not_remote).
+        if gulf and job.remote_status == REMOTE and gulf.only_place([m.evidence for m in restricted]):
+            return _assess_gulf_remote(job, restricted, desc, gulf, notes)
         return Assessment(NOT_ELIGIBLE, [f"Restricted to {_quote(restricted)}"] + notes, "location_restricted")
 
     if tz_conflict:

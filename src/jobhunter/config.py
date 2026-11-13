@@ -9,6 +9,7 @@ from dataclasses import dataclass, field, fields
 from pathlib import Path
 
 from .agency import AgencyRules
+from .gulf import GulfRemote
 from .identity import company_key
 from .relocation import Relocation
 from .text import normalize_words
@@ -148,6 +149,8 @@ class Filters:
     relocation: Relocation | None = None
     # Countries you would move to on a work visa (visa.py): their jobs go to the separate visa list.
     visa: VisaRules | None = None
+    # Gulf countries you would work for but not move to (gulf.py): only their remote jobs count.
+    gulf_remote: GulfRemote | None = None
     # AI and forward-deployed roles: rejected unless junior (relevance.py).
     junior_only: JuniorOnly | None = None
 
@@ -156,6 +159,7 @@ class Filters:
         def words(key: str) -> list[str]:
             return [w for w in (normalize_words(x) for x in data.get(key, [])) if w]
 
+        relocation = Relocation.from_dict(data.get("relocation"))
         return cls(
             max_posting_age_days=data.get("max_posting_age_days", 30),
             reject_if_required_yoe_at_least=data.get("reject_if_required_yoe_at_least"),
@@ -170,8 +174,10 @@ class Filters:
             blocked_companies={company_key(b["name"]): (b["name"], b.get("why", ""))
                                for b in data.get("blocked_companies", []) if company_key(b["name"])},
             agencies=AgencyRules.from_dict(data.get("agencies")),
-            relocation=Relocation.from_dict(data.get("relocation")),
+            relocation=relocation,
             visa=VisaRules.from_dict(data.get("visa_list")),
+            # The "already in the country" phrases are written once, in the relocation section.
+            gulf_remote=GulfRemote.from_dict(data.get("gulf_remote"), relocation.local_only if relocation else None),
             junior_only=JuniorOnly.from_dict(data.get("junior_only")),
         )
 

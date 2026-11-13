@@ -131,3 +131,52 @@ def test_a_national_allowance_or_bank_is_not_a_nationals_only_rule(filters):
     text = "Benefits: housing allowance, UAE National Allowance. Partnership with Qatar National Bank."
     result = _classify(filters, description=text, remote_status=ONSITE, allowed_locations=["Dubai"])
     assert result.status == SHORTLISTED
+
+
+# --- Kuwait and Bahrain: companies you would work for remotely, not move to (gulf.py) ---------
+
+
+def test_a_remote_job_listed_in_kuwait_is_kept_for_the_ai_check(filters):
+    result = _classify(filters, remote_status=REMOTE, allowed_locations=["Kuwait City, Kuwait"])
+    assert result.status == SHORTLISTED and result.eligibility.code == "gulf_remote"
+    assert result.eligibility.reasons[0] == (
+        'Remote, listed in "Kuwait City, Kuwait": a country you would work for from Lebanon, '
+        "not move to (Kuwait or Bahrain). Can they hire someone living in Lebanon?")
+
+
+def test_a_remote_job_listed_in_bahrain_is_kept(filters):
+    for place in ("Bahrain", "Manama, Bahrain", "Seef, Bahrain", "Remote - Kuwait"):
+        result = _classify(filters, remote_status=REMOTE, allowed_locations=[place])
+        assert result.status == SHORTLISTED and result.eligibility.code == "gulf_remote", place
+
+
+def test_onsite_or_hybrid_in_kuwait_or_bahrain_is_still_rejected(filters):
+    # You would work for them, not move there: only remote counts (your call 2026-11-13).
+    for status in (ONSITE, HYBRID):
+        for place in ("Kuwait City, Kuwait", "Manama, Bahrain"):
+            result = _classify(filters, remote_status=status, allowed_locations=[place])
+            assert result.reject_code == "not_remote", (status, place)
+
+
+def test_a_job_that_does_not_say_whether_it_is_remote_is_not_kept(filters):
+    result = _classify(filters, remote_status="unknown", allowed_locations=["Kuwait City, Kuwait"])
+    assert result.status == REJECTED and result.reject_code == "location_restricted"
+
+
+def test_kuwait_next_to_another_country_is_still_rejected(filters):
+    result = _classify(filters, remote_status=REMOTE, allowed_locations=["Bahrain; India"])
+    assert result.status == REJECTED and result.reject_code == "location_restricted"
+
+
+def test_a_remote_kuwait_job_that_wants_someone_already_there_is_rejected(filters):
+    text = "Python APIs.\nCandidates must hold a transferable visa; we do not sponsor."
+    result = _classify(filters, remote_status=REMOTE, allowed_locations=["Kuwait"], description=text)
+    assert result.status == REJECTED and result.reject_code == "local_only"
+    assert "transferable visa" in result.reject_reason
+
+
+def test_a_remote_kuwait_job_whose_text_names_another_country_is_rejected(filters):
+    text = "Python APIs.\nYou must be based in India for this role."
+    result = _classify(filters, remote_status=REMOTE, allowed_locations=["Kuwait"], description=text)
+    assert result.status == REJECTED and result.reject_code == "location_restricted"
+    assert "based in India" in result.reject_reason

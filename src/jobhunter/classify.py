@@ -95,7 +95,7 @@ def apply_ai_check(rule: Assessment, check: AiCheck) -> Assessment:
 def classify(job: Job, filters: Filters, now: datetime, check_age: bool = True) -> Classification:
     """check_age=False for a job inside an explicitly requested date range:
     asking for "Sep 1 - Sep 7" means those postings are wanted, however old."""
-    eligibility = assess_eligibility(job, filters.relocation, filters.visa)
+    eligibility = assess_eligibility(job, filters.relocation, filters.visa, filters.gulf_remote)
     if eligibility.verdict == UNCLEAR and job.ai_check:
         eligibility = apply_ai_check(eligibility, job.ai_check)
     relevance, score = assess_relevance(job, filters)
