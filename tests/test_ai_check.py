@@ -15,11 +15,13 @@ from jobhunter.ai_check import (
     check_jobs,
     find_quote,
     job_links,
+    rule_reason,
 )
 from jobhunter.classify import classify
 from jobhunter.config import Paths
 from jobhunter.models import (
     CANNOT_HIRE,
+    REMOTE,
     ELIGIBLE,
     LIKELY,
     REJECTED,
@@ -364,3 +366,12 @@ def test_build_checker_with_deepseek(tmp_path, monkeypatch):
     checker_, note = build_checker(config)
     assert isinstance(checker_, TwoStepChecker) and note is None
     assert checker_.label == "deepseek-v4-pro, then claude-code" and checker_.second.model.tools == "WebSearch,WebFetch"
+
+
+def test_the_prompt_asks_the_right_question_about_a_kuwait_job(filters):
+    """A remote job in Kuwait: the model must be asked, not told the answer (gulf.py)."""
+    job = make_job(remote_status=REMOTE, allowed_locations=["Kuwait City, Kuwait"])
+    assert rule_reason(job, filters).startswith("Remote, listed in")
+    assert "Can they hire someone living in Lebanon?" in rule_reason(job, filters)
+    # Without the filters the rules do not know Kuwait, so the reason reads as a rejection.
+    assert rule_reason(job).startswith("Restricted to")

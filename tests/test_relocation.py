@@ -164,8 +164,13 @@ def test_a_job_that_does_not_say_whether_it_is_remote_is_not_kept(filters):
 
 
 def test_kuwait_next_to_another_country_is_still_rejected(filters):
-    result = _classify(filters, remote_status=REMOTE, allowed_locations=["Bahrain; India"])
-    assert result.status == REJECTED and result.reject_code == "location_restricted"
+    for place in ("Bahrain; India", "Kuwait, US", "Remote - KSA, Kuwait", "Kuwait or Europe"):
+        result = _classify(filters, remote_status=REMOTE, allowed_locations=[place])
+        assert result.status == REJECTED and result.reject_code == "location_restricted", place
+    # "US", "UK" and "UAE" only count in capitals, so the places are cut from the text as written.
+    # The UK is a visa-list country, so this one is rejected by the visa rules instead.
+    uk = _classify(filters, remote_status=REMOTE, allowed_locations=["Bahrain; UK"])
+    assert uk.status == REJECTED and uk.eligibility.code == "no_visa_evidence"
 
 
 def test_a_remote_kuwait_job_that_wants_someone_already_there_is_rejected(filters):

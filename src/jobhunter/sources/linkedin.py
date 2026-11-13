@@ -6,8 +6,10 @@ returns one job's page with its full description. No key. Checked 2026-10-21 (do
 
 - Logged out, only keywords, location and f_TPR (posted within N seconds) work. The remote (f_WT)
   and level (f_E) filters are ignored, so location=Worldwide gives on-site jobs from everywhere.
-  Searches are by place: the UAE and Qatar (relocation), Lebanon, and the UK/NL with "visa
-  sponsorship" in the keywords (the visa list).
+  Searches are by place: the UAE and Qatar (relocation), Lebanon, the UK/NL with "visa
+  sponsorship" in the keywords (the visa list), and Kuwait and Bahrain with "remote" in them
+  (gulf.py: their remote jobs only). A keyword only steers the search; what makes a job remote
+  is still `extract.enrich` reading "fully remote", "remote-first" and the like in its text.
 - About one request a second gets HTTP 429, so every request waits `pause` seconds first. That
   makes this the slowest source (a few minutes a run), and it is never fetched twice in a run.
 - LinkedIn's terms forbid automated access; it is used anyway, at this low volume (decision

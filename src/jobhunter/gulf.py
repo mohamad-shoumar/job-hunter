@@ -32,12 +32,15 @@ class GulfRemote:
     places: list[str] = field(default_factory=list)  # normalized words: "kuwait", "manama"
     countries: str = ""  # for reason lines: "Kuwait or Bahrain"
     local_only: re.Pattern | None = None
+    _cut: re.Pattern | None = None  # the places as a regex, built once (see _without_places)
 
     @classmethod
     def from_dict(cls, data: dict | None, local_only: re.Pattern | None = None) -> GulfRemote | None:
         if not data or not data.get("places"):
             return None
         places = [w for w in (normalize_words(p) for p in data["places"]) if w]
+        if not places:
+            return None
         return cls(places=sorted(set(places), key=len, reverse=True),
                    countries=data.get("countries", ""), local_only=local_only)
 
@@ -46,11 +49,16 @@ class GulfRemote:
         return any(f" {p} " in words for p in self.places)
 
     def _without_places(self, text: str) -> str:
-        """The location text with the Kuwait/Bahrain words taken out, so what is left can be judged."""
-        words = f" {normalize_words(text)} "
-        for place in self.places:  # longest first, so "kuwait city" goes before "kuwait"
-            words = words.replace(f" {place} ", "  ")
-        return words.strip()
+        """The location text with the Kuwait/Bahrain words taken out, so what is left can be judged.
+
+        Cut from the text as written, not from a lowercased copy: geo reads "US", "UK" and "UAE"
+        only in capitals, so "Bahrain; UK" must still read as the UK once "Bahrain" is gone.
+        """
+        if self._cut is None:
+            # Longest first, so "Kuwait City" goes before "Kuwait".
+            alternation = "|".join(r"\s+".join(re.escape(w) for w in p.split()) for p in self.places)
+            self._cut = re.compile(r"(?<![A-Za-z0-9])(?:" + alternation + r")(?![A-Za-z0-9])", re.I)
+        return self._cut.sub(" ", text)
 
     def only_place(self, texts: list[str]) -> str | None:
         """The first text naming one of these countries, when no text names anywhere else."""
