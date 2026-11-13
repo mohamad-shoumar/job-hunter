@@ -166,6 +166,18 @@ def _job_message(job: Job, rule_reason: str) -> str:
     ])
 
 
+def rule_reason(job: Job, filters: Filters | None = None) -> str:
+    """The rules' own first reason, which the prompt shows the model as what code already found.
+
+    With `filters` it is the real one: a remote job in Kuwait or Bahrain reads "Remote, listed in
+    ...: can they hire someone living in Lebanon?", not "Restricted to ...", which would answer
+    the question for the model (gulf.py).
+    """
+    rules = (assess_eligibility(job, filters.relocation, filters.visa, filters.gulf_remote)
+             if filters else assess_eligibility(job))
+    return (rules.reasons or [""])[0]
+
+
 class AiChecker:
     def __init__(self, config: AiCheckConfig, client):
         self.config = config
@@ -180,10 +192,9 @@ class AiChecker:
             RECORD_VERDICT,
         ]
 
-    def check(self, job: Job, now: datetime) -> AiCheck:
+    def check(self, job: Job, now: datetime, reason: str | None = None) -> AiCheck:
         """One job. Raises on API errors, so a failed check is retried next run."""
-        rule_reason = (assess_eligibility(job).reasons or [""])[0]
-        messages: list[dict] = [{"role": "user", "content": _job_message(job, rule_reason)}]
+        messages: list[dict] = [{"role": "user", "content": _job_message(job, reason or rule_reason(job))}]
         pages = [(JOB_DESCRIPTION, job.description or "")]
         usage = Usage()
         tool_choice = {"type": "auto"}
@@ -358,12 +369,12 @@ class PagesChecker:
         self.http = http
         self.label = config.model
 
-    def check(self, job: Job, now: datetime) -> AiCheck:
-        rule_reason = (assess_eligibility(job).reasons or [""])[0]
+    def check(self, job: Job, now: datetime, reason: str | None = None) -> AiCheck:
+        reason = reason or rule_reason(job)
         fetched = {url: page for url in job_links(job, self.config.max_fetches_per_job)
                    if (page := fetch_page(url, self.http))}
         usage = Usage()
-        message = _pages_message(job, rule_reason, [(url, text) for url, (text, _) in fetched.items()])
+        message = _pages_message(job, reason, [(url, text) for url, (text, _) in fetched.items()])
         answer = self.model.ask(PAGES_SYSTEM, [{"role": "user", "content": message}], ANSWER_SCHEMA, usage,
                                 ANSWER_EXAMPLE, max_tokens=1024)
         pages = [(JOB_DESCRIPTION, job.description or "")]
@@ -382,10 +393,9 @@ class WebChecker:
         self.http = http
         self.label = config.web_model
 
-    def check(self, job: Job, now: datetime) -> AiCheck:
-        rule_reason = (assess_eligibility(job).reasons or [""])[0]
+    def check(self, job: Job, now: datetime, reason: str | None = None) -> AiCheck:
         usage = Usage()
-        prompt = (_job_message(job, rule_reason) + f"\n\nUse at most {self.config.max_searches_per_job} searches "
+        prompt = (_job_message(job, reason or rule_reason(job)) + f"\n\nUse at most {self.config.max_searches_per_job} searches "
                   f"and {self.config.max_fetches_per_job} page fetches.")
         answer = self.model.ask(WEB_SYSTEM, [{"role": "user", "content": prompt}], ANSWER_SCHEMA, usage, ANSWER_EXAMPLE)
         if not answer.get("verdict"):
@@ -406,11 +416,11 @@ class TwoStepChecker:
         self.config = first.config
         self.label = f"{first.label}, then {second.label}"
 
-    def check(self, job: Job, now: datetime) -> AiCheck:
-        first = self.first.check(job, now)
+    def check(self, job: Job, now: datetime, reason: str | None = None) -> AiCheck:
+        first = self.first.check(job, now, reason)
         if first.verified:
             return first
-        return self.second.check(job, now)  # verified or not, it looked further
+        return self.second.check(job, now, reason)  # verified or not, it looked further
 
 
 def build_checker(config_file: Path, require_enabled: bool = True):
@@ -474,6 +484,10 @@ def _fatal(exc: Exception) -> bool:
     return getattr(exc, "status_code", None) in (400, 401, 403, 404)
 
 
+def _check_one(checker: AiChecker, job: Job, now: datetime, filters: Filters) -> AiCheck:
+    return checker.check(job, now, rule_reason(job, filters))
+
+
 def check_jobs(store: JobStore, checker: AiChecker, rows, filters: Filters, now: datetime,
                on_result=None) -> CheckRun:
     """Check `rows`, save each result as it arrives and re-classify that job.
@@ -486,7 +500,7 @@ def check_jobs(store: JobStore, checker: AiChecker, rows, filters: Filters, now:
         return run
     stopped = False
     with ThreadPoolExecutor(max_workers=max(1, checker.config.workers)) as pool:
-        futures = {pool.submit(checker.check, row_to_job(row), now): row for row in rows}
+        futures = {pool.submit(_check_one, checker, row_to_job(row), now, filters): row for row in rows}
         for future in as_completed(futures):
             if future.cancelled():
                 continue

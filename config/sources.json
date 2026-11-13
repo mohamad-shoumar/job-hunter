@@ -70,7 +70,7 @@
     }
   ],
   "getro": {
-    "_note": "Investor (VC) job boards on Getro: only the companies each fund invested in, so no agencies. No descriptions (the API has none). Remote jobs from the big funds; jobs in the UAE, Qatar or Lebanon from the Gulf ones. An id is in a board's page source: \"network\":{\"id\":...}. Checked 2026-10-10.",
+    "_note": "Investor (VC) job boards on Getro: only the companies each fund invested in, so no agencies. No descriptions (the API has none). Remote jobs from the big funds; jobs in the UAE, Qatar, Kuwait, Bahrain or Lebanon from the Gulf ones. An id is in a board's page source: \"network\":{\"id\":...}. Checked 2026-10-10.",
     "enabled": true,
     "queries": ["python", "backend", "software engineer", "ai engineer", "full stack", "forward deployed"],
     "max_pages": 2,
@@ -79,11 +79,11 @@
       { "name": "Accel", "collection_id": 8672, "filters": { "work_mode": ["remote"] } },
       { "name": "Point Nine", "collection_id": 1680, "filters": { "work_mode": ["remote"] } },
       { "name": "Hub71", "collection_id": 9266, "queries": ["engineer", "developer"],
-        "filters": { "searchable_locations": ["United Arab Emirates", "Qatar", "Lebanon"] } },
+        "filters": { "searchable_locations": ["United Arab Emirates", "Qatar", "Kuwait", "Bahrain", "Lebanon"] } },
       { "name": "MEVP", "collection_id": 1034, "queries": ["engineer", "developer"],
-        "filters": { "searchable_locations": ["United Arab Emirates", "Qatar", "Lebanon"] } },
+        "filters": { "searchable_locations": ["United Arab Emirates", "Qatar", "Kuwait", "Bahrain", "Lebanon"] } },
       { "name": "BECO Capital", "collection_id": 10883, "queries": ["engineer", "developer"],
-        "filters": { "searchable_locations": ["United Arab Emirates", "Qatar", "Lebanon"] } },
+        "filters": { "searchable_locations": ["United Arab Emirates", "Qatar", "Kuwait", "Bahrain", "Lebanon"] } },
       { "_note": "European funds and the big ones' EU jobs, for the visa list (checked 2026-10-13). Only the UK, the Netherlands and Ireland: Getro gives no posting text, so a job gets on the list only through those countries' sponsor registers; one that does makes its company's own board watched, and that board's postings have the text.",
         "name": "Index Ventures (UK, NL, IE)", "collection_id": 1629, "queries": ["python", "backend"],
         "filters": { "searchable_locations": ["United Kingdom", "Netherlands", "Ireland"] } },
@@ -170,7 +170,7 @@
                 "automation engineer", "ai automation", "applied ai", "founding engineer", "llm"]
   },
   "linkedin": {
-    "_note": "LinkedIn's logged-out job search (src/jobhunter/sources/linkedin.py). Logged out, only keywords, location and the posted-within window work (no remote or level filter), so searches are by place: the UAE and Qatar (relocation), Lebanon, and UK/NL jobs that mention visa sponsorship (visa list). Each request waits `pause` seconds (about 1/s gets HTTP 429); only titles with one of `queries` get their page read. LinkedIn's terms forbid automated access: used anyway at this low volume (decision 2026-10-21, see docs/decisions.md). Research: docs/research/2026-10-21-market-size.md.",
+    "_note": "LinkedIn's logged-out job search (src/jobhunter/sources/linkedin.py). Logged out, only keywords, location and the posted-within window work (no remote or level filter), so searches are by place: the UAE and Qatar (relocation), Kuwait and Bahrain with 'remote' in the words (you would work for them, not move there, and the remote filter does nothing logged out), Lebanon, and UK/NL jobs that mention visa sponsorship (visa list). Each request waits `pause` seconds (about 1/s gets HTTP 429); only titles with one of `queries` get their page read. LinkedIn's terms forbid automated access: used anyway at this low volume (decision 2026-10-21, see docs/decisions.md). Research: docs/research/2026-10-21-market-size.md.",
     "enabled": true,
     "hours": 24,
     "max_pages": 4,
@@ -188,6 +188,10 @@
       { "keywords": "solutions engineer", "location": "United Arab Emirates", "max_pages": 2 },
       { "keywords": "software engineer", "location": "Qatar", "max_pages": 2 },
       { "keywords": "backend developer", "location": "Qatar", "max_pages": 1 },
+      { "keywords": "software engineer remote", "location": "Kuwait", "max_pages": 1 },
+      { "keywords": "backend developer remote", "location": "Kuwait", "max_pages": 1 },
+      { "keywords": "software engineer remote", "location": "Bahrain", "max_pages": 1 },
+      { "keywords": "backend developer remote", "location": "Bahrain", "max_pages": 1 },
       { "keywords": "software engineer", "location": "Lebanon", "max_pages": 2 },
       { "keywords": "backend developer", "location": "Lebanon", "max_pages": 1 },
       { "keywords": "software engineer visa sponsorship", "location": "United Kingdom", "max_pages": 3 },
@@ -209,6 +213,7 @@
     "searches": [
       { "name": "UAE", "countries": ["ae"] },
       { "name": "Qatar", "countries": ["qa"], "days": 3 },
+      { "name": "Kuwait and Bahrain (remote only)", "countries": ["kw", "bh"], "work_mode": "remote", "days": 7 },
       { "name": "Lebanon", "countries": ["lb"], "days": 7 },
       { "name": "Remote", "work_mode": "remote" },
       { "name": "Visa list countries", "countries": ["gb", "nl", "de", "ie", "es", "it", "fi"] }

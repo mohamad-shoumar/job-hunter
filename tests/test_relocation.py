@@ -1,9 +1,9 @@
 import pytest
 
-from jobhunter.classify import classify
+from jobhunter.classify import classify, gulf_quote_adds_evidence
 from jobhunter.config import Filters
 from jobhunter.extract import enrich
-from jobhunter.models import HYBRID, ONSITE, REJECTED, REMOTE, SHORTLISTED
+from jobhunter.models import HYBRID, ONSITE, REJECTED, REMOTE, SHORTLISTED, AiCheck
 
 from .conftest import FIXTURES, NOW, make_job
 
@@ -131,3 +131,159 @@ def test_a_national_allowance_or_bank_is_not_a_nationals_only_rule(filters):
     text = "Benefits: housing allowance, UAE National Allowance. Partnership with Qatar National Bank."
     result = _classify(filters, description=text, remote_status=ONSITE, allowed_locations=["Dubai"])
     assert result.status == SHORTLISTED
+
+
+# --- Kuwait and Bahrain: companies you would work for remotely, not move to (gulf.py) ---------
+
+
+def test_a_remote_job_listed_in_kuwait_is_kept_for_the_ai_check(filters):
+    result = _classify(filters, remote_status=REMOTE, allowed_locations=["Kuwait City, Kuwait"])
+    assert result.status == SHORTLISTED and result.eligibility.code == "gulf_remote"
+    assert result.eligibility.reasons[0] == (
+        'Remote, listed in "Kuwait City, Kuwait": a country you would work for from Lebanon, '
+        "not move to (Kuwait or Bahrain). Can they hire someone living in Lebanon?")
+
+
+def test_a_remote_job_listed_in_bahrain_is_kept(filters):
+    for place in ("Bahrain", "Manama, Bahrain", "Seef, Bahrain", "Remote - Kuwait"):
+        result = _classify(filters, remote_status=REMOTE, allowed_locations=[place])
+        assert result.status == SHORTLISTED and result.eligibility.code == "gulf_remote", place
+
+
+def test_onsite_or_hybrid_in_kuwait_or_bahrain_is_still_rejected(filters):
+    # You would work for them, not move there: only remote counts (your call 2026-11-13).
+    for status in (ONSITE, HYBRID):
+        for place in ("Kuwait City, Kuwait", "Manama, Bahrain"):
+            result = _classify(filters, remote_status=status, allowed_locations=[place])
+            assert result.reject_code == "not_remote", (status, place)
+
+
+def test_a_job_that_does_not_say_whether_it_is_remote_is_not_kept(filters):
+    result = _classify(filters, remote_status="unknown", allowed_locations=["Kuwait City, Kuwait"])
+    assert result.status == REJECTED and result.reject_code == "location_restricted"
+
+
+def test_kuwait_next_to_another_country_is_still_rejected(filters):
+    for place in ("Bahrain; India", "Kuwait, US", "Remote - KSA, Kuwait", "Kuwait or Europe"):
+        result = _classify(filters, remote_status=REMOTE, allowed_locations=[place])
+        assert result.status == REJECTED and result.reject_code == "location_restricted", place
+    # "US", "UK" and "UAE" only count in capitals, so the places are cut from the text as written.
+    # The UK is a visa-list country, so this one is rejected by the visa rules instead.
+    uk = _classify(filters, remote_status=REMOTE, allowed_locations=["Bahrain; UK"])
+    assert uk.status == REJECTED and uk.eligibility.code == "no_visa_evidence"
+
+
+def test_a_remote_kuwait_job_that_wants_someone_already_there_is_rejected(filters):
+    text = "Python APIs.\nCandidates must hold a transferable visa; we do not sponsor."
+    result = _classify(filters, remote_status=REMOTE, allowed_locations=["Kuwait"], description=text)
+    assert result.status == REJECTED and result.reject_code == "local_only"
+    assert "transferable visa" in result.reject_reason
+
+
+def test_a_remote_kuwait_job_whose_text_names_another_country_is_rejected(filters):
+    text = "Python APIs.\nYou must be based in India for this role."
+    result = _classify(filters, remote_status=REMOTE, allowed_locations=["Kuwait"], description=text)
+    assert result.status == REJECTED and result.reject_code == "location_restricted"
+    assert "based in India" in result.reject_reason
+
+
+def _with_check(filters, quote, reason="The careers page says so.", verdict="cannot_hire"):
+    """A remote Kuwait job whose AI check quotes a page: the description itself says nothing about where."""
+    check = AiCheck(verdict, reason, quote, "https://example.com/careers", verified=True)
+    return _classify(filters, remote_status=REMOTE, allowed_locations=["Kuwait City, Kuwait"],
+                     description="Python APIs.", ai_check=check)
+
+
+def test_the_ai_check_cannot_reject_a_kuwait_job_on_its_location_alone(filters):
+    # The rules kept it knowing where it is listed, and the model is told a country list means
+    # "cannot hire": quoting the location back is not an answer.
+    result = _with_check(filters, "Kuwait City, Kuwait")
+    assert result.status == SHORTLISTED and result.eligibility.code == "gulf_remote"
+    assert "only repeats the location the rules already read" in result.eligibility.reasons[-1]
+
+
+def test_the_ai_check_still_rejects_a_kuwait_job_on_a_real_rule(filters):
+    for quote in ("You must be based in Kuwait for this role.", "We do not sponsor visas.",
+                  "This role is open to candidates in India only.", "Kuwait residents only."):
+        result = _with_check(filters, quote)
+        assert result.status == REJECTED and result.reject_code == "ai_cannot_hire", quote
+
+
+def test_a_residency_rule_in_the_posting_itself_rejects_it_without_the_ai_check(filters):
+    result = _classify(filters, remote_status=REMOTE, allowed_locations=["Kuwait City, Kuwait"],
+                       description="Python APIs. You must be based in Kuwait for this role.")
+    assert result.status == REJECTED and result.reject_code == "location_restricted"
+
+
+def test_the_ai_check_can_still_clear_a_kuwait_job(filters):
+    result = _with_check(filters, "We hire across the Middle East.", verdict="can_hire")
+    assert result.status == SHORTLISTED and result.eligibility.code == "ai_can_hire"
+
+
+def test_a_nationals_only_title_in_kuwait_is_rejected(filters):
+    result = _classify(filters, remote_status=REMOTE, title="Software Engineer - Kuwaiti National Only",
+                       allowed_locations=["Kuwait City, Kuwait"])
+    assert result.status == REJECTED and result.reject_code == "local_only"
+
+
+def test_a_region_narrowed_to_kuwait_is_kept_not_a_conflict(filters):
+    # "Remote, MENA" with the location Kuwait City: the narrower rule applies, and for these
+    # countries that is the remote-only list, not a rejection.
+    result = _classify(filters, remote_status=REMOTE, title="Backend Engineer (Remote, MENA)",
+                       allowed_locations=["Kuwait City, Kuwait"])
+    assert result.status == SHORTLISTED and result.eligibility.code == "gulf_remote"
+
+
+def test_a_kuwait_job_the_text_doubts_is_kept_on_this_list_too(filters):
+    # Not `conflict`: the code is what stops the AI check rejecting it on the location alone.
+    result = _classify(filters, remote_status=REMOTE, allowed_locations=["Kuwait City, Kuwait"],
+                       description="Python APIs. This role is globally remote.")
+    assert result.status == SHORTLISTED and result.eligibility.code == "gulf_remote"
+    assert "The posting also says:" in result.eligibility.reasons[1]
+    check = AiCheck("cannot_hire", "The posting is for Kuwait.", "Kuwait City, Kuwait",
+                    "https://example.com/job", verified=True)
+    kept = _classify(filters, remote_status=REMOTE, allowed_locations=["Kuwait City, Kuwait"],
+                     description="Python APIs. This role is globally remote.", ai_check=check)
+    assert kept.status == SHORTLISTED and kept.eligibility.code == "gulf_remote"
+
+
+def test_the_guard_covers_the_quotes_an_ats_posting_gives(filters):
+    # PagesChecker formats a Greenhouse/Lever/Ashby posting as "Location: <name>".
+    for quote in ("Location: Kuwait City, Kuwait", "Remote - Kuwait", "Kuwait City, Al Asimah, Kuwait",
+                  "Manama, Capital Governorate, Bahrain"):
+        assert not gulf_quote_adds_evidence(quote, filters.gulf_remote), quote
+        assert _with_check(filters, quote).status == SHORTLISTED, quote
+
+
+def test_adding_a_country_never_rejects_a_job_that_was_kept_before(filters):
+    # "Globally remote" plus "we do not sponsor": before this list the doubt kept it for the AI
+    # check, and it still does. The sentence is a note, not a rejection.
+    result = _classify(filters, remote_status=REMOTE, allowed_locations=["Kuwait City, Kuwait"],
+                       description="This role is globally remote. We do not sponsor visas.")
+    assert result.status == SHORTLISTED and result.eligibility.code == "gulf_remote"
+    assert 'We do not sponsor visas' in result.eligibility.reasons[-1]
+    # With nothing to doubt it, the same sentence rejects the job.
+    plain = _classify(filters, remote_status=REMOTE, allowed_locations=["Kuwait City, Kuwait"],
+                      description="Python APIs. We do not sponsor visas.")
+    assert plain.status == REJECTED and plain.reject_code == "local_only"
+
+
+def test_the_ai_check_may_say_the_kuwait_job_is_not_remote(filters):
+    for quote in ("This role is on-site five days a week.", "Hybrid - Kuwait City, Kuwait",
+                  "You will work from our Kuwait office three days a week."):
+        result = _with_check(filters, quote)
+        assert result.status == REJECTED and result.reject_code == "ai_cannot_hire", quote
+
+
+def test_a_visa_offer_does_not_promote_a_kuwait_job(filters):
+    # Sponsoring a visa means moving there, which is the whole point of this list being separate.
+    result = _with_check(filters, "We offer visa sponsorship and relocation support.", verdict="sponsors_visa")
+    assert result.status == SHORTLISTED and result.eligibility.code == "gulf_remote"
+    assert "the move you do not want there" in result.eligibility.reasons[-1]
+
+
+def test_a_time_zone_window_in_the_location_is_a_doubt_here_too(filters):
+    # Before this list a time zone that fits kept the job for the AI check; it still does.
+    result = _classify(filters, remote_status=REMOTE, allowed_locations=["Remote - Kuwait (UTC+3)"],
+                       description="Python APIs. We do not sponsor visas.")
+    assert result.status == SHORTLISTED and result.eligibility.code == "gulf_remote"

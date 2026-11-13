@@ -77,6 +77,12 @@
     ]
   },
 
+  "_gulf_remote": "Gulf countries you want the companies of, but would not move to: Kuwait and Bahrain (your call 2026-11-13). The opposite of `relocation` above. Only a REMOTE job listed there counts, and it is never shortlisted on evidence: it is kept `unclear` (code gulf_remote), quoting the location, so the daily AI check asks whether they can hire someone living in Lebanon and rejects it with a quote when they cannot. On-site or hybrid there is rejected like anywhere else (not_remote); a posting that wants someone already in the country is rejected (local_only), by the general wording in the shared `relocation.local_only` and `title_local_only` lists (\"National only\", \"transferable visa\", \"no visa sponsorship\") - their UAE and Qatar phrases never match here, and a rule naming the country itself (\"must be based in Kuwait\") is caught by eligibility's description rules; a location that also names another place (\"Kuwait or India\") is rejected as before (location_restricted); and an AI check that says cannot_hire while only quoting the location back is not used, since the rules kept the job knowing where it is listed. src/jobhunter/gulf.py.",
+  "gulf_remote": {
+    "countries": "Kuwait or Bahrain",
+    "places": ["Kuwait", "Kuwait City", "Bahrain", "Manama"]
+  },
+
   "_visa_list": "Countries you would move to on a work visa. A target role there (on-site, hybrid, or remote for people living there) goes to the separate visa list (status visa_list) only with evidence the employer sponsors visas, quoted: the posting offers one, a Hacker News header says VISA, or the company is on that country's government sponsor list (uk, nl, ie: data/sponsors/, `jobhunter sponsors --update`, refreshed by the daily run every refresh_days). Rejected, quoted: the posting refuses or wants a right to work you don't have (no_sponsor), asks for or is written in one of `languages` (language_required: your profile lists Arabic and English only), or says nothing (no_visa_evidence). The phrases are in src/jobhunter/visa.py. Places in a location that also names a US state, the US or Canada are skipped ('Dublin, OH'); 'Cambridge' (MA), 'Wales' (New South Wales) and 'England' (New England) are left out; London, UK and United Kingdom cover them. Researched 2026-10-13 (docs/research).",
   "visa_list": {
     "refresh_days": 7,

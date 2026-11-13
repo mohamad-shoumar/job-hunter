@@ -12,8 +12,9 @@ import re
 from datetime import datetime
 
 from .config import Filters
-from .eligibility import assess_eligibility
+from .eligibility import DescriptionSignals, assess_eligibility
 from .extract import quote_around
+from .gulf import GulfRemote
 from .identity import company_key
 from .models import (
     CAN_HIRE,
@@ -70,16 +71,54 @@ def recheck_age(row) -> bool:
     return not posted or posted.astimezone().date().isoformat() != row["report_date"]
 
 
-def apply_ai_check(rule: Assessment, check: AiCheck) -> Assessment:
+# "Hybrid - Kuwait City, Kuwait", "you will work from our Kuwait office": the quote says the job
+# is not remote, which the location alone did not.
+_NOT_REMOTE_QUOTE = re.compile(
+    r"\b(?:on[- ]?site|onsite|hybrid|in[- ]?office|office[- ]based|in person|in[- ]the[- ]office|"
+    r"from our [\w ,'-]{0,30}office|days? (?:a|per) week in)\b", re.I)
+
+
+def gulf_quote_adds_evidence(quote: str, gulf: GulfRemote) -> bool:
+    """Does an AI `cannot_hire` quote on a Kuwait/Bahrain job say more than its location already did?
+
+    The rules kept the job knowing it is listed in Kuwait, so "Kuwait City, Kuwait" quoted back is
+    not an answer: the model is told a country list means cannot_hire, and the location field is
+    one. Everything else counts - a quote that does not name Kuwait or Bahrain at all, one that
+    names somewhere else, a residency rule ("must be based in Kuwait"), a posting that wants
+    someone already there ("no visa sponsorship"), or one that says the job is not remote.
+    """
+    text = (quote or "").strip()
+    if not text:
+        return False
+    if not gulf.names_place(text):
+        return True  # it is not about where this job is listed
+    if gulf.names_other_place(text) or DescriptionSignals(text).restrictions:
+        return True
+    if gulf.local_only and gulf.local_only.search(text):
+        return True
+    return bool(_NOT_REMOTE_QUOTE.search(text))
+
+
+def apply_ai_check(rule: Assessment, check: AiCheck, gulf: GulfRemote | None = None) -> Assessment:
     """Combine an `unclear` rule verdict with the AI check. The rule's reasons stay listed."""
     evidence = f'"{check.quote}" ({check.source_url})'
     rule_reasons = [f"Rules: {rule.reasons[0]}", *rule.reasons[1:]] if rule.reasons else []
+    if (check.verified and check.verdict == CANNOT_HIRE and rule.code == "gulf_remote" and gulf
+            and not gulf_quote_adds_evidence(check.quote, gulf)):
+        note = ("AI check says it cannot hire from Lebanon, but its quote only repeats the location the "
+                f"rules already read, so it is not used: {evidence} {check.reason}")
+        return Assessment(UNCLEAR, [*rule.reasons, note], rule.code)
     if check.verified and check.verdict == CANNOT_HIRE:
         return Assessment(NOT_ELIGIBLE, [f"AI check: {check.reason} {evidence}", *rule_reasons], "ai_cannot_hire")
     if check.verified and check.verdict == CAN_HIRE:
         return Assessment(LIKELY, [f"AI check: {check.reason} {evidence}", *rule_reasons], "ai_can_hire")
     # The visa rules read the quote too: "sponsorship" alone, or "we cannot sponsor", is no offer.
-    offer = read_posting(check.quote) if check.verdict == SPONSORS_VISA else None
+    # Not on this list: a visa to Kuwait or Bahrain is the move you ruled out, so it is a note.
+    offer = read_posting(check.quote) if check.verdict == SPONSORS_VISA and rule.code != "gulf_remote" else None
+    if check.verdict == SPONSORS_VISA and rule.code == "gulf_remote":
+        note = (f"AI check says it sponsors a visa, which is the move you do not want there, so it is only "
+                f"a note: {evidence} {check.reason}")
+        return Assessment(UNCLEAR, [*rule.reasons, note], rule.code)
     if check.verified and offer and offer.offers and not offer.refusals:
         return Assessment(LIKELY, [f"AI check: {check.reason} {evidence}", *rule_reasons], "ai_sponsors_visa")
     if check.verdict == UNKNOWN_HIRE:
@@ -95,9 +134,9 @@ def apply_ai_check(rule: Assessment, check: AiCheck) -> Assessment:
 def classify(job: Job, filters: Filters, now: datetime, check_age: bool = True) -> Classification:
     """check_age=False for a job inside an explicitly requested date range:
     asking for "Sep 1 - Sep 7" means those postings are wanted, however old."""
-    eligibility = assess_eligibility(job, filters.relocation, filters.visa)
+    eligibility = assess_eligibility(job, filters.relocation, filters.visa, filters.gulf_remote)
     if eligibility.verdict == UNCLEAR and job.ai_check:
-        eligibility = apply_ai_check(eligibility, job.ai_check)
+        eligibility = apply_ai_check(eligibility, job.ai_check, filters.gulf_remote)
     relevance, score = assess_relevance(job, filters)
 
     # Hacker News names come as "WorkHero https://workhero.pro": the link is not part of the name.

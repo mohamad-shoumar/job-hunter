@@ -57,7 +57,7 @@ flowchart LR
 | --- | --- | --- |
 | One run | `pipeline.py`, `cli.py` | fetch, store, classify, the optional steps, the reports (`RunOptions`) |
 | Sources | `sources/` | one adapter per site; `BoardSource` for per-company careers boards, `parse_each` so one bad posting costs only itself |
-| Rules | `classify.py`, `eligibility.py`, `geo.py`, `relevance.py`, `extract.py`, `agency.py`, `relocation.py`, `visa.py` | the status and its quoted reason |
+| Rules | `classify.py`, `eligibility.py`, `geo.py`, `relevance.py`, `extract.py`, `agency.py`, `relocation.py`, `gulf.py`, `visa.py` | the status and its quoted reason |
 | Memory | `store/` | every SQL statement: the schema with numbered migrations, one module per group of tables |
 | Model helpers | `llm.py`, `grounding.py`, `profile.py` | one JSON answer from DeepSeek, Claude or the Claude Code CLI; `find_quote`; the shared fact checks; reading the profile |
 | Model steps | `ai_check.py`, `posted_date.py`, `fitgrade.py` | the AI eligibility check, posting dates, the fit grade |
