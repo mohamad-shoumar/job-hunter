@@ -17,7 +17,8 @@
     {"name": "Valsoft Corporation", "why": "you skipped its roles and asked to reject Valsoft (2026-10-29, 2026-11-01)"},
     {"name": "Aspire Software", "why": "you skipped its role and asked to add Aspire to rejected companies (2026-10-29)"},
     {"name": "Wise", "why": "you skipped its role and asked to add Wise to rejected companies (2026-11-01)"},
-    {"name": "Bending Spoons", "why": "you skipped its roles and asked to add it to rejected companies (2026-10-25)"}
+    {"name": "Bending Spoons", "why": "you skipped its roles and asked to add it to rejected companies (2026-10-25)"},
+    {"name": "ElevenLabs", "why": "you skipped its role with the note \"Add elevenlabs to rejected companies\" (2026-11-12)"}
   ],
 
   "_agencies": "Staffing agencies and talent marketplaces: they repost other companies' jobs, sell vetted developers or pay per task. Rejected (code agency) with what matched: a name below, a whole word in the company name, or a phrase in the posting. not_agencies: real companies a name word would catch. Checked against the stored jobs 2026-10-10: 'our clients', 'talent pool' and 'talent network' are left out because real companies (Zscaler, Percona, GitLab) use them.",
