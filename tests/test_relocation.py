@@ -253,3 +253,30 @@ def test_the_guard_covers_the_quotes_an_ats_posting_gives(filters):
                   "Manama, Capital Governorate, Bahrain"):
         assert not gulf_quote_adds_evidence(quote, filters.gulf_remote), quote
         assert _with_check(filters, quote).status == SHORTLISTED, quote
+
+
+def test_adding_a_country_never_rejects_a_job_that_was_kept_before(filters):
+    # "Globally remote" plus "we do not sponsor": before this list the doubt kept it for the AI
+    # check, and it still does. The sentence is a note, not a rejection.
+    result = _classify(filters, remote_status=REMOTE, allowed_locations=["Kuwait City, Kuwait"],
+                       description="This role is globally remote. We do not sponsor visas.")
+    assert result.status == SHORTLISTED and result.eligibility.code == "gulf_remote"
+    assert 'We do not sponsor visas' in result.eligibility.reasons[-1]
+    # With nothing to doubt it, the same sentence rejects the job.
+    plain = _classify(filters, remote_status=REMOTE, allowed_locations=["Kuwait City, Kuwait"],
+                      description="Python APIs. We do not sponsor visas.")
+    assert plain.status == REJECTED and plain.reject_code == "local_only"
+
+
+def test_the_ai_check_may_say_the_kuwait_job_is_not_remote(filters):
+    for quote in ("This role is on-site five days a week.", "Hybrid - Kuwait City, Kuwait",
+                  "You will work from our Kuwait office three days a week."):
+        result = _with_check(filters, quote)
+        assert result.status == REJECTED and result.reject_code == "ai_cannot_hire", quote
+
+
+def test_a_visa_offer_does_not_promote_a_kuwait_job(filters):
+    # Sponsoring a visa means moving there, which is the whole point of this list being separate.
+    result = _with_check(filters, "We offer visa sponsorship and relocation support.", verdict="sponsors_visa")
+    assert result.status == SHORTLISTED and result.eligibility.code == "gulf_remote"
+    assert "the move you do not want there" in result.eligibility.reasons[-1]

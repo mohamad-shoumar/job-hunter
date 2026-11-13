@@ -71,20 +71,32 @@ def recheck_age(row) -> bool:
     return not posted or posted.astimezone().date().isoformat() != row["report_date"]
 
 
+# "Hybrid - Kuwait City, Kuwait", "you will work from our Kuwait office": the quote says the job
+# is not remote, which the location alone did not.
+_NOT_REMOTE_QUOTE = re.compile(
+    r"\b(?:on[- ]?site|onsite|hybrid|in[- ]?office|office[- ]based|in person|in[- ]the[- ]office|"
+    r"from our [\w ,'-]{0,30}office|days? (?:a|per) week in)\b", re.I)
+
+
 def gulf_quote_adds_evidence(quote: str, gulf: GulfRemote) -> bool:
     """Does an AI `cannot_hire` quote on a Kuwait/Bahrain job say more than its location already did?
 
     The rules kept the job knowing it is listed in Kuwait, so "Kuwait City, Kuwait" quoted back is
     not an answer: the model is told a country list means cannot_hire, and the location field is
-    one. It counts when the quote names somewhere else, is a residency rule ("must be based in
-    Kuwait"), or wants someone already in the country ("no visa sponsorship").
+    one. Everything else counts - a quote that does not name Kuwait or Bahrain at all, one that
+    names somewhere else, a residency rule ("must be based in Kuwait"), a posting that wants
+    someone already there ("no visa sponsorship"), or one that says the job is not remote.
     """
     text = (quote or "").strip()
     if not text:
         return False
+    if not gulf.names_place(text):
+        return True  # it is not about where this job is listed
     if gulf.names_other_place(text) or DescriptionSignals(text).restrictions:
         return True
-    return bool(gulf.local_only and gulf.local_only.search(text))
+    if gulf.local_only and gulf.local_only.search(text):
+        return True
+    return bool(_NOT_REMOTE_QUOTE.search(text))
 
 
 def apply_ai_check(rule: Assessment, check: AiCheck, gulf: GulfRemote | None = None) -> Assessment:
@@ -101,7 +113,12 @@ def apply_ai_check(rule: Assessment, check: AiCheck, gulf: GulfRemote | None = N
     if check.verified and check.verdict == CAN_HIRE:
         return Assessment(LIKELY, [f"AI check: {check.reason} {evidence}", *rule_reasons], "ai_can_hire")
     # The visa rules read the quote too: "sponsorship" alone, or "we cannot sponsor", is no offer.
-    offer = read_posting(check.quote) if check.verdict == SPONSORS_VISA else None
+    # Not on this list: a visa to Kuwait or Bahrain is the move you ruled out, so it is a note.
+    offer = read_posting(check.quote) if check.verdict == SPONSORS_VISA and rule.code != "gulf_remote" else None
+    if check.verdict == SPONSORS_VISA and rule.code == "gulf_remote":
+        note = (f"AI check says it sponsors a visa, which is the move you do not want there, so it is only "
+                f"a note: {evidence} {check.reason}")
+        return Assessment(UNCLEAR, [*rule.reasons, note], rule.code)
     if check.verified and offer and offer.offers and not offer.refusals:
         return Assessment(LIKELY, [f"AI check: {check.reason} {evidence}", *rule_reasons], "ai_sponsors_visa")
     if check.verdict == UNKNOWN_HIRE:

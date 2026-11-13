@@ -243,14 +243,16 @@ def _assess_gulf_remote(job: Job, restricted: list[PlaceMatch], desc: Descriptio
         return Assessment(NOT_ELIGIBLE, [f'Only for nationals or residents (title): "{job.title}"'], "local_only")
     text = job.description or ""
     m = gulf.local_only.search(text) if gulf.local_only else None
-    if m:
-        quote = _snippet(text, m.start(), m.end())
-        return Assessment(NOT_ELIGIBLE, [f'Restricted to {_quote(restricted)}, and only for people already '
-                                         f'there: "{quote}"'], "local_only")
+    rules = [f'only for people already there: "{_snippet(text, m.start(), m.end())}"'] if m else []
     if desc.restrictions:
-        return Assessment(NOT_ELIGIBLE, [f'Restricted to {_quote(restricted)}, and the description limits '
-                                         f'location: "{desc.restrictions[0]}"'], "location_restricted")
+        rules.append(f'the description limits location: "{desc.restrictions[0]}"')
+    # A posting that doubts itself ("this role is globally remote") is left for the AI check, as
+    # it was before this list existed: adding a country may keep more jobs, never reject more.
     doubt = [f'The posting also says: "{desc.specific_positive}"'] if desc.specific_positive else []
+    if rules and not doubt:
+        code = "local_only" if m else "location_restricted"
+        return Assessment(NOT_ELIGIBLE, [f"Restricted to {_quote(restricted)}, and {rules[0]}"], code)
+    doubt += [f"But: {rule[0].upper()}{rule[1:]}" for rule in rules]
     return Assessment(UNCLEAR, [f"Remote, listed in {_quote(restricted)}: a country you would work for from "
                                 f"Lebanon, not move to ({gulf.countries}). Can they hire someone living in "
                                 "Lebanon?"] + doubt + notes, "gulf_remote")
