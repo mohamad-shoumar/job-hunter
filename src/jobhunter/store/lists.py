@@ -83,6 +83,33 @@ def job_list(store: JobStore, view: str, q: str = "", yoe: str = "",
     ).fetchall()
 
 
+def role_copies(store: JobStore, fingerprint: str) -> list[sqlite3.Row]:
+    """Every job still shortlisted or on the visa list with this company + title (`identity.fingerprint`),
+    with the signs you acted on it. One of them is kept and the rest are rejected: see duplicates.py.
+
+    A copy already rejected is left out on purpose: a twin rejected as `too_old` or for its
+    country must never swallow a posting the rules kept.
+    """
+    return store.conn.execute(
+        """
+        SELECT j.id, j.company, j.title, j.location_raw, j.posted_at, j.first_seen, j.status,
+               a.stage, a.closed_reason, a.applied_at, a.linkedin_url
+        FROM jobs j LEFT JOIN applications a ON a.job_id = j.id
+        WHERE j.fingerprint = ? AND j.status IN (?, ?)
+        """,
+        (fingerprint, SHORTLISTED, VISA_LIST),
+    ).fetchall()
+
+
+def roles_with_copies(store: JobStore) -> list[str]:
+    """The fingerprints that more than one shortlisted or visa-list job shares (`reclassify`)."""
+    rows = store.conn.execute(
+        "SELECT fingerprint FROM jobs WHERE status IN (?, ?) GROUP BY fingerprint HAVING COUNT(*) > 1",
+        (SHORTLISTED, VISA_LIST),
+    ).fetchall()
+    return [row["fingerprint"] for row in rows]
+
+
 def new_jobs(store: JobStore, status: str, since: datetime) -> list[sqlite3.Row]:
     """Jobs with `status` first seen since `since` that you have not acted on (Today), best grade first."""
     return store.conn.execute(

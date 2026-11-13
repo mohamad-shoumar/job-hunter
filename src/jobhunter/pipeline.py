@@ -18,7 +18,7 @@ import time as clock
 from collections import Counter
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import date, datetime, time, timedelta
 from functools import partial
 from pathlib import Path
@@ -28,10 +28,12 @@ from .ai_check import AiChecker, CheckRun, build_checker, check_jobs
 from .boards import WatchRun
 from .classify import classify
 from .config import Filters, OutreachConfig
+from .duplicates import Duplicate, fold
 from .extract import enrich
+from .identity import fingerprint
 from .fitgrade import FitGrader, GradeRun, build_grader, grade_jobs, to_grade
 from .http import Http, wait_for_network
-from .models import REJECTED, SHORTLISTED, UNCLEAR, Classification, Job
+from .models import DUPLICATE_ROLE, REJECTED, SHORTLISTED, UNCLEAR, VISA_LIST, Classification, Job
 from .posted_date import DateFinder, DateRun, build_finder, find_dates
 from .outreach import run_outreach
 from .report import write_report
@@ -111,6 +113,8 @@ class RunSummary:
     new_ids: list[int] = field(default_factory=list)
     # Rejected jobs a listing somewhere else brought back (see _rejudge).
     rejudged: list[Rejudged] = field(default_factory=list)
+    # Copies of a role already kept, rejected `duplicate_role` (see duplicates.py).
+    duplicates: list[Duplicate] = field(default_factory=list)
 
     @property
     def fetched(self) -> int:
@@ -129,6 +133,7 @@ class RunSummary:
             "reject_codes": dict(self.reject_codes),
             "config_notes": self.config_notes,
             "rejudged": [r.to_dict() for r in self.rejudged],
+            "duplicates": [asdict(d) for d in self.duplicates],
             "ai_check": _as_dict(self.ai_check),
             "date_check": _as_dict(self.date_check),
             "fit_grade": _as_dict(self.fit_grade),
@@ -259,6 +264,8 @@ def ingest(store: JobStore, results: list[SourceResult], filters: Filters, run_i
                 job.first_seen = now
                 cls = classify(job, filters, now)
                 job_id = store.insert(job, cls, run_id, now)
+                if cls.status in (SHORTLISTED, VISA_LIST):
+                    cls = _fold_copies(store, job, job_id, cls, summary)
             except Exception as exc:  # one malformed listing must not drop the rest
                 log.exception("failed to store %s %s", job.source, job.source_job_id)
                 stats.errors.append(f"{job.source_job_id}: {describe_error(exc)}")
@@ -270,6 +277,21 @@ def ingest(store: JobStore, results: list[SourceResult], filters: Filters, run_i
             if cls.reject_code:
                 summary.reject_codes[cls.reject_code] += 1
         store.commit()
+
+
+def _fold_copies(store: JobStore, job: Job, job_id: int, cls: Classification,
+                 summary: RunSummary) -> Classification:
+    """Keep one copy of the role this job belongs to and reject the rest (duplicates.py).
+
+    Returns the new job's own verdict, which is a rejection when an older copy was the one
+    kept, so the run's counts say what the stored row says.
+    """
+    for copy in fold(store, fingerprint(job.company, job.title)):
+        log.info("job %s is another copy of job %s: %s", copy.job_id, copy.kept_id, copy.reason)
+        summary.duplicates.append(copy)
+        if copy.job_id == job_id:
+            cls = replace(cls, status=REJECTED, reject_reason=copy.reason, reject_code=DUPLICATE_ROLE)
+    return cls
 
 
 def local_day(dt: datetime) -> date:

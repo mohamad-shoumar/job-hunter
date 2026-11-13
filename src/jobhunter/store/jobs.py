@@ -34,7 +34,9 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from ..identity import ats_key_from_url, fingerprint
-from ..models import SHORTLISTED, UNCLEAR, VISA_LIST, AiCheck, Classification, DateCheck, Job
+from ..models import (
+    DUPLICATE_ROLE, REJECTED, SHORTLISTED, UNCLEAR, VISA_LIST, AiCheck, Classification, DateCheck, Job,
+)
 from ..text import iso, parse_datetime
 from .schema import migrate as migrate_schema
 
@@ -307,6 +309,17 @@ class JobStore:
         values = _classification_values(cls)
         assignments = ", ".join(f"{k} = :{k}" for k in values)
         self.conn.execute(f"UPDATE jobs SET {assignments} WHERE id = :id", {**values, "id": job_id})
+
+    def mark_duplicate(self, job_id: int, reason: str) -> None:
+        """Reject a job as another copy of a role already kept (duplicates.py).
+
+        Only the verdict changes: what the rules found about this posting stays, so
+        `reclassify` can give it back when the duplicate rule changes.
+        """
+        self.conn.execute(
+            "UPDATE jobs SET status = ?, reject_reason = ?, reject_code = ? WHERE id = ?",
+            (REJECTED, reason, DUPLICATE_ROLE, job_id),
+        )
 
     # --- reading ------------------------------------------------------------
 

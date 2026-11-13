@@ -47,6 +47,10 @@ VISA_LIST = "visa_list"
 # The reject code of the jobs that waited in "needs review" (a status until 2026-10-27): cleared on the
 # user's call (2026-10-29) by migration 2 (store/schema.py), and never judged again (`reclassify` skips them).
 REVIEW_CLEARED = "review_cleared"
+# Another copy of a role already kept: one company, one title, one place, two postings
+# (duplicates.py; the user's call, 2026-11-14). Worked out again from the stored jobs
+# every run, so `reclassify` undoes it when the rule changes.
+DUPLICATE_ROLE = "duplicate_role"
 
 # Where you are with a job (applications.stage; tracking.py moves jobs between them)
 NEW = "new"

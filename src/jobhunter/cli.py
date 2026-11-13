@@ -16,12 +16,14 @@ from .ai_check import build_checker, check_jobs
 from .posted_date import build_finder, find_dates
 from .classify import classify, recheck_age
 from .config import Filters, Paths, load_dotenv, load_json, resolve_root
+from .duplicates import fold
 from .extract import enrich
 from .fitgrade import build_grader, grade_jobs, to_grade
 from .report import write_report
 from .sources import build_sources
-from .models import REVIEW_CLEARED, UNCLEAR
+from .models import DUPLICATE_ROLE, REVIEW_CLEARED, UNCLEAR
 from .store import JobStore, row_to_job
+from .store.lists import roles_with_copies
 from .text import utcnow
 
 
@@ -361,6 +363,8 @@ def cmd_reclassify(args) -> int:
     changed_days: set[str] = set()
     now = utcnow()
     pending: list = []
+    folded: list = []
+    was_duplicate: dict[int, tuple] = {}  # copies already rejected `duplicate_role` when this run started
 
     def save() -> None:
         # A run takes minutes: the jobs are judged with no write lock held and
@@ -379,7 +383,12 @@ def cmd_reclassify(args) -> int:
             job.required_yoe = None  # no source sets it: it is always read from the text
             job = enrich(job)  # re-extract too, so extraction changes apply
             cls = classify(job, filters, now, check_age=recheck_age(row))
-            if cls.status != row["status"] or cls.eligibility.verdict != row["eligibility"]:
+            # The rules judge one posting alone, so a copy rejected `duplicate_role` gets its own
+            # status back here and the pass below takes it away again: its day and its verdict are
+            # settled there, not counted as a change twice over.
+            if row["reject_code"] == DUPLICATE_ROLE:
+                was_duplicate[row["id"]] = (row["status"], row["report_date"])
+            elif cls.status != row["status"] or cls.eligibility.verdict != row["eligibility"]:
                 changes[f"{row['status']} -> {cls.status}"] += 1
                 if row["report_date"]:
                     changed_days.add(row["report_date"])
@@ -387,6 +396,23 @@ def cmd_reclassify(args) -> int:
             if len(pending) == 100:
                 save()
         save()
+        # Work the duplicates out again from the stored jobs (duplicates.py): the same rule the
+        # daily run uses, so a second run leaves the database exactly as it found it.
+        for role in roles_with_copies(store):
+            for copy in fold(store, role):
+                if was_duplicate.pop(copy.job_id, None):
+                    continue  # already a rejected copy, and still is: nothing changed
+                changes["duplicate copies rejected"] += 1
+                folded.append(copy)
+                day = store.get(copy.job_id)["report_date"]  # its day's report now shows it as rejected
+                if day:
+                    changed_days.add(day)
+        # A copy the rule no longer folds keeps the status the rules just gave it back.
+        for job_id, (status, day) in was_duplicate.items():
+            changes[f"{status} -> {store.get(job_id)['status']}"] += 1
+            if day:
+                changed_days.add(day)
+        store.commit()
         summary = store.last_run_stats()
         rebuilt = [write_report(store, paths.reports_dir, day, summary, now, filters.max_posting_age_days)
                    for day in sorted(changed_days)]
@@ -396,6 +422,8 @@ def cmd_reclassify(args) -> int:
         print("no changes")
     for change, count in changes.most_common():
         print(f"{count:5}  {change}")
+    for copy in folded:
+        print(f"  #{copy.job_id} {copy.company} - {copy.title}: {copy.reason}")
     for path in rebuilt:
         print(f"rebuilt {path}")
     print("jobs that became shortlisted/visa_list and were never reported go into the next daily report")

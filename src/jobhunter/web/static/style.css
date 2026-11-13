@@ -122,6 +122,21 @@ input[type=text], input[type=email], input[type=search] { width: 100%; }
 .day-head:first-child { border-top: 0; }
 .empty { padding: 30px; text-align: center; color: var(--muted); }
 
+/* One company, one box: its best job, then a button for the roles folded behind it. */
+.company-box { border-top: 1px solid var(--line); }
+.company-box:first-child, .day-head + .company-box { border-top: 0; }
+.company-box .job-row { border-top: 0; }
+.company-box.open { background: var(--panel-2); box-shadow: inset 3px 0 0 var(--accent); }
+.company-box.open .job-row + .job-row { border-top: 1px dashed var(--line); }
+.company-more { margin: 0 14px 10px; color: var(--muted); }
+.company-more:hover { color: var(--text); }
+.company-more .caret { color: var(--accent); font-weight: 700; }
+/* In a pipeline column the box wraps the cards instead of the rows. */
+.column .company-box { border-top: 0; }
+.column .company-box.open { border-radius: 8px; padding-bottom: 8px; margin-top: 8px; }
+.column .company-box.open .pcard:first-child { margin-top: 0; }
+.column .company-more { margin: 6px 0 0 8px; }
+
 /* cards */
 .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; align-items: start; }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; }
