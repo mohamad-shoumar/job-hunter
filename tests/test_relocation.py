@@ -280,3 +280,10 @@ def test_a_visa_offer_does_not_promote_a_kuwait_job(filters):
     result = _with_check(filters, "We offer visa sponsorship and relocation support.", verdict="sponsors_visa")
     assert result.status == SHORTLISTED and result.eligibility.code == "gulf_remote"
     assert "the move you do not want there" in result.eligibility.reasons[-1]
+
+
+def test_a_time_zone_window_in_the_location_is_a_doubt_here_too(filters):
+    # Before this list a time zone that fits kept the job for the AI check; it still does.
+    result = _classify(filters, remote_status=REMOTE, allowed_locations=["Remote - Kuwait (UTC+3)"],
+                       description="Python APIs. We do not sponsor visas.")
+    assert result.status == SHORTLISTED and result.eligibility.code == "gulf_remote"

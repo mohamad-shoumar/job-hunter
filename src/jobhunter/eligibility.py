@@ -236,7 +236,7 @@ def assess_eligibility(job: Job, relocation: Relocation | None = None, visa: Vis
 
 
 def _assess_gulf_remote(job: Job, restricted: list[PlaceMatch], desc: DescriptionSignals,
-                        gulf: GulfRemote, notes: list[str]) -> Assessment:
+                        gulf: GulfRemote, notes: list[str], doubt: str | None = None) -> Assessment:
     """A remote job listed in Kuwait or Bahrain: countries you would work for, not move to (gulf.py)."""
     title = gulf.title_local_only.search(job.title or "") if gulf.title_local_only else None
     if title:
@@ -246,16 +246,17 @@ def _assess_gulf_remote(job: Job, restricted: list[PlaceMatch], desc: Descriptio
     rules = [f'only for people already there: "{_snippet(text, m.start(), m.end())}"'] if m else []
     if desc.restrictions:
         rules.append(f'the description limits location: "{desc.restrictions[0]}"')
-    # A posting that doubts itself ("this role is globally remote") is left for the AI check, as
-    # it was before this list existed: adding a country may keep more jobs, never reject more.
-    doubt = [f'The posting also says: "{desc.specific_positive}"'] if desc.specific_positive else []
-    if rules and not doubt:
+    # A posting that doubts itself ("this role is globally remote", a time zone window that fits)
+    # is left for the AI check, as it was before this list existed: adding a country may keep more
+    # jobs, never reject more. A nationals-only title, above, is the one exception.
+    doubted = [f'The posting also says: "{doubt}"'] if doubt else []
+    if rules and not doubted:
         code = "local_only" if m else "location_restricted"
         return Assessment(NOT_ELIGIBLE, [f"Restricted to {_quote(restricted)}, and {rules[0]}"], code)
-    doubt += [f"But: {rule[0].upper()}{rule[1:]}" for rule in rules]
+    doubted += [f"But: {rule[0].upper()}{rule[1:]}" for rule in rules]
     return Assessment(UNCLEAR, [f"Remote, listed in {_quote(restricted)}: a country you would work for from "
                                 f"Lebanon, not move to ({gulf.countries}). Can they hire someone living in "
-                                "Lebanon?"] + doubt + notes, "gulf_remote")
+                                "Lebanon?"] + doubted + notes, "gulf_remote")
 
 
 def _assess_remote(job: Job, field_texts: list[str], field_matches: list[PlaceMatch],
@@ -309,16 +310,16 @@ def _assess_remote(job: Job, field_texts: list[str], field_matches: list[PlaceMa
 
     restricted = field_restricted + title_restricted
     if restricted:
-        # Remote in a Gulf country you would work for but not move to: the AI check asks whether
-        # they can hire from Lebanon. Only remote, so on-site there stays rejected (not_remote).
-        # Before the doubt below, so a job with one is judged here too and keeps the code that
-        # stops the AI check from rejecting it on the location alone (classify.py).
-        if gulf and job.remote_status == REMOTE and gulf.only_place([m.evidence for m in restricted]):
-            return _assess_gulf_remote(job, restricted, desc, gulf, notes)
         # "Remote - Europe (UTC-1 to UTC+3)": the place may be loose wording
         # for a time zone window that does include Lebanon.
         tz_in_field = next((timezone_signal(t) for t in field_texts if timezone_signal(t)), None)
         doubt = desc.specific_positive or (f"time zone window {tz_in_field}" if tz_in_field else None)
+        # Remote in a Gulf country you would work for but not move to: the AI check asks whether
+        # they can hire from Lebanon. Only remote, so on-site there stays rejected (not_remote).
+        # A job with a doubt is judged here too, so it keeps the code that stops the AI check
+        # from rejecting it on the location alone (classify.py); the doubt goes with it.
+        if gulf and job.remote_status == REMOTE and gulf.only_place([m.evidence for m in restricted]):
+            return _assess_gulf_remote(job, restricted, desc, gulf, notes, doubt)
         if doubt:
             return Assessment(UNCLEAR, [f"Restricted to {_quote(restricted)}, but: {doubt}"] + notes, "conflict")
         return Assessment(NOT_ELIGIBLE, [f"Restricted to {_quote(restricted)}"] + notes, "location_restricted")
