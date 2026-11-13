@@ -116,3 +116,18 @@ def test_a_sentence_that_refuses_sponsorship_is_not_an_offer(filters):
                            description=f"Python APIs.\n{sentence}")
         assert result.reject_code == "local_only", sentence
         assert result.reject_reason == f'Only for people already in the country: "{sentence}"'
+
+
+def test_a_role_for_nationals_named_only_in_the_text_is_rejected(filters):
+    # Emirates NBD through freehire: the title is plain "Software Engineer", the text says who it is for
+    text = "The Software Engineer (UAE National) will be responsible for developing high-quality applications."
+    result = _classify(filters, title="Software Engineer", description=text, remote_status=ONSITE,
+                       allowed_locations=["United Arab Emirates"])
+    assert result.status == REJECTED and result.reject_code == "local_only"
+    assert "(UAE National)" in result.eligibility.reasons[0]
+
+
+def test_a_national_allowance_or_bank_is_not_a_nationals_only_rule(filters):
+    text = "Benefits: housing allowance, UAE National Allowance. Partnership with Qatar National Bank."
+    result = _classify(filters, description=text, remote_status=ONSITE, allowed_locations=["Dubai"])
+    assert result.status == SHORTLISTED

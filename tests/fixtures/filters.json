@@ -49,7 +49,7 @@
       "UAE National", "UAE Nationals", "Emirati", "Emiratis", "Qatari", "Qataris", "National only", "Nationals only"
     ],
     "local_only": [
-      "UAE nationals only", "open to UAE nationals", "for UAE nationals", "Emirati nationals only", "Emiratis only",
+      "(UAE National)", "(UAE Nationals)", "(Emirati National)", "(Qatari National)", "UAE nationals only", "open to UAE nationals", "for UAE nationals", "Emirati nationals only", "Emiratis only",
       "Emirati candidates only", "Qatari nationals only", "open to Qatari nationals", "for Qatari nationals",
       "Qataris only", "children of Qatari mothers", "family book", "UAE residents only", "Qatar residents only",
       "currently residing in the UAE", "currently residing in UAE", "currently based in the UAE",

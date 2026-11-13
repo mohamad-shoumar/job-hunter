@@ -619,3 +619,72 @@ def test_custom_page_with_a_link_that_is_not_a_url_costs_only_that_page():
     result = custom_page.CustomPageSource(pages).fetch(http)
     assert result.errors == ["Bad: ValueError: Invalid IPv6 URL"]
     assert [j.title for j in result.jobs] == ["Technical Product Manager"]
+
+
+def test_freehire_dates_by_created_at_and_skips_reposters_and_foreign_boards():
+    from jobhunter.sources import freehire
+
+    calls = []
+
+    def respond(params):
+        calls.append(dict(params))
+        return fixture_json("freehire_search.json")
+
+    source = freehire.FreehireSource(
+        [{"name": "UAE", "countries": ["ae"]}, {"name": "Remote", "work_mode": "remote", "days": 3}],
+        ["software engineer", "full stack", "python"], skip_sources=["whatjobs-*", "hh"], pause=0)
+    result = source.fetch(FakeHttp({freehire.API: respond}))
+
+    assert calls[0]["q"] == 'title:"software engineer" OR title:"full stack" OR title:"python"'
+    assert calls[0]["countries"] == ["ae"] and calls[0]["posted_within_days"] == 2
+    assert calls[1]["work_mode"] == "remote" and calls[1]["posted_within_days"] == 3
+    assert calls[0]["description_format"] == "text"
+    # whatjobs, hh and the posting with no company are left out; a posting seen in one search is not read twice
+    assert {j.company for j in result.jobs} == {"Binance", "Get Devs"}
+    assert len(result.jobs) == 2 and "left out" in result.notes[0]
+    binance = next(j for j in result.jobs if j.company == "Binance")
+    # posted_at says 2026-11-13, but freehire first saw it 2026-10-23: the earlier date wins
+    assert binance.posted_at == datetime(2026, 10, 23, 9, 41, 50, tzinfo=UTC)
+    assert binance.remote_status == REMOTE and binance.application_url.startswith("https://")
+    assert binance.source_url == "https://freehire.me/jobs/" + binance.source_job_id
+    assert "United Arab Emirates" in binance.location_raw
+
+
+def test_freehire_groups_title_words_five_at_a_time_and_keeps_wanted_titles():
+    from jobhunter.sources import freehire
+
+    groups = freehire.query_groups(["a", "b", "c", "d", "e", "f"])
+    assert len(groups) == 2 and groups[0].count(" OR ") == 4 and groups[1] == 'title:"f"'
+    source = freehire.FreehireSource([], ["backend"], pause=0)
+    assert source.wanted("Senior Backend Engineer") and not source.wanted("Full Stack Developer")
+
+
+def test_freehire_a_failed_search_costs_only_itself():
+    from jobhunter.sources import freehire
+
+    def respond(params):
+        if params.get("countries") == ["qa"]:
+            return http_error(freehire.API, 503)
+        return fixture_json("freehire_search.json")
+
+    source = freehire.FreehireSource([{"name": "Qatar", "countries": ["qa"]}, {"name": "Remote", "work_mode": "remote"}],
+                                     ["full stack"], pause=0)
+    result = source.fetch(FakeHttp({freehire.API: respond}))
+    assert len(result.errors) == 1 and result.errors[0].startswith("Qatar") and "?" not in result.errors[0]
+    assert result.jobs
+
+
+def test_freehire_keeps_the_postings_own_location_and_unglues_legal_forms():
+    from jobhunter.sources import freehire
+
+    # freehire tagged this Toronto posting as the UK: its country codes are never added
+    job = freehire.parse_job({"public_slug": "x", "company": "eworgmbh", "title": "Backend Engineer",
+                              "location": "Toronto, Canada", "countries": ["gb"]})
+    assert job.location_raw == "Toronto, Canada" and job.company == "ewor gmbh"
+    assert freehire.parse_job({"public_slug": "z", "company": "A", "title": "B", "location": "",
+                               "cities": ["Doha"], "countries": ["qa"]}).location_raw == "Doha"
+    assert freehire.company_name("Zinc") == "Zinc" and freehire.company_name("Acme Inc") == "Acme Inc"
+    source = freehire.FreehireSource([], [], pause=0)
+    assert source.skipped({"company": "GoCo Demo Account", "title": "Senior Software Developer"})
+    assert source.skipped({"company": "MeVitae", "title": "Software Engineer Demo Job - MeVitae-229"})
+    assert not source.skipped({"company": "Demofy", "title": "Backend Engineer"})

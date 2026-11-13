@@ -1,0 +1,387 @@
+{
+ "data": [
+  {
+   "public_slug": "full-stack-engineer-frontend-oriented-identity-security-binance-wshglrmj",
+   "source": "greenhouse",
+   "url": "https://job-boards.eu.greenhouse.io/binance/jobs/5007086101?utm_source=freehire.me",
+   "title": "Full Stack Engineer (Web,Frontend Oriented) — AI Facial Recognition, Identity & Security",
+   "company": "Binance",
+   "location": "Australia; Hong Kong; New Zealand; Singapore; Taiwan; United Arab Emirates",
+   "description": "Binance is a leading global blockchain ecosystem behind the world’s largest cryptocurrency exchange by trading volume and registered users. We are trusted by 300+ million people in 100+ countries for our industry-leading security, user fund transparency, trading engine speed, deep liquidity, and an unmatched portfolio of digital-asset products. Binance offerings range from trading and finance to e",
+   "work_mode": "remote",
+   "countries": [
+    "ae",
+    "au",
+    "hk",
+    "nz",
+    "sg",
+    "tw"
+   ],
+   "cities": [
+    "Hong Kong",
+    "Singapore"
+   ],
+   "posted_at": "2026-11-13T02:37:47Z",
+   "created_at": "2026-10-23T09:41:50Z",
+   "skills": [
+    "ai",
+    "android",
+    "api",
+    "authentication",
+    "blockchain"
+   ],
+   "enrichment": {
+    "summary": "Frontend-leaning full stack engineer at Binance building the login, registration, and account-security experience for 300M+ users, plus an in-house AI facial recognition/KYC product. Day to day: React/TypeScript web apps, Node.js SSR and BFF services, passkeys/FIDO2 and MFA orchestration across web, mini programs, and webviews.",
+    "experience_years_min": 3,
+    "education_level": "master",
+    "category": "fullstack",
+    "domains": [
+     "crypto"
+    ],
+    "posting_language": "en",
+    "company_type": "product",
+    "requirements": [
+     {
+      "text": "Bachelor's or Master's degree in Computer Science, Engineering, or equivalent industry experience",
+      "priority": "required"
+     },
+     {
+      "text": "3–8 years of frontend or full stack engineering experience, including consumer-facing products",
+      "priority": "required"
+     },
+     {
+      "text": "Strong web fundamentals: HTML, CSS, JavaScript/TypeScript, browser rendering, networking, caching, performance optimization",
+      "priority": "required"
+     },
+     {
+      "text": "Deep proficiency in React 18+ and TypeScript, state management, data-fetching, multi-step form/flow orchestration",
+      "priority": "required"
+     },
+     {
+      "text": "Production Node.js experience: SSR or isomorphic apps, BFF layering, API aggregation and caching, server-side debugging",
+      "priority": "required"
+     },
+     {
+      "text": "Methodology for modeling complex, stateful, interruptible/resumable flows into testable, reusable models",
+      "priority": "required"
+     },
+     {
+      "text": "Solid engineering practice: modular architecture, component design, unit and E2E testing, CI/CD, shared library versioning and rollout",
+      "priority": "required"
+     },
+     {
+      "text": "Proficient with AI-assisted development tools (Cursor / Claude Code / Copilot) in daily workflows",
+      "priority": "required"
+     },
+     {
+      "text": "Strong analytical and troubleshooting skills for production issues, compatibility problems, performance bottlenecks",
+      "priority": "required"
+     },
+     {
+      "text": "Fluency in Mandarin to coordinate with overseas partners and stakeholders",
+      "priority": "required"
+     },
+     {
+      "text": "Additional languages beyond Mandarin are an advantage",
+      "priority": "preferred"
+     }
+    ]
+   }
+  },
+  {
+   "public_slug": "software-engineer-technology-dubai-uae-2-5-yrs-experience-verified-opening-on-site-9-00-am-6-00-pm-gst-serves-uae-aed-18-000-aed-25-000-month-closes-31-jan-studdy-lab-skrjupot",
+   "source": "whatjobs-ae",
+   "url": "https://en-ae.whatjobs.com/pub_api__cpl__94534246__7102?utm_campaign=publisher&utm_medium=api&geoID=1743&utm_source=freehire.me",
+   "title": "Software Engineer  Technology  Dubai, UAE 2 - 5 yrs experience Verified opening On-site 9:00 AM - 6:00 PM GST Serves UAE AED 18,000 – AED 25,000 / month Closes 31 Jan",
+   "company": "Studdy Lab",
+   "location": "Dubai, United Arab Emirates",
+   "description": "Build the platform that powers Studdy: learner apps, school tools, payments and internal systems used across countries.\n\nYour code ships to learners and schools in seven countries.\n\nRequirements:\n-------------\n\n* Excellent English communication, spoken and written.\n* Basic French: an A2 French certificate is required before your visa application. You can learn it after you are selected, with any p",
+   "work_mode": null,
+   "countries": [
+    "ae"
+   ],
+   "cities": [
+    "Dubai"
+   ],
+   "posted_at": "2026-11-12T03:33:21Z",
+   "created_at": "2026-11-12T03:33:21Z",
+   "skills": [
+    "javascript",
+    "nodejs",
+    "postgresql",
+    "react",
+    "sql"
+   ],
+   "enrichment": {
+    "summary": "Software engineer building Studdy's edtech platform end to end — learner apps, school tools, payments and internal systems serving learners and schools in seven countries. On-site in Dubai, working with TypeScript/JavaScript, React, Node.js and Postgres.",
+    "relocation": "supported",
+    "visa_sponsorship": true,
+    "timezone_note": "On-site 9:00 AM - 6:00 PM GST",
+    "salary_min": 18000,
+    "salary_max": 25000,
+    "salary_currency": "AED",
+    "salary_period": "month",
+    "experience_years_min": 2,
+    "category": "software_engineering",
+    "domains": [
+     "edtech"
+    ],
+    "posting_language": "en",
+    "company_type": "product",
+    "requirements": [
+     {
+      "text": "Excellent English communication, spoken and written",
+      "priority": "required"
+     },
+     {
+      "text": "A2 French certificate required before visa application",
+      "priority": "required"
+     },
+     {
+      "text": "2+ years building production web applications",
+      "priority": "required"
+     },
+     {
+      "text": "Strong in TypeScript/JavaScript, React and Node.js",
+      "priority": "required"
+     },
+     {
+      "text": "Good SQL (Postgres preferred)",
+      "priority": "required"
+     }
+    ]
+   }
+  },
+  {
+   "public_slug": "full-stack-razrabotchik-bitrix-laboratoriia-gemotest-ladm3vpd",
+   "source": "hh",
+   "url": "https://hh.ru/vacancy/139442840?utm_source=freehire.me",
+   "title": "Full stack разработчик Bitrix",
+   "company": "Лаборатория Гемотест",
+   "location": "Москва",
+   "description": "*Мы ищем full stack разработчика PHP Bitrix + Vue3, для поддержания работоспособности и развития интернет ресурсов компании.*\n\n*Вам предстоит разрабатывать и улучшать сервисы, которые ежедневно используют десятки тысяч пользователей и клиентов в России и странах СНГ.*\n\n*Обязанности:*\n\n* Разработка новых подсистем сайта gemotest.ru и других наших онлайн систем на платформе Bitrix\n* Оптимизация кода",
+   "work_mode": "remote",
+   "countries": [
+    "ru"
+   ],
+   "cities": [
+    "Moscow"
+   ],
+   "posted_at": "2026-11-12T15:03:14Z",
+   "created_at": "2026-11-12T17:01:52Z",
+   "skills": [
+    "1c",
+    "api",
+    "css",
+    "ecommerce",
+    "html"
+   ],
+   "enrichment": {
+    "employment_type": "full_time",
+    "category": "fullstack",
+    "posting_language": "ru",
+    "requirements": [
+     {
+      "text": "Практический опыт разработки информационных систем на платформе 1С-Битрикс от 3 лет",
+      "priority": "required"
+     },
+     {
+      "text": "Уверенное знание PHP, JavaScript, Vue, Nuxt, MySQL, HTML, CSS;",
+      "priority": "required"
+     },
+     {
+      "text": "Наличие сертификатов/экзаменов по Битрикс и знание внутренней архитектуры и API 1С-Битиркс, умение писать компоненты и модули, D7, ORM D7.",
+      "priority": "required"
+     },
+     {
+      "text": "Опыт разработки высоконагруженного e-commerce проекта",
+      "priority": "required"
+     },
+     {
+      "text": "Знание принципов построения высоконагруженных систем (Memcache, nginx, master-slave репликация mysql, кластеризация web-серверов)",
+      "priority": "required"
+     },
+     {
+      "text": "Желателен опыт разработки модулей для 1С-Bitrix;",
+      "priority": "required"
+     },
+     {
+      "text": "Умение анализировать поставленные задачи и предлагать наиболее подходящее решение",
+      "priority": "required"
+     },
+     {
+      "text": "Самоорганизация и ответственность. Мы работаем удаленно. В рабочее время Вы должны быть доступны и готовы к выполнению задач. В случае возникновения проблем — вовремя сигнализировать о них.",
+      "priority": "required"
+     }
+    ]
+   }
+  },
+  {
+   "public_slug": "ai-engineer-pjslb25k",
+   "source": "eures",
+   "url": "https://europa.eu/eures/portal/jv-se/jv-details/NjAyMTdkNzUtNTM1My1lYmZjLWUwNjMtNjg5M2IyMGFjZDA5IDQy?lang=en&utm_source=freehire.me",
+   "title": "AI Engineer",
+   "company": "",
+   "location": "'S-GRAVENHAGE, Netherlands",
+   "description": "- AI engineer loop voorop in de strijd AI engineer Stedin Den Haag Fulltime 36/40 uur Solliciteer direct Salaris €5.000 per maand - 36/40 uur per week - Fulltime 01 Wil jij jouw AI-expertise inzetten om deze wereld fundamenteel te veranderen? Bij onze opdrachtgever zoeken we een AI Engineer die een leidende rol wil spelen in de ontwikkeling van ons baanbrekende AI-platform. Wij zijn continue aan h",
+   "work_mode": null,
+   "countries": [
+    "nl"
+   ],
+   "cities": [
+    "The Hague"
+   ],
+   "posted_at": "2026-11-13T03:13:36Z",
+   "created_at": "2026-11-13T09:32:53Z",
+   "skills": [
+    "ai",
+    "aws",
+    "azure",
+    "ci-cd",
+    "gcp"
+   ],
+   "enrichment": {
+    "employment_type": "contract",
+    "category": "ai_engineering",
+    "posting_language": "nl"
+   }
+  },
+  {
+   "public_slug": "full-stack-developer-get-devs-u2bjrgve",
+   "source": "jazzhr",
+   "url": "https://getdevs.applytojob.com/apply/emDAvab37B/Full-Stack-Developer?utm_source=freehire.me",
+   "title": "Full Stack Developer",
+   "company": "Get Devs",
+   "location": "Remote",
+   "description": "Full Stack Developer\n\n*POSITION OVERVIEW*\nGet Devs is looking for a responsible and highly motivated Engineer who is ready to take ownership of the design, development, and implementation of AI-driven solutions. You will work closely with our advisory and technology teams, turning ideas into intelligent systems that create real value for our clients in the legal, risk, and compliance sectors.\nResh",
+   "work_mode": "remote",
+   "countries": [
+    "ph"
+   ],
+   "cities": [],
+   "posted_at": "2026-11-12T21:47:48Z",
+   "created_at": "2026-11-12T21:47:48Z",
+   "skills": [
+    "agentic-ai",
+    "ai",
+    "aws",
+    "cloud",
+    "ecs"
+   ],
+   "enrichment": {
+    "summary": "Remote (Philippines-only) Full Stack Developer at Get Devs building AI solutions that automate legal, risk, and compliance work: RAG pipelines, NLP, prompt engineering and agentic workflows in Python, with React/Next.js, Laravel/MySQL on AWS (ECS, Terraform). Contract or full-time, morning schedule, start ASAP.",
+    "employment_type": "contract",
+    "timezone_note": "Morning shift schedule; remote work setup",
+    "experience_years_min": 3,
+    "category": "fullstack",
+    "domains": [
+     "ai",
+     "other"
+    ],
+    "posting_language": "en",
+    "company_type": "outsource",
+    "requirements": [
+     {
+      "text": "Philippines-based Filipino citizens only",
+      "priority": "required"
+     },
+     {
+      "text": "At least 5 years of experience as a Software Engineer",
+      "priority": "required"
+     },
+     {
+      "text": "3+ years of experience in AI/ML engineering",
+      "priority": "required"
+     },
+     {
+      "text": "AI/ML experience preferably in legal, regulatory, or compliance domains",
+      "priority": "preferred"
+     },
+     {
+      "text": "Proficiency in Python",
+      "priority": "required"
+     },
+     {
+      "text": "Strong experience building RAG pipelines, NLP, and prompt engineering",
+      "priority": "required"
+     },
+     {
+      "text": "Proven track record of shipping and operating systems at scale with high reliability",
+      "priority": "required"
+     },
+     {
+      "text": "Rigorous testing, code-review, and documentation habits",
+      "priority": "required"
+     },
+     {
+      "text": "Familiarity with AWS (or equivalent cloud platforms)",
+      "priority": "required"
+     }
+    ]
+   }
+  },
+  {
+   "public_slug": "data-analyst-insights-sql-python-growth-training-jobleader-wcf3fq3n",
+   "source": "whatjobs-ae",
+   "url": "https://en-ae.whatjobs.com/pub_api__cpl__94543930__7102?utm_campaign=publisher&utm_medium=api&geoID=2201&utm_source=freehire.me",
+   "title": "Data Analyst: Insights, SQL/Python, Growth & Training",
+   "company": "JobLeader",
+   "location": "Khor Fakkan, United Arab Emirates",
+   "description": "JobLeader is seeking a Data Analyst to join our team in Haur-Fakkan, United Arab Emirates. You will collect, analyze, and interpret data to reveal insights on organizational performance and support strategic decisions with accurate data.\n\nThe role requires a Bachelor's degree in a related field and proven data analysis experience, with strong skills in Python, SQL, and R, plus the ability to inter",
+   "work_mode": null,
+   "countries": [
+    "ae"
+   ],
+   "cities": [
+    "Khawr Fakkān"
+   ],
+   "posted_at": "2026-11-11T19:33:06Z",
+   "created_at": "2026-11-11T19:33:06Z",
+   "skills": [
+    "python",
+    "sql"
+   ],
+   "enrichment": {
+    "summary": "JobLeader is hiring a Data Analyst in Khor Fakkan, UAE, to collect, analyze, and interpret organizational data and support strategic decisions with accurate insights. The role centers on Python, SQL, and R for data analysis.",
+    "education_level": "bachelor",
+    "category": "data_analytics",
+    "posting_language": "en",
+    "requirements": [
+     {
+      "text": "Bachelor's degree in a related field",
+      "priority": "required"
+     },
+     {
+      "text": "Proven data analysis experience",
+      "priority": "required"
+     },
+     {
+      "text": "Strong Python skills",
+      "priority": "required"
+     },
+     {
+      "text": "Strong SQL skills",
+      "priority": "required"
+     },
+     {
+      "text": "Strong R skills",
+      "priority": "required"
+     },
+     {
+      "text": "Ability to interpret complex datasets",
+      "priority": "required"
+     },
+     {
+      "text": "Ability to communicate findings clearly",
+      "priority": "required"
+     }
+    ]
+   }
+  }
+ ],
+ "meta": {
+  "total": 6,
+  "limit": 50,
+  "offset": 0
+ }
+}

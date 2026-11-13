@@ -195,6 +195,25 @@
       { "keywords": "software engineer visa sponsorship", "location": "Netherlands", "max_pages": 2 }
     ]
   },
+  "freehire": {
+    "_note": "freehire.me's public API (src/jobhunter/sources/freehire.py): one aggregator over ~450 sources and ~180 ATS platforms we do not read (Bayt, Naukri, Workday, Oracle, iCIMS, Taleo, Personio, JazzHR, Comeet, Wellfound...). No key. Each search runs the `queries` 5 title words at a time; every request waits `pause` seconds. A job is dated by freehire's created_at (its posted_at is re-dated, a median 18 days late). skip_sources: whatjobs re-posts under rewritten company names (hid an agency, brought back a rejected job; links are a whatjobs page), the others post in Russian or Spanish. Checked 2026-11-13: docs/research/2026-11-13-freehire-as-a-source.md.",
+    "enabled": true,
+    "days": 2,
+    "max_pages": 4,
+    "pause": 1.0,
+    "skip_sources": ["whatjobs-*", "hh", "habr_career", "getmatch", "huntflow", "getonbrd", "superjob", "djinni"],
+    "queries": ["software engineer", "backend", "back end", "python", "full stack", "fullstack", "ai engineer",
+                "forward deployed", "solutions engineer", "platform engineer", "product engineer",
+                "automation engineer", "integration engineer", "integrations engineer", "applied ai",
+                "founding engineer", "django", "fastapi", "web developer", "software developer"],
+    "searches": [
+      { "name": "UAE", "countries": ["ae"] },
+      { "name": "Qatar", "countries": ["qa"], "days": 3 },
+      { "name": "Lebanon", "countries": ["lb"], "days": 7 },
+      { "name": "Remote", "work_mode": "remote" },
+      { "name": "Visa list countries", "countries": ["gb", "nl", "de", "ie", "es", "it", "fi"] }
+    ]
+  },
   "himalayas": {
     "_note": "country=LB makes Himalayas return jobs that list Lebanon or list no countries. No countries is treated as unknown, not worldwide. It searches all the profile's target roles, not only Python/backend words: it is the source with the most applied-to jobs (checked 2026-10-19).",
     "enabled": true,

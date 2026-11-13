@@ -12,6 +12,7 @@ from . import (
     bamboohr,
     custom_page,
     euremotejobs,
+    freehire,
     getro,
     greenhouse,
     hackernews,
@@ -51,6 +52,7 @@ BUILDERS = {
     "jobicy": jobicy.from_config,
     "euremotejobs": euremotejobs.from_config,
     "linkedin": linkedin.from_config,
+    "freehire": freehire.from_config,
 }
 
 # Sections that configure something other than one source (boards.py reads "watch_boards").

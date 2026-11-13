@@ -159,3 +159,39 @@ against a trimmed real response, per the project's source convention.
   gain is smaller but clean.
 
 Cost: free, no key, ~20-40 requests a run.
+
+## Built and run (2026-11-13, same day)
+
+`sources/freehire.py`, with `whatjobs-*` and the Russian/Spanish boards skipped, dated by
+`created_at`, and the posting's own location only (freehire's country codes were wrong on
+some jobs: "Toronto, Canada" and "Bucharest" tagged as the UK, so they are never used).
+Two more gaps found on the way and fixed: freehire wrote EWOR as `eworgmbh`, which hid it
+from `agency.py` (the adapter now puts the space back), and Emirates NBD's
+"Software Engineer" said "(UAE National)" only in its text (added to `local_only`, checked
+against the stored jobs: the bare words would have hit "UAE National Allowance" and
+"Qatar National Bank").
+
+One full run on a copy of the database, with the AI check and the fit grade, as the daily
+run does it (2-day window, ~80 requests, ~3.5 minutes, $0.07 of AI check):
+
+```
+717 listings, 626 not already stored
+593 rejected (rules, then 14 by the AI check)
+ 16 shortlisted   grades: one 4, the rest 1-2
+ 17 visa_list     grades: six 4, two 3, the rest 1-2
+```
+
+Against the last 14 days of the other sources (grade 3+ per day: ~6 shortlisted, ~6 visa
+list):
+
+- **Visa list: useful.** ~4 more grade-3+ jobs a day, from big employers whose own ATS we
+  do not read: Google London, MongoDB Ireland, ServiceNow Dublin, Workday Dublin,
+  Booking.com Amsterdam, Tradeweb London, Motorola Glasgow, Kneat Limerick, Machine
+  Medicine London, apoha London.
+- **Remote and Gulf: little.** One grade-4 shortlisted job (TECDATA) and one Dubai job
+  (Cognita, grade 2). The Gulf gain measured earlier was almost all whatjobs, which is
+  skipped for the reasons above.
+- Known leftover: company names written differently still slip past dedup now and then
+  ("Visa Europe Limited" vs a stored "Visa" job). Cost: an occasional repeat in the list.
+
+Kept enabled as is: it is free and fast, and the visa-list gain alone is worth it.
