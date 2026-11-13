@@ -106,8 +106,12 @@ def _what_you_did(row: sqlite3.Row) -> str:
 
 
 def _rank(row: sqlite3.Row) -> tuple:
-    """Best copy first: the one you acted on, then the newest posting, then the newest row."""
-    return (acted_on(row), row["posted_at"] or row["first_seen"] or "", row["id"])
+    """Best copy first: the one you acted on, then a dated posting, then the newest, then the newest row.
+
+    A dated copy wins over an undated one because an undated job sorts by the day it was found,
+    which is today, and the date lookup later in the same run may still reject it as `too_old`.
+    """
+    return (acted_on(row), bool(row["posted_at"]), row["posted_at"] or row["first_seen"] or "", row["id"])
 
 
 def clusters(rows: list[sqlite3.Row]) -> list[list[sqlite3.Row]]:
@@ -148,11 +152,17 @@ def _reason(keeper: sqlite3.Row) -> str:
 
 
 def duplicates(rows: list[sqlite3.Row]) -> list[Duplicate]:
-    """Which copies of a role to reject, given every copy still shortlisted or on the visa list."""
+    """Which copies of a role to reject, given every copy still shortlisted or on the visa list.
+
+    A copy you acted on yourself is never rejected, whichever one is kept: it is not in a waiting
+    list, so it clutters nothing, and rejecting it would put a job you applied to under Rejected,
+    with a red chip on its card in Tracked. Only the copies still waiting are folded away.
+    """
     out = []
     for group in clusters(rows):
         keeper, *copies = group
-        out += [Duplicate(r["id"], keeper["id"], r["company"], r["title"], _reason(keeper)) for r in copies]
+        out += [Duplicate(r["id"], keeper["id"], r["company"], r["title"], _reason(keeper))
+                for r in copies if not acted_on(r)]
     return out
 
 

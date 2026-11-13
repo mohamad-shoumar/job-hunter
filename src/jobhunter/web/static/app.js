@@ -70,6 +70,8 @@ function gradeChip(g) {
   return `<span class="chip ${tone}" title="${esc(g.reason)}">grade ${g.grade}/5</span>`;
 }
 const companyKey = (r) => (r.company || "").trim().toLowerCase() || `#${r.id}`;
+// The two Jobs tab views that show one box per company: the jobs still waiting for a decision.
+const GROUPED_VIEWS = new Set(["shortlisted", "visa_list"]);
 
 // A job with no grade yet sorts in the middle (3), as on the server (fitgrade.UNGRADED).
 // One board fetch can bring a whole company at once (17 Palantir London roles on 2026-10-21, 15 at
@@ -241,6 +243,19 @@ async function loadJobs() {
   if (!data.jobs.length) {
     const filtered = state.yoe || state.days !== "0" || state.q;
     list.innerHTML = `<div class="empty">${filtered ? "No jobs match these filters." : "No jobs here."}</div>`;
+    return;
+  }
+  // Only the two lists of jobs still waiting are grouped. Tracked, Closed, Rejected and the LinkedIn
+  // follow-ups are lists of jobs you are already working: each row has to stand on its own there, and
+  // a second one at the same company must never sit behind a button.
+  if (!GROUPED_VIEWS.has(state.view)) {
+    let day = null;
+    list.innerHTML = data.jobs.map((j) => {
+      const d = j.report_date || (j.first_seen || "").slice(0, 10);
+      const head = d !== day ? `<div class="day-head">${esc(d)}</div>` : "";
+      day = d;
+      return head + jobRow(j);
+    }).join("");
     return;
   }
   // The server's order decides where a company sits (its first row's place in the list); its own jobs

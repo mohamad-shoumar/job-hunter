@@ -244,6 +244,13 @@ def render(day: str, rows: list[sqlite3.Row], sightings: dict[int, list[sqlite3.
                     f"{_cell(r['where_now'] or 'no location')} on {r['source']}: {r['now_is']}"
                     for r in back]
             out += [""]
+        folded = summary.get("duplicates") or []
+        if folded:
+            out += [f"**Copies of a role already kept** ({len(folded)} rejected `duplicate_role`, "
+                    "one company, one title, one place, two postings):", ""]
+            out += [f"- {_cell(d['company'])} - {_cell(d['title'])} (job #{d['job_id']}): {_cell(d['reason'])}"
+                    for d in folded]
+            out += [""]
         dates = summary.get("date_check")
         if dates:
             found = ", ".join(f"{n} {v}" for v, n in sorted(dates["found"].items())) or "none"

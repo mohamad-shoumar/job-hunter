@@ -70,6 +70,27 @@ def test_the_copy_you_acted_on_is_kept_even_when_it_is_older(filters):
     assert "it is under Reached out" in found[0].reason
 
 
+def test_a_copy_you_acted_on_is_never_rejected(filters):
+    """Rejecting it would put a job you applied to under Rejected, with a red chip in Tracked."""
+    store = JobStore(":memory:")
+    old, new = copies(store, filters, [("London, UK", 5), ("London", 1)])
+    set_stage(store, old, "reached_out", NOW)
+    set_stage(store, new, "closed", NOW, reason="skipped")
+    assert duplicates(role_copies(store, fingerprint("Acme", make_job().title))) == []
+
+
+def test_a_dated_copy_is_kept_over_an_undated_one(filters):
+    """An undated job sorts by the day it was found, and the date lookup may reject it later."""
+    store = JobStore(":memory:")
+    undated = store_job(store, filters, source_job_id="a", location_raw="London", posted_at=None,
+                        application_url="https://job-boards.greenhouse.io/acme/jobs/1")
+    dated = store_job(store, filters, source_job_id="b", location_raw="London, UK",
+                      application_url="https://job-boards.greenhouse.io/acme/jobs/2",
+                      posted_at=NOW - timedelta(days=3))
+    found = duplicates(role_copies(store, fingerprint("Acme", make_job().title)))
+    assert [(d.job_id, d.kept_id) for d in found] == [(undated, dated)]
+
+
 def test_a_role_you_skipped_does_not_come_back_when_it_is_posted_again(filters):
     store = JobStore(":memory:")
     skipped, fresh = copies(store, filters, [("London, UK", 10), ("London", 1)])  # both still inside the age limit
