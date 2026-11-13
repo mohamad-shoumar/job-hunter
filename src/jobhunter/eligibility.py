@@ -238,6 +238,9 @@ def assess_eligibility(job: Job, relocation: Relocation | None = None, visa: Vis
 def _assess_gulf_remote(job: Job, restricted: list[PlaceMatch], desc: DescriptionSignals,
                         gulf: GulfRemote, notes: list[str]) -> Assessment:
     """A remote job listed in Kuwait or Bahrain: countries you would work for, not move to (gulf.py)."""
+    title = gulf.title_local_only.search(job.title or "") if gulf.title_local_only else None
+    if title:
+        return Assessment(NOT_ELIGIBLE, [f'Only for nationals or residents (title): "{job.title}"'], "local_only")
     text = job.description or ""
     m = gulf.local_only.search(text) if gulf.local_only else None
     if m:

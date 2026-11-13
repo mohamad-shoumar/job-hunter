@@ -3,7 +3,7 @@ import pytest
 from jobhunter.classify import classify
 from jobhunter.config import Filters
 from jobhunter.extract import enrich
-from jobhunter.models import HYBRID, ONSITE, REJECTED, REMOTE, SHORTLISTED
+from jobhunter.models import HYBRID, ONSITE, REJECTED, REMOTE, SHORTLISTED, AiCheck
 
 from .conftest import FIXTURES, NOW, make_job
 
@@ -185,3 +185,42 @@ def test_a_remote_kuwait_job_whose_text_names_another_country_is_rejected(filter
     result = _classify(filters, remote_status=REMOTE, allowed_locations=["Kuwait"], description=text)
     assert result.status == REJECTED and result.reject_code == "location_restricted"
     assert "based in India" in result.reject_reason
+
+
+def _with_check(filters, quote, reason="The careers page says so.", verdict="cannot_hire"):
+    """A remote Kuwait job whose AI check quotes a page: the description itself says nothing about where."""
+    check = AiCheck(verdict, reason, quote, "https://example.com/careers", verified=True)
+    return _classify(filters, remote_status=REMOTE, allowed_locations=["Kuwait City, Kuwait"],
+                     description="Python APIs.", ai_check=check)
+
+
+def test_the_ai_check_cannot_reject_a_kuwait_job_on_its_location_alone(filters):
+    # The rules kept it knowing where it is listed, and the model is told a country list means
+    # "cannot hire": quoting the location back is not an answer.
+    result = _with_check(filters, "Kuwait City, Kuwait")
+    assert result.status == SHORTLISTED and result.eligibility.code == "gulf_remote"
+    assert "only repeats the location the rules already read" in result.eligibility.reasons[-1]
+
+
+def test_the_ai_check_still_rejects_a_kuwait_job_on_a_real_rule(filters):
+    for quote in ("You must be based in Kuwait for this role.", "We do not sponsor visas.",
+                  "This role is open to candidates in India only.", "Kuwait residents only."):
+        result = _with_check(filters, quote)
+        assert result.status == REJECTED and result.reject_code == "ai_cannot_hire", quote
+
+
+def test_a_residency_rule_in_the_posting_itself_rejects_it_without_the_ai_check(filters):
+    result = _classify(filters, remote_status=REMOTE, allowed_locations=["Kuwait City, Kuwait"],
+                       description="Python APIs. You must be based in Kuwait for this role.")
+    assert result.status == REJECTED and result.reject_code == "location_restricted"
+
+
+def test_the_ai_check_can_still_clear_a_kuwait_job(filters):
+    result = _with_check(filters, "We hire across the Middle East.", verdict="can_hire")
+    assert result.status == SHORTLISTED and result.eligibility.code == "ai_can_hire"
+
+
+def test_a_nationals_only_title_in_kuwait_is_rejected(filters):
+    result = _classify(filters, remote_status=REMOTE, title="Software Engineer - Kuwaiti National Only",
+                       allowed_locations=["Kuwait City, Kuwait"])
+    assert result.status == REJECTED and result.reject_code == "local_only"

@@ -177,7 +177,10 @@ class Filters:
             relocation=relocation,
             visa=VisaRules.from_dict(data.get("visa_list")),
             # The "already in the country" phrases are written once, in the relocation section.
-            gulf_remote=GulfRemote.from_dict(data.get("gulf_remote"), relocation.local_only if relocation else None),
+            gulf_remote=GulfRemote.from_dict(
+                data.get("gulf_remote"),
+                relocation.local_only if relocation else None,
+                relocation.title_local_only if relocation else None),
             junior_only=JuniorOnly.from_dict(data.get("junior_only")),
         )
 
