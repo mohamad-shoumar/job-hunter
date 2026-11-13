@@ -1,0 +1,154 @@
+# Master profile
+
+> **This file is the only source of facts about me.** Every CV, cover letter and
+application answer is built from it.
+> 
+> 
+> Tailoring MAY: reorder sections and bullets, emphasize what is relevant,
+> rephrase bullets, and remove what is not relevant.
+> 
+> Tailoring MUST NEVER add a skill, technology, employer, job title, date,
+> responsibility, achievement, metric or certification that is not written here.
+> If a job asks for something that is not in this file, the answer is a gap, not
+> a new bullet.
+> 
+> Anything marked `TODO` is unknown. Leave it out of generated material until it
+> is filled in with real facts.
+> 
+> Sources: `~/Documents/resume/output/Shoumar_Resume_General.pdf` (September
+> 
+> 1. and what I stated when setting up this project.
+
+## Basics
+
+- Name: Mohamad Shoumar
+- Headline: Backend Engineer
+- Email: [shoumar.mohamad1@gmail.com](mailto:shoumar.mohamad1@gmail.com)
+- Phone: +961 81 811 614
+- LinkedIn: linkedin.com/in/mohamad-shoumar
+- Location: Beirut, Lebanon
+- Open to: remote work as an international contractor, through an employer of record (EOR), or as a direct international employee
+- Open to relocation: UAE or Qatar, for at least 5000 usd/month (60000 usd/year); remote interviews only (will not fly in to interview)
+- Open to relocation to Europe, including the UK, with visa sponsorship from the employer (stated by me 2026-10-15)
+- GitHub: github.com/mohamad-shoumar
+- Portfolio: [https://mohamadshoumar.com/](https://mohamadshoumar.com/)
+- Spoken languages and levels: Arabic (Native), English (Advanced)
+
+## Summary of experience
+
+- About 3.3 years of software engineering (June 2023 – present, as of September 2026), all at CoinQuant
+- Backend-heavy, with full-stack and mobile work earlier on
+- Currently Team Lead, leading a team of 3 engineers
+
+Summary (printed on the CV word for word; stated by me 2026-10-20):
+
+Founding Engineer at a fast-paced startup, helping scale a production platform to **15,000** users. I leverage AI-native development practices, including multi-agent orchestration, AI-driven testing, and autonomous bug triage and resolution, to accelerate delivery without compromising reliability. I take ownership, drive initiatives, and approach engineering decisions from the client's perspective, focusing on solving real problems and delivering business value.
+
+## Target roles
+
+Backend Engineer · Software Engineer  · AI Engineer · Forward Deployed Engineer · Solutions Engineer · AI Automation Engineer · Full Stack Engineer
+
+## Experience
+
+Each bullet starts with its tags (see “Tailoring rules” below). `Printed title:`
+lines are the titles a CV may print for that role; the `###` heading keeps the
+real title.
+
+### Team Lead - Algorithmic Trader — CoinQuant (Abu Dhabi)        Sept 2025 – Present
+
+Printed title: Team Lead [default]
+
+- [core] Architected an event-driven AWS Lambda and SQS backtesting system, scaling execution to **800+ concurrent jobs**. Implemented dead-letter queues, retry mechanisms, idempotent PostgreSQL result writes, and credit refunds to ensure reliable failure recovery.
+- [core] Built a comprehensive test suite across the testing pyramid, uncovering **40 bugs and edge cases** during implementation and catching regressions in subsequent PRs.
+- [core] Designed and implemented a slippage model that improves backtest realism and trading cost accuracy.
+- [core] Led development of a multi-position scaling feature, enabling advanced position sizing strategies.
+- [core] Lead a team of 3 engineers through sprint planning, code reviews, and a strict unit and integration testing culture.
+- [fullstack, lead] Built the interactive backtest chart in Next.js and TypeScript on TradingView Lightweight Charts: trade entry/exit markers, indicator panes and win/loss filters, with candle and indicator data lazy-loaded as the user pans. (Confirmed by me 2026-09-30: my commits in `nextjs-frontend-coinquant/src/components/chart`, Apr-Aug 2026. The divergence pivots and the “Why this trade?” panel are a teammate’s work, never claim them.)
+- [automation] Built and own an internal LLM automation flow that uses AI agents for extraction, classification, and triage, with validation gates that check every output before it ships - 115+ version-controlled workflows covering code review, release QA, and deploy gates.
+- [automation] Own third-party API integrations end to end, including an event-driven Slack gateway that routes authenticated events, enforces scoped permissions, and reliably handles bot-to-bot messages in production. (Confirmed by me 2026-09-27; from the spare bullets in `~/Documents/resume/resume.md`.)
+
+### Backend Developer — CoinQuant (Abu Dhabi)        Aug 2024 – Aug 2025
+
+- [core] Led the migration from Bazel to Poetry across 4 Python microservices, simplifying dependency management and reducing estimated dependency update and conflict-resolution effort by **~70%**. (Confirmed by me 2026-10-22: 4 microservices; ~70% is my estimate.)
+- [core] Standardized the local development workflow, reducing environment setup and iteration time for the backend team.
+
+### Full Stack Developer — CoinQuant (Abu Dhabi)        Jun 2023 – Jul 2024
+
+- [core] Developed RESTful Python APIs for the backtesting platform, delivering market and simulation data to the frontend.
+- [core] Built the backtesting platform UI from scratch, turning a backend-only tool into intuitive, usable software.
+- [fullstack, mobile] Developed and deployed a portfolio management app using React Native and Firebase, enabling investors to track P&L, transactions, and investment performance through charts and weekly, monthly, and quarterly reports.
+
+All three CoinQuant roles: full time, working remotely from Beirut, Lebanon for
+the Abu Dhabi company. 
+
+## Skills (confirmed)
+
+Only skills listed here may appear on a CV.
+
+- Languages: Python, SQL, TypeScript, JavaScript
+- Frameworks: Django, FastAPI, Node.js, React, Next.js, React Native
+- Databases: PostgreSQL, MongoDB, Firebase
+- Tools & Platforms: AWS (Lambda, SQS), TradingView, Docker, Git, Datadog, Grafana, AI coding agents, Claude Code, Testsprite
+- Concepts & Methodologies: API design, system design, async programming, serverless architecture, event-driven architecture, message queues, data integration, microservices, LLM/AI automation, unit & integration testing, TDD, Agile/Scrum, distributed systems, agentic workflows, multi-agent orchestration, loop engineering, RAG
+
+## Projects
+
+Side project
+
+Job Hunter 
+- Built an AI-powered job discovery platform that scans **10,000+** postings a day from 19 sources and narrows them to the top **10-20** matches, combining rule-based filtering with LLM eligibility checks. (Confirmed by me 2026-10-22: data/jobs.sqlite runs 34-40 read 10-13k postings per run, 2 runs a day, 19 sources; 10-20 shortlisted or visa-list jobs on most days.)
+
+## Education
+
+- Software Engineering Factory — Full Stack Software Engineering Bootcamp, Nov 2022 – May 2023. Completed the boot camp as a Star Developer with a Full stack web app.
+- American University of Beirut — Psychology, Sep 2018 – Jun 2021. Degree type: BS
+
+## Certifications
+
+Newest first. Always on the CV. (Confirmed by me 2026-09-30.)
+
+- Software Engineering Factory — Applied AI Engineering Workshop, Sep 2026. Built a support agent with tool calling, RAG, structured outputs, evaluations, and human approval gates.
+- Zapier Academy — AI Builder Path, Mar 2026. Built multi-step Zaps with AI steps, webhooks, scheduling, and Zapier Tables to move data between business tools.
+
+## Tailoring rules
+
+Which bullets and title a CV prints. Code (`cv.py`) and `build.py new` follow these.
+
+- `[core]` bullets are always printed. A bullet with no tag counts as core.
+- An optional bullet is printed only when the job matches one of its tags:
+    - `lead`: the job asks for leading, managing or mentoring engineers (Team Lead, Tech Lead, Engineering Manager).
+    - `fullstack`: a full-stack or frontend job, or one that asks for React / Next.js.
+    - `automation`: the job is about automation, AI or LLMs, or lists AI agents, LLM workflows, Slack or third-party integration work as a requirement.
+    - `mobile`: the job asks for mobile or React Native.
+- Printed title: the `[default]` one, unless the job matches another one’s tag. CoinQuant’s current role prints Team Lead for every job (changed 2026-10-09).
+- Certifications are always printed.
+
+## Work authorization and logistics
+
+- Lives in Beirut, Lebanon
+- Needs: remote role open to Lebanon residents (contractor, EOR, or direct international employment), or a role I relocate for (see "Open to relocation" in Basics)
+- Time zone: Lebanon, UTC+2 (winter) / UTC+3 (summer)
+- Notice period / availability: 2 weeks
+- Compensation expectations: 3500-6000 usd
+- Salary floor on application forms: 3000 usd/month (36000 usd/year); never ask for less
+- Current salary (only for "current salary" questions): 10000 AED/month (about 2700 usd/month). (Stated by me 2026-10-13.)
+- Current benefits: Class A medical insurance; annual bonus up to 3 months; annual budget for courses and certificates (professional development). (Stated by me 2026-10-13.)
+
+## Voluntary self-identification (forms only)
+
+Only for the voluntary / EEO questions on application forms. Never "Prefer not to say" for these, except where a line below says so. (Stated by me 2026-10-21.)
+
+- Gender: Male
+- Gender identity: Male only
+- Sexual orientation: Heterosexual / straight
+- Race / ethnicity: White (always, even when "Middle Eastern" or "Arab" is offered)
+- Disability: No, I don't have a disability
+- Veteran status: I am not a protected veteran
+- Transgender: No
+- Pronouns: he/him
+- Hispanic or Latino: No
+- Date of birth: 27/03/1999 (stated 2026-10-28)
+- Age: 27 (stated 2026-10-21); age range 25-34; over 18: Yes; over 40: No
+- Nationality / citizenship: Lebanese
+- Religion: Prefer not to say
+- Marital status: Single (stated 2026-10-28)

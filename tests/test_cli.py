@@ -3,6 +3,7 @@
 
 import json
 import shutil
+from datetime import timedelta
 
 import pytest
 
@@ -136,6 +137,29 @@ def test_reclassify_applies_an_edited_filter_and_rebuilds_that_day_s_report(home
     assert (job["status"], job["reject_code"]) == ("rejected", "review_cleared")
     text = path.read_text()
     assert "## Shortlisted (0)" in text and "never again" in text
+
+
+def test_reclassify_folds_a_second_copy_of_a_role_and_then_leaves_it_alone(home, capsys, filters):
+    """The rules give a copy rejected `duplicate_role` its own status back, and the fold pass takes
+    it away again: the second run must report nothing and rebuild nothing (duplicates.py)."""
+    store = JobStore(home / "data" / "jobs.sqlite")
+    # Same company and title as #1, and the same place (neither names one), but its own posting.
+    copy = store_job(store, filters, source_job_id="4", posted_at=NOW - timedelta(days=4),
+                     application_url="https://job-boards.greenhouse.io/acme/jobs/4")
+    store.set_report_date([copy], DAY)
+    store.commit()
+    store.close()
+
+    assert jobhunter(home, "reclassify") == 0
+    out = capsys.readouterr().out.splitlines()
+    assert out[0] == "    1  duplicate copies rejected"
+    assert out[1].endswith('at Acme, no location given, posted 2026-09-25 (the newest posting of this role)')
+    assert stored(home, copy)["reject_code"] == "duplicate_role"  # #1 is the newer posting
+    assert stored(home, 1)["status"] == "shortlisted"
+
+    assert jobhunter(home, "reclassify") == 0
+    assert capsys.readouterr().out.startswith("no changes\n")
+    assert stored(home, copy)["reject_code"] == "duplicate_role"
 
 
 def test_sources_lists_what_is_on_and_why_the_rest_is_not(home, capsys):

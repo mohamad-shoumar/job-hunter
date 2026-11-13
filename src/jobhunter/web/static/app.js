@@ -69,28 +69,54 @@ function gradeChip(g) {
   const tone = g.grade >= 4 ? "good" : g.grade <= 2 ? "warn" : "";
   return `<span class="chip ${tone}" title="${esc(g.reason)}">grade ${g.grade}/5</span>`;
 }
+const companyKey = (r) => (r.company || "").trim().toLowerCase() || `#${r.id}`;
+// The two Jobs tab views that show one box per company: the jobs still waiting for a decision.
+const GROUPED_VIEWS = new Set(["shortlisted", "visa_list"]);
+
 // A job with no grade yet sorts in the middle (3), as on the server (fitgrade.UNGRADED).
-// One board fetch can bring a whole company at once (17 Palantir London roles on 2026-10-21):
-// show each company's best job (grade, then fit) and a button for the rest. Display only; statuses are unchanged.
-// `order` sorts the companies by their shown job; without it they keep the grade order.
-function onePerCompany(rows, grade, order) {
+// One board fetch can bring a whole company at once (17 Palantir London roles on 2026-10-21, 15 at
+// Deliveroo on 2026-11-13): a company's jobs are grouped, best first (grade, then fit), and shown
+// under one box. Display only; every job keeps its status.
+// `order` sorts the companies by their best job; without it they keep the grade order.
+function byCompany(rows, grade, order) {
   const groups = new Map();
   [...rows].sort((a, b) => (grade(b) || 3) - (grade(a) || 3) || (b.fit ?? b.fit_score ?? 0) - (a.fit ?? a.fit_score ?? 0))
     .forEach((r) => {
-      const key = (r.company || "").trim().toLowerCase() || `#${r.id}`;
+      const key = companyKey(r);
       groups.has(key) ? groups.get(key).push(r) : groups.set(key, [r]);
     });
-  const list = [...groups];
-  if (order) list.sort(([, [a]], [, [b]]) => order(a, b));
-  return list.flatMap(([key, [best, ...others]]) => [
-    { ...best, _key: key, _more: others.length },
-    ...(state.expanded.has(key) ? others : []),
+  const list = [...groups.values()];
+  if (order) list.sort(([a], [b]) => order(a, b));
+  return list;
+}
+// The same grouping as a flat list, for the places that draw plain rows (Today).
+function onePerCompany(rows, grade, order) {
+  return byCompany(rows, grade, order).flatMap(([best, ...others]) => [
+    { ...best, _key: companyKey(best), _more: others.length },
+    ...(state.expanded.has(companyKey(best)) ? others : []),
   ]);
 }
 function moreButton(r) {
   if (!r._more) return "";
   const open = state.expanded.has(r._key);
   return `<button class="btn small" data-more="${esc(r._key)}">${open ? "Hide" : `+${r._more}`} more at ${esc(r.company)}</button>`;
+}
+// One company, one box: its best job, a badge counting the others, and the others when you press it,
+// so a company that posted ten roles takes one place in the list and you choose from inside it
+// (the user's call, 2026-11-14). A company with one job is drawn as before, with no box around it.
+function companyBox(jobs, drawRow) {
+  const [best, ...others] = jobs;
+  if (!others.length) return drawRow(best);
+  const key = companyKey(best);
+  const open = state.expanded.has(key);
+  const roles = (n) => `role${n > 1 ? "s" : ""} at ${best.company}`;
+  const label = open ? `Hide ${jobs.length} ${roles(jobs.length)}` : `${others.length} more ${roles(others.length)}`;
+  return `<div class="company-box ${open ? "open" : ""}">
+    ${(open ? jobs : [best]).map(drawRow).join("")}
+    <button class="btn small company-more" data-more="${esc(key)}">
+      <span class="caret">${open ? "&#9652;" : "&#9662;"}</span> ${esc(label)}
+    </button>
+  </div>`;
 }
 // Why you skip a job: one tap, plus an optional note. The fit grade learns from these.
 function skipPicker(id) {
@@ -219,12 +245,31 @@ async function loadJobs() {
     list.innerHTML = `<div class="empty">${filtered ? "No jobs match these filters." : "No jobs here."}</div>`;
     return;
   }
+  // Only the two lists of jobs still waiting are grouped. Tracked, Closed, Rejected and the LinkedIn
+  // follow-ups are lists of jobs you are already working: each row has to stand on its own there, and
+  // a second one at the same company must never sit behind a button.
+  if (!GROUPED_VIEWS.has(state.view)) {
+    let day = null;
+    list.innerHTML = data.jobs.map((j) => {
+      const d = j.report_date || (j.first_seen || "").slice(0, 10);
+      const head = d !== day ? `<div class="day-head">${esc(d)}</div>` : "";
+      day = d;
+      return head + jobRow(j);
+    }).join("");
+    return;
+  }
+  // The server's order decides where a company sits (its first row's place in the list); its own jobs
+  // are then grouped into one box under that day, each row still showing its own date.
+  const place = new Map();
+  data.jobs.forEach((j, i) => place.has(companyKey(j)) || place.set(companyKey(j), i));
+  const groups = byCompany(data.jobs, (j) => j.fit_grade?.grade,
+    (a, b) => place.get(companyKey(a)) - place.get(companyKey(b)));
   let lastDay = null;
-  list.innerHTML = data.jobs.map((j) => {
-    const d = j.report_date || (j.first_seen || "").slice(0, 10);
+  list.innerHTML = groups.map((jobs) => {
+    const d = jobs[0].report_date || (jobs[0].first_seen || "").slice(0, 10);
     const head = d !== lastDay ? `<div class="day-head">${esc(d)}</div>` : "";
     lastDay = d;
-    return head + jobRow(j);
+    return head + companyBox(jobs, jobRow);
   }).join("");
 }
 
@@ -628,17 +673,25 @@ async function renderPipeline() {
   // A saved job is in the tracked list too (and a visa-list one may be older than the two days): it shows once, in To apply.
   const waiting = [...open.jobs, ...visa.jobs].filter(toApplyStage);
   const ids = new Set(waiting.map((j) => j.id));
-  const toApply = onePerCompany([...waiting, ...tracked.jobs.filter((j) => j.stage === "saved" && !ids.has(j.id))], grade, newestDay(postedAt));
+  // To apply is grouped: one box per company, its best job on top and the rest a press away, so a
+  // board fetch that brought ten roles at one company is one choice, not ten cards (2026-11-14).
+  const toApply = byCompany([...waiting, ...tracked.jobs.filter((j) => j.stage === "saved" && !ids.has(j.id))], grade, newestDay(postedAt));
   const reachedOut = tracked.jobs.filter((j) => j.stage === "reached_out").sort(newestReachedOut);
   // The closed list holds rejections too: they come from their own list instead, so no card shows twice.
   const isRejected = (j) => j.closed_reason === "rejected";
-  const jobs = [...toApply, ...reachedOut, ...tracked.jobs.filter((j) => !toApplyStage(j) && j.stage !== "reached_out"),
+  const jobs = [...toApply.flat(), ...reachedOut, ...tracked.jobs.filter((j) => !toApplyStage(j) && j.stage !== "reached_out"),
     ...(rejected ? rejected.jobs : closed.jobs.filter(isRejected)), ...closed.jobs.filter((j) => !isRejected(j))];
   const options = (current) => BOARD
     .map((c) => `<option value="${c.key}" ${c.key === current ? "selected" : ""}>${esc(c.label || stageLabel(c.stage))}</option>`).join("");
-  $("#main").innerHTML = `<div class="board">${BOARD.map((col) => {
+  // The To apply column draws one box per company; every other column one card per job.
+  const drawn = (col) => {
     const cards = jobs.filter((j) => boardKey(j) === col.key);
-    return `<div class="column"><h3>${esc(col.label || stageLabel(col.stage))} <span>${cards.length}</span></h3>${cards.map((j) => `
+    const html = col.key === "to_apply"
+      ? toApply.map((group) => companyBox(group, (j) => pcard(j, col))).join("")
+      : cards.map((j) => pcard(j, col)).join("");
+    return { count: cards.length, html: html || `<div class="small muted" style="margin-top:8px">Empty</div>` };
+  };
+  const pcard = (j, col) => `
       <div class="pcard">
         <div class="job-title" data-open="${j.id}">${esc(j.title)}</div>
         <div class="small muted">${esc(j.company)}</div>
@@ -651,8 +704,11 @@ async function renderPipeline() {
           ${j.closed_reason && col.key === "closed" ? `<span class="chip">${esc(j.closed_reason)}${j.skip_reason ? esc(": " + ((state.status?.skip_reasons || {})[j.skip_reason] || j.skip_reason)) : ""}</span>` : ""}
         </div>
         <div class="row"><select data-move="${j.id}">${options(col.key)}</select>
-          ${col.key === "to_apply" ? `<button class="btn small danger" data-quick="skipped" data-id="${j.id}">Skip</button>${moreButton(j)}` : ""}</div>
-      </div>`).join("") || `<div class="small muted" style="margin-top:8px">Empty</div>`}</div>`;
+          ${col.key === "to_apply" ? `<button class="btn small danger" data-quick="skipped" data-id="${j.id}">Skip</button>` : ""}</div>
+      </div>`;
+  $("#main").innerHTML = `<div class="board">${BOARD.map((col) => {
+    const { count, html } = drawn(col);
+    return `<div class="column"><h3>${esc(col.label || stageLabel(col.stage))} <span>${count}</span></h3>${html}</div>`;
   }).join("")}</div>`;
 }
 
