@@ -14,7 +14,9 @@ from datetime import date, datetime
 from pathlib import Path
 
 from .fitgrade import grade_of, sort_grade
-from .models import ELIGIBLE, LIKELY, REJECTED, REVIEW_CLEARED, SHORTLISTED, VISA_LIST
+from .models import (
+    DUPLICATE_ROLE, ELIGIBLE, LIKELY, REJECTED, REVIEW_CLEARED, SHORTLISTED, VISA_LIST,
+)
 from .store import JobStore
 
 _ELIGIBILITY_ORDER = {ELIGIBLE: 0, LIKELY: 1}
@@ -52,6 +54,9 @@ _REJECT_GROUPS = [
      "Asks for, or is written in, one of `languages` in the `visa_list` section of `config/filters.json`. Quoted."),
     ("no_visa_evidence", "Abroad: no sign it sponsors a visa",
      "The posting does not offer one, and the company is not on its country's sponsor list (or there is none)."),
+    (DUPLICATE_ROLE, "Another copy of a role already kept",
+     "One company, one title, one place, two postings (duplicates.py): the copy carrying your work, "
+     "else the newest posting, is kept and the rest are rejected. The job kept is named."),
     ("ai_cannot_hire", "AI check: cannot hire from Lebanon",
      "The rules could not tell, so Claude searched the web. Its quote was found word for word on the linked page; "
      "open the link if the job looks worth it."),

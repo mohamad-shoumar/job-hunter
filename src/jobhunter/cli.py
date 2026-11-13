@@ -16,12 +16,14 @@ from .ai_check import build_checker, check_jobs
 from .posted_date import build_finder, find_dates
 from .classify import classify, recheck_age
 from .config import Filters, Paths, load_dotenv, load_json, resolve_root
+from .duplicates import fold
 from .extract import enrich
 from .fitgrade import build_grader, grade_jobs, to_grade
 from .report import write_report
 from .sources import build_sources
 from .models import REVIEW_CLEARED, UNCLEAR
 from .store import JobStore, row_to_job
+from .store.lists import roles_with_copies
 from .text import utcnow
 
 
@@ -361,6 +363,7 @@ def cmd_reclassify(args) -> int:
     changed_days: set[str] = set()
     now = utcnow()
     pending: list = []
+    folded: list = []
 
     def save() -> None:
         # A run takes minutes: the jobs are judged with no write lock held and
@@ -387,6 +390,17 @@ def cmd_reclassify(args) -> int:
             if len(pending) == 100:
                 save()
         save()
+        # The rules judge one posting alone, so they have just given every copy of a role its
+        # status back. Work the duplicates out again from the stored jobs (duplicates.py): the
+        # same rule the daily run uses, so running it twice changes nothing the second time.
+        for role in roles_with_copies(store):
+            for copy in fold(store, role):
+                changes["duplicate copies rejected"] += 1
+                folded.append(copy)
+                day = store.get(copy.job_id)["report_date"]  # its day's report now shows it as rejected
+                if day:
+                    changed_days.add(day)
+        store.commit()
         summary = store.last_run_stats()
         rebuilt = [write_report(store, paths.reports_dir, day, summary, now, filters.max_posting_age_days)
                    for day in sorted(changed_days)]
@@ -396,6 +410,8 @@ def cmd_reclassify(args) -> int:
         print("no changes")
     for change, count in changes.most_common():
         print(f"{count:5}  {change}")
+    for copy in folded:
+        print(f"  #{copy.job_id} {copy.company} - {copy.title}: {copy.reason}")
     for path in rebuilt:
         print(f"rebuilt {path}")
     print("jobs that became shortlisted/visa_list and were never reported go into the next daily report")
