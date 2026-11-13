@@ -1,6 +1,6 @@
 import pytest
 
-from jobhunter.classify import classify
+from jobhunter.classify import classify, gulf_quote_adds_evidence
 from jobhunter.config import Filters
 from jobhunter.extract import enrich
 from jobhunter.models import HYBRID, ONSITE, REJECTED, REMOTE, SHORTLISTED, AiCheck
@@ -224,3 +224,32 @@ def test_a_nationals_only_title_in_kuwait_is_rejected(filters):
     result = _classify(filters, remote_status=REMOTE, title="Software Engineer - Kuwaiti National Only",
                        allowed_locations=["Kuwait City, Kuwait"])
     assert result.status == REJECTED and result.reject_code == "local_only"
+
+
+def test_a_region_narrowed_to_kuwait_is_kept_not_a_conflict(filters):
+    # "Remote, MENA" with the location Kuwait City: the narrower rule applies, and for these
+    # countries that is the remote-only list, not a rejection.
+    result = _classify(filters, remote_status=REMOTE, title="Backend Engineer (Remote, MENA)",
+                       allowed_locations=["Kuwait City, Kuwait"])
+    assert result.status == SHORTLISTED and result.eligibility.code == "gulf_remote"
+
+
+def test_a_kuwait_job_the_text_doubts_is_kept_on_this_list_too(filters):
+    # Not `conflict`: the code is what stops the AI check rejecting it on the location alone.
+    result = _classify(filters, remote_status=REMOTE, allowed_locations=["Kuwait City, Kuwait"],
+                       description="Python APIs. This role is globally remote.")
+    assert result.status == SHORTLISTED and result.eligibility.code == "gulf_remote"
+    assert "The posting also says:" in result.eligibility.reasons[1]
+    check = AiCheck("cannot_hire", "The posting is for Kuwait.", "Kuwait City, Kuwait",
+                    "https://example.com/job", verified=True)
+    kept = _classify(filters, remote_status=REMOTE, allowed_locations=["Kuwait City, Kuwait"],
+                     description="Python APIs. This role is globally remote.", ai_check=check)
+    assert kept.status == SHORTLISTED and kept.eligibility.code == "gulf_remote"
+
+
+def test_the_guard_covers_the_quotes_an_ats_posting_gives(filters):
+    # PagesChecker formats a Greenhouse/Lever/Ashby posting as "Location: <name>".
+    for quote in ("Location: Kuwait City, Kuwait", "Remote - Kuwait", "Kuwait City, Al Asimah, Kuwait",
+                  "Manama, Capital Governorate, Bahrain"):
+        assert not gulf_quote_adds_evidence(quote, filters.gulf_remote), quote
+        assert _with_check(filters, quote).status == SHORTLISTED, quote

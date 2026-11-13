@@ -250,9 +250,10 @@ def _assess_gulf_remote(job: Job, restricted: list[PlaceMatch], desc: Descriptio
     if desc.restrictions:
         return Assessment(NOT_ELIGIBLE, [f'Restricted to {_quote(restricted)}, and the description limits '
                                          f'location: "{desc.restrictions[0]}"'], "location_restricted")
+    doubt = [f'The posting also says: "{desc.specific_positive}"'] if desc.specific_positive else []
     return Assessment(UNCLEAR, [f"Remote, listed in {_quote(restricted)}: a country you would work for from "
                                 f"Lebanon, not move to ({gulf.countries}). Can they hire someone living in "
-                                "Lebanon?"] + notes, "gulf_remote")
+                                "Lebanon?"] + doubt + notes, "gulf_remote")
 
 
 def _assess_remote(job: Job, field_texts: list[str], field_matches: list[PlaceMatch],
@@ -287,6 +288,12 @@ def _assess_remote(job: Job, field_texts: list[str], field_matches: list[PlaceMa
             conflicts.append(f"location: {_quote(field_restricted)}")
         kinds = {m.kind for m in positive}
         if conflicts:
+            # "Remote, MENA" narrowed to "Kuwait City": the narrower rule applies, and for these
+            # countries that means the remote-only list, not a rejection (gulf.py).
+            narrowed = ([] if title_positive else title_restricted) + ([] if field_positive else field_restricted)
+            if (gulf and job.remote_status == REMOTE and narrowed and not desc.restrictions and not tz_conflict
+                    and gulf.only_place([m.evidence for m in narrowed])):
+                return _assess_gulf_remote(job, narrowed, desc, gulf, notes)
             return Assessment(
                 NOT_ELIGIBLE,
                 [f"Location says {_quote(positive)}, but: " + " | ".join(conflicts)] + notes,
@@ -300,16 +307,18 @@ def _assess_remote(job: Job, field_texts: list[str], field_matches: list[PlaceMa
 
     restricted = field_restricted + title_restricted
     if restricted:
+        # Remote in a Gulf country you would work for but not move to: the AI check asks whether
+        # they can hire from Lebanon. Only remote, so on-site there stays rejected (not_remote).
+        # Before the doubt below, so a job with one is judged here too and keeps the code that
+        # stops the AI check from rejecting it on the location alone (classify.py).
+        if gulf and job.remote_status == REMOTE and gulf.only_place([m.evidence for m in restricted]):
+            return _assess_gulf_remote(job, restricted, desc, gulf, notes)
         # "Remote - Europe (UTC-1 to UTC+3)": the place may be loose wording
         # for a time zone window that does include Lebanon.
         tz_in_field = next((timezone_signal(t) for t in field_texts if timezone_signal(t)), None)
         doubt = desc.specific_positive or (f"time zone window {tz_in_field}" if tz_in_field else None)
         if doubt:
             return Assessment(UNCLEAR, [f"Restricted to {_quote(restricted)}, but: {doubt}"] + notes, "conflict")
-        # Remote in a Gulf country you would work for but not move to: the AI check asks whether
-        # they can hire from Lebanon. Only remote, so on-site there stays rejected (not_remote).
-        if gulf and job.remote_status == REMOTE and gulf.only_place([m.evidence for m in restricted]):
-            return _assess_gulf_remote(job, restricted, desc, gulf, notes)
         return Assessment(NOT_ELIGIBLE, [f"Restricted to {_quote(restricted)}"] + notes, "location_restricted")
 
     if tz_conflict:
