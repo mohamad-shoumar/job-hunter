@@ -8,7 +8,8 @@ Stages, in order (models.STAGES): new -> saved -> reached_out -> replied ->
 interviewing -> offer, plus closed (with a reason: rejected, ghosted, skipped). "New" is a job
 you have not acted on yet: no row, or a row that only holds a draft or a
 contact the daily run found. "Reached out" covers both applying through the posting and emailing a
-person; `applied_at` and `emailed_at` say which.
+person; `applied_at` and `emailed_at` say which. Moving a new or saved job there by hand marks it
+applied (`move_by_hand`).
 
 Follow-ups come due on business days (Mon-Fri): 4 days after the first email,
 then 7 more (config/outreach.json). They are never sent automatically. A job
@@ -137,6 +138,18 @@ def mark_applied(store: JobStore, job_id: int, when: datetime | None, now: datet
     else:
         add_event(store, job_id, "applied", "Applied date cleared", now)
     return get_application(store, job_id)
+
+
+def move_by_hand(store: JobStore, job_id: int, stage: str, now: datetime, reason: str | None = None,
+                 skip_reason: str | None = None, skip_note: str = "") -> sqlite3.Row:
+    """A move the user made in the app. Moving a job not acted on yet (new or saved) to Reached out
+    also marks it applied, dated now: every card the user moves there is an application they
+    submitted (the user's call 2026-11-15). A move back from a later stage only changes the stage,
+    as in `mark_applied`: today's date would be wrong for an old application."""
+    row = ensure_application(store, job_id, now)
+    if stage == REACHED_OUT and row["stage"] in (NEW, SAVED) and not row["applied_at"]:
+        return mark_applied(store, job_id, now, now)
+    return set_stage(store, job_id, stage, now, reason=reason, skip_reason=skip_reason, skip_note=skip_note)
 
 
 # --- email lifecycle (called by mailer.py) -----------------------------------

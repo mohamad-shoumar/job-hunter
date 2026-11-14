@@ -339,8 +339,8 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
     @app.post("/api/jobs/{job_id}/stage")
     def stage(job_id: int, body: StageChange, store: JobStore = Depends(db)):
         job_or_404(store, job_id)
-        tracking.set_stage(store, job_id, body.stage, now(), reason=body.reason, skip_reason=body.skip_reason or None,
-                           skip_note=body.skip_note or "")
+        tracking.move_by_hand(store, job_id, body.stage, now(), reason=body.reason,
+                              skip_reason=body.skip_reason or None, skip_note=body.skip_note or "")
         store.commit()
         return _job_detail(store, store.get(job_id), config, services, profile(), now())
 

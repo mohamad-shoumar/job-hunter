@@ -97,6 +97,14 @@ def test_applied_jobs_say_when_you_reached_out(client):
     assert jobs[2]["reached_out_at"] is None
 
 
+def test_moving_a_card_to_reached_out_marks_it_applied(client):
+    r = client.post("/api/jobs/1/stage", json={"stage": "reached_out"}, headers=AUTH)
+    app = r.json()["application"]
+    assert app["stage"] == "reached_out" and app["applied_at"]
+    jobs = {j["id"]: j for j in client.get("/api/jobs?view=tracked").json()["jobs"]}
+    assert jobs[1]["reached_out_at"] == jobs[1]["applied_at"]
+
+
 def test_shortlisted_list_drops_jobs_you_reached_out_on(client):
     # Old jobs you already applied to read as new shortlisted ones; they live under Tracked.
     client.patch("/api/jobs/1/application", json={"applied": True}, headers=AUTH)

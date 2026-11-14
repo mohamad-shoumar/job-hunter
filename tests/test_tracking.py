@@ -52,6 +52,36 @@ def test_applying_moves_a_new_job_to_reached_out(store, filters):
     assert row["stage"] == REACHED_OUT and row["applied_at"] == iso(NOW)
 
 
+def test_moving_a_new_job_to_reached_out_by_hand_marks_it_applied(store, filters):
+    # Every card the user moves to Reached out is an application they submitted.
+    job_id = store_job(store, filters)
+    row = tracking.move_by_hand(store, job_id, REACHED_OUT, NOW)
+    assert row["stage"] == REACHED_OUT and row["applied_at"] == iso(NOW)
+    assert [e["kind"] for e in events_for(store, job_id)] == ["applied", "stage"]
+    saved = store_job(store, filters, source_job_id="2", company="Beta")
+    tracking.move_by_hand(store, saved, SAVED, NOW)
+    assert tracking.move_by_hand(store, saved, REACHED_OUT, NOW)["applied_at"] == iso(NOW)
+
+
+def test_a_move_back_to_reached_out_keeps_the_applied_date_it_had(store, filters):
+    # Today's date would be wrong for an old application, and an old move without one stays without.
+    old = store_job(store, filters)
+    tracking.set_stage(store, old, REACHED_OUT, NOW - timedelta(days=9))
+    tracking.set_stage(store, old, CLOSED, NOW - timedelta(days=2), reason="rejected")
+    row = tracking.move_by_hand(store, old, REACHED_OUT, NOW)
+    assert row["stage"] == REACHED_OUT and row["applied_at"] is None
+    applied = store_job(store, filters, source_job_id="2", company="Beta")
+    tracking.mark_applied(store, applied, NOW - timedelta(days=5), NOW - timedelta(days=5))
+    tracking.move_by_hand(store, applied, REPLIED, NOW - timedelta(days=1))
+    assert tracking.move_by_hand(store, applied, REACHED_OUT, NOW)["applied_at"] == iso(NOW - timedelta(days=5))
+
+
+def test_other_moves_by_hand_never_mark_applied(store, filters):
+    job_id = store_job(store, filters)
+    row = tracking.move_by_hand(store, job_id, CLOSED, NOW, reason="skipped", skip_note="German needed")
+    assert row["closed_reason"] == "skipped" and row["skip_note"] == "German needed" and row["applied_at"] is None
+
+
 def _outreach_rows(store):
     """The app's job list: every job these tests make is shortlisted and not closed."""
     return {r["id"]: r for r in job_list(store, "active")}
