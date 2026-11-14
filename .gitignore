@@ -21,6 +21,9 @@ reports/
 # details go in .env (MY_NAME, MY_EMAIL, ...).
 profile/master_profile.md
 resume/resume.md
+# Backups of those two (master_profile.md.bak-<date>, resume.md.bak-<date>) are just as personal.
+profile/master_profile.md*
+resume/resume.md*
 
 # The resume folder: build.py is tracked; the CVs, cover letters and the
 # applications sheet it produces are personal output, like reports/.
