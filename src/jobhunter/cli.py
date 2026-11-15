@@ -140,8 +140,12 @@ def cmd_run(args) -> int:
 
 
 def _print_discovery(found) -> None:
+    from .discovery import site_line
+
     print(f"Boards found on visa job sites: {len(found.added)} "
           f"({found.wanted} target-role listings of {found.listed} in your visa-list countries)")
+    if found.by_site:
+        print(f"  per site: {site_line(found.by_site)}")
     for added in found.added:
         print(f"  {added['board']} ({added['company']}): {added['reason']}")
     if found.unreadable:

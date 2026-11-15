@@ -8,8 +8,11 @@ third party's say-so, with no language check. So they are used to find companies
 with a target-role title in a visa-list country links to the employer's own posting, and when that
 link names a Greenhouse, Lever or Ashby board the daily run doesn't fetch yet, the board is added to
 `watched_boards`, the reason naming the site and the listing (at most `max_new_per_run` a run, so a
-first run spreads its load). From the next run the board's real postings are read and judged by the
-usual rules, like any watched board (boards.py).
+first run spreads its load). The two sites' listings are taken in turn, so they share that limit:
+read one after the other, EuropeVisaJobs' 1,400 listings filled it before The Stack's were looked at
+(2026-11-15: 15 boards of 15 from EuropeVisaJobs). Each run counts every site's listings, target
+titles and boards (`by_site`), so a site that quietly returns nothing shows as 0. From the next run
+the board's real postings are read and judged by the usual rules, like any watched board (boards.py).
 
 A link on the company's own site that only carries a Greenhouse job id (`?gh_jid=`) names no board:
 slugs made from the company name are tried, and a board is kept only when it lists the same title
@@ -101,12 +104,35 @@ class DiscoverRun:
     added: list[dict] = field(default_factory=list)
     probed: int = 0
     unreadable: Counter = field(default_factory=Counter)  # wanted listings on boards the app can't read, by kind
+    # Per site read this run: {"listed": n, "wanted": n, "added": n}. A site that failed or found nothing shows 0.
+    by_site: dict[str, dict[str, int]] = field(default_factory=dict)
     notes: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {"listed": self.listed, "wanted": self.wanted, "added": self.added, "probed": self.probed,
-                "unreadable": dict(self.unreadable), "notes": self.notes, "errors": self.errors}
+                "unreadable": dict(self.unreadable), "by_site": self.by_site, "notes": self.notes,
+                "errors": self.errors}
+
+
+
+def site_line(by_site: dict[str, dict[str, int]]) -> str:
+    """'EuropeVisaJobs 1,343 listed, 300 target, 8 boards; The Stack 120 listed, 66 target, 7 boards'."""
+    return "; ".join(f"{site} {n['listed']:,} listed, {n['wanted']:,} target, {n['added']} boards"
+                     for site, n in by_site.items())
+
+
+def _site(run: DiscoverRun, site: str, listed: int) -> None:
+    run.by_site[site] = {"listed": listed, "wanted": 0, "added": 0}
+
+
+def in_turn(found: list[Listing]) -> list[Listing]:
+    """The sites' listings taken one each in turn, each site keeping its own order."""
+    queues: dict[str, list[Listing]] = {}
+    for listing in found:
+        queues.setdefault(listing.site, []).append(listing)
+    longest = max((len(q) for q in queues.values()), default=0)
+    return [q[i] for i in range(longest) for q in queues.values() if i < len(q)]
 
 
 def europevisajobs(http, countries: dict[str, str]) -> list[Listing]:
@@ -152,16 +178,22 @@ def listings(http, filters: Filters, config: DiscoverConfig, run: DiscoverRun) -
     found: list[Listing] = []
     if config.europevisajobs:
         codes = {_EVJ_CODES.get(c.code, c.code.upper()): c.name for c in countries}
+        site: list[Listing] = []
         try:
-            found += europevisajobs(http, codes)
+            site = europevisajobs(http, codes)
         except Exception as exc:  # one site down must not stop the other
             run.errors.append(f"EuropeVisaJobs: {describe_error(exc)}")
+        _site(run, "EuropeVisaJobs", len(site))
+        found += site
     if config.the_stack:
         names = {_STACK_NAMES[c.code]: c.name for c in countries if c.code in _STACK_NAMES}
+        site = []
         try:
-            found += the_stack(http, names, config.the_stack_days, config.max_stack_pages)
+            site = the_stack(http, names, config.the_stack_days, config.max_stack_pages)
         except Exception as exc:
             run.errors.append(f"The Stack: {describe_error(exc)}")
+        _site(run, "The Stack", len(site))
+        found += site
     return found
 
 
@@ -175,7 +207,7 @@ def discover(store: JobStore, http, sources_config: dict, filters: Filters, outr
     if not filters.visa:
         run.notes.append("no visa_list countries in config/filters.json: nothing to look for")
         return run
-    found = listings(http, filters, config, run)
+    found = in_turn(listings(http, filters, config, run))
     run.listed = len(found)
     configured = configured_boards(sources_config)
     rows = watched_boards(store, include_removed=True)
@@ -192,6 +224,7 @@ def discover(store: JobStore, http, sources_config: dict, filters: Filters, outr
         if not check_title(listing.title, filters)[0]:
             continue
         run.wanted += 1
+        run.by_site[listing.site]["wanted"] += 1
         key = company_key(listing.company)
         if never_watch(key, filters, outreach, job_boards) or filters.agencies.check(listing.company, ""):
             continue
@@ -238,6 +271,7 @@ def discover(store: JobStore, http, sources_config: dict, filters: Filters, outr
             add_watched_board(store, kind, slug, listing.company, key, None, reason, now)
         known.add(name)
         run.added.append({"board": f"{kind}:{slug}", "company": listing.company, "reason": reason})
+        run.by_site[listing.site]["added"] += 1
     if not dry_run:
         store.commit()
     return run
