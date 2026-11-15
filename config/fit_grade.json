@@ -10,7 +10,7 @@
   "lookback_days": 7,
   "description_chars": 6000,
   "workers": 4,
-  "_interview": "When a posting does not say how they interview, the company is looked up once on the web (Claude Code with web search), its quote checked on the page code fetches, and kept for interview_recheck_days. At most max_interview_lookups_per_run companies a run, best score first (about 20-30 s each; on 2026-11-15, 2 of 6 companies tried had an answer code could check). 0 turns it off.",
+  "_interview": "When a posting does not say how they interview, the company is looked up once: the public hiring-without-whiteboards list, then the web (Claude Code with web search), its quote checked on the page code fetches, and kept for interview_recheck_days. At most max_interview_lookups_per_run companies a run, best score first (about 20-30 s each; on 2026-11-15, 2 of 6 companies tried had an answer code could check). 0 turns it off.",
   "interview_model": "claude-code:sonnet",
   "max_interview_lookups_per_run": 10,
   "interview_recheck_days": 90
