@@ -29,7 +29,7 @@ from .models import ELIGIBLE, REMOTE, VISA_LIST
 from .relocation import Relocation
 from .sponsors import LISTS
 from .text import normalize_words
-from .visa import VisaRules, read_posting
+from .visa import VisaRules, offers_relocation
 
 # --- skills match: 40 --------------------------------------------------------
 
@@ -88,9 +88,6 @@ TRACK_RECORD = 23  # evidence of earlier international hires (a sponsor register
 REMOTE_FROM_LEBANON = 20  # a remote role that says it can be done from Lebanon
 UNCONFIRMED = 15  # nothing against it, international hiring not confirmed
 
-_RELOCATION_WORD = re.compile(r"\breloca\w*", re.I)
-
-
 def _short(text: str, width: int = 140) -> str:
     text = " ".join((text or "").split())
     return text if len(text) <= width else text[: width - 1] + "…"
@@ -103,41 +100,56 @@ def _ai_check(row: sqlite3.Row) -> dict:
         return {}
 
 
+def _visa_offer(why: str, text: str, quote: str) -> tuple[int, str]:
+    """30 when the posting also offers help moving (not negated), else 27."""
+    moves = offers_relocation(text)
+    if moves:
+        return VISA_AND_RELOCATION, f'{why}: "{_short(quote)}", and help moving: "{_short(moves, 100)}"'
+    return HIRES_ABROAD, f'{why}: "{_short(quote)}"'
+
+
+def _quoted_after(reason: str, marker: str) -> str:
+    """The quote a rule's reason carries after `marker` ('the posting offers a visa: "..."')."""
+    rest = reason.split(marker, 1)[1] if marker in reason else ""
+    m = re.search(r'"(.+)"', rest)
+    return m.group(1) if m else rest.strip()
+
+
 def visa_points(row: sqlite3.Row, relocation: Relocation | None = None,
                 other_offer: str | None = None) -> tuple[int, str]:
     """The best row of the visa and location table that this job has evidence for.
 
-    `other_offer` is a visa sentence from another posting of the same company (the
-    track record the store found), or None.
+    Read from the verdict the rules already wrote (its first reason's fixed wording: visa.assess_visa,
+    relocation.assess_relocation), so the score and the reason on screen never disagree; the AI check's
+    verified quote for the rest. `other_offer` is the company's track record (fitgrade.other_offer), or None.
     """
-    reasons = " ".join(json.loads(row["eligibility_reasons_json"] or "[]"))
+    reasons = json.loads(row["eligibility_reasons_json"] or "[]")
+    first = reasons[0] if reasons else ""
+    text = row["description"] or ""
     check = _ai_check(row)
     verified = bool(check.get("verified"))
-    remote = row["remote_status"] == REMOTE and row["status"] != VISA_LIST
-    moving = not remote or (relocation is not None and relocation.place_in([row["location_raw"] or ""]) is not None)
-    if remote:
+    register = next((name for name in LISTS.values() if name in " ".join(reasons)), None)
+
+    if row["status"] == VISA_LIST:
+        if "the posting offers a visa:" in first:
+            return _visa_offer("offers a visa", text, _quoted_after(first, "the posting offers a visa:"))
+        if "offers help moving" in first:
+            return HIRES_ABROAD, f'offers help moving: "{_short(_quoted_after(first, "(ask):"))}"'
+    elif "a country you would move to; the posting offers:" in first:  # the UAE or Qatar
+        return _visa_offer("offers", text, _quoted_after(first, "the posting offers:"))
+    elif row["remote_status"] == REMOTE:
         if row["eligibility"] == ELIGIBLE:
-            return REMOTE_FROM_LEBANON, f"remote, open to Lebanon: {_short(reasons)}"
+            return REMOTE_FROM_LEBANON, f"remote, open to Lebanon: {_short(first)}"
         if verified and check.get("verdict") == "can_hire":
             return REMOTE_FROM_LEBANON, f'remote, the AI check found it can hire from Lebanon: "{_short(check.get("quote", ""))}"'
-        if not moving:
-            return UNCONFIRMED, "remote, hiring from Lebanon not confirmed"
-    posting = read_posting(row["description"] or "")
-    if posting.offers:
-        offer = posting.offers[0]
-        moves = any(_RELOCATION_WORD.search(s) for s in posting.offers) or posting.relocation
-        if moves:
-            return VISA_AND_RELOCATION, f'offers a visa and relocation help: "{_short(offer)}"'
-        return HIRES_ABROAD, f'offers a visa: "{_short(offer)}"'
     if verified and check.get("verdict") == "sponsors_visa":
-        return HIRES_ABROAD, f'the AI check found a visa offer: "{_short(check.get("quote", ""))}"'
-    if posting.relocation:
-        return HIRES_ABROAD, f'offers help moving: "{_short(posting.relocation[0])}"'
-    register = next((name for name in LISTS.values() if name in reasons), None)
+        return _visa_offer("the AI check found a visa offer", check.get("quote", ""), check.get("quote", ""))
     if register:
         return TRACK_RECORD, f"the company is on {register}"
-    if other_offer:
+    if other_offer and row["remote_status"] != REMOTE:
         return TRACK_RECORD, f'their other postings offered a visa: "{_short(other_offer, 200)}"'
+    if row["remote_status"] == REMOTE and row["status"] != VISA_LIST:
+        return UNCONFIRMED, "remote, hiring from Lebanon not confirmed"
     return UNCONFIRMED, "nothing against it, international hiring not confirmed"
 
 

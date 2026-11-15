@@ -256,9 +256,34 @@ def cmd_report(args) -> int:
     return 0
 
 
+def _rescore(args, paths, filters) -> int:
+    """`jobhunter grade --rescore`: the code parts again (salary floors, visa, years), no model call."""
+    from .fitgrade import FitGradeConfig, grade_of, rescore
+
+    config = FitGradeConfig.load(paths.fit_grade_file)
+    now = utcnow()
+    store = JobStore(paths.db_file)
+    try:
+        if args.job_ids:
+            rows = [row for row in (store.get(i) for i in args.job_ids) if row]
+        else:
+            rows = to_grade(store, now, args.days or config.lookback_days, regrade=True)
+        rows = [row for row in rows if grade_of(row)]
+        changed = rescore(store, rows, paths.profile_file, filters)
+        store.commit()
+        for day in sorted(changed):
+            write_report(store, paths.reports_dir, day, store.last_run_stats(), now, filters.max_posting_age_days)
+    finally:
+        store.close()
+    print(f"{len(rows)} scored jobs looked at again; report days rewritten: {', '.join(sorted(changed)) or 'none'}")
+    return 0
+
+
 def cmd_grade(args) -> int:
-    """AI fit grade for shown jobs: given ids, or the open (New or Saved) ungraded ones from the last days."""
+    """Fit score for shown jobs: given ids, or the open (New or Saved) unscored ones from the last days."""
     paths, _, filters = _load(args)
+    if args.rescore:
+        return _rescore(args, paths, filters)
     grader, note = build_grader(paths.fit_grade_file, require_enabled=False)
     if grader is None:
         raise SystemExit(note or "fit grades are off")
@@ -922,6 +947,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("job_ids", type=int, nargs="*", help="grade these jobs (again, if already graded)")
     p.add_argument("--regrade", action="store_true", help="score open jobs again")
     p.add_argument("--no-interviews", action="store_true", help="skip the company interview lookup")
+    p.add_argument("--rescore", action="store_true",
+                   help="no model: score the open scored jobs again from their stored answers (after changing "
+                   "FIT_SALARY_FLOORS or the rubric)")
     p.add_argument("--days", type=int, metavar="N", help="look back N report days (default: lookback_days)")
     p.add_argument("--limit", type=int, metavar="N", help="grade at most N jobs")
     p.set_defaults(func=cmd_grade)

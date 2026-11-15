@@ -254,6 +254,16 @@ def read_posting(text: str) -> Posting:
     return found
 
 
+def offers_relocation(text: str) -> str | None:
+    """The first sentence that offers help moving, read like read_posting reads one ("no relocation support"
+    and "benefits may include relocation" are not offers), or None. For the fit score (rubric.py)."""
+    for sentence in _sentences(text):
+        if not _MAYBE.search(sentence) and any(_RELOCATION.search(c) and not _NEGATION.search(c)
+                                               for c in _clauses(sentence)):
+            return sentence
+    return None
+
+
 def hn_visa(job: Job) -> tuple[str | None, bool]:
     """A Hacker News header field about visas ("VISA", "NO VISA"): (the field, whether it refuses)."""
     if job.source != "hackernews":

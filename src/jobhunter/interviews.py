@@ -46,10 +46,11 @@ _ROUNDS = re.compile(r"\b(\d|two|three|four|five|six|seven)[- ](?:stages?|steps?
 
 
 def read_note(note: str) -> dict | None:
-    """A process note judged by code: live coding named (and not negated) is "yes"; a note that describes a
-    process without it is "no"; anything else None."""
-    live = next((m for m in _LIVE.finditer(note) if not _NEGATED.search(note[:m.start()])), None)
-    if not live and not _PROCESS.search(note):
+    """A process note or quote judged by code: live coding named (and not negated) is "yes"; live coding
+    negated ("no whiteboard"), or a process described without it, is "no"; anything else None."""
+    found = list(_LIVE.finditer(note))
+    live = next((m for m in found if not _NEGATED.search(note[:m.start()])), None)
+    if not live and not found and not _PROCESS.search(note):  # "We never do live coding" says no by itself
         return None
     m = _ROUNDS.search(note)
     rounds = (int(m.group(1)) if m.group(1).isdigit() else _NUMBERS[m.group(1).lower()]) if m else None
@@ -70,7 +71,9 @@ Answer:
 test such as HackerRank, Codility or LeetCode; "no" when a source describes the process and it has none \
 of those (a take-home assignment or a system design talk is "no"); "unknown" when you found nothing clear.
 - rounds: the number of interview stages, or null.
-- quote: the exact words from source_url that say so, copied word for word (code checks them on that page).
+- quote: the exact words from source_url that say so, copied word for word (code checks them on that page). \
+The quote itself must name the step ("a 60-minute pair programming session", "a take-home task, then a \
+call"): code reads the quote, not the page title.
 - source_url: the page the quote is on.
 - reason: one short sentence on what you found.
 
@@ -141,6 +144,9 @@ class InterviewFinder:
         if found_at is None:
             why = "the page could not be read" if page is None else "its quote was not found on the page"
             return Lookup(None, self.label, url, f"Not used: {why}. {reason}")
+        read = read_note(quote)
+        if read is None or read["live_coding"] != live:
+            return Lookup(None, self.label, found_at, f"Not used: its quote does not say so by itself. {reason}")
         rounds = answer.get("rounds")
         return Lookup({"live_coding": live, "rounds": rounds if isinstance(rounds, int) and rounds > 0 else None,
                        "quote": quote, "source": found_at}, self.label, found_at, reason)

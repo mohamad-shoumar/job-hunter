@@ -128,8 +128,16 @@ def test_visa_rows_by_evidence(store, filters):
 
     both = onsite(1, "We offer visa sponsorship and relocation support.")
     visa_only = onsite(2, "Visa sponsorship is available for this role.")
+    no_move = onsite(3, "Visa sponsorship available (no relocation support).")
     assert both["status"] == "visa_list" and rubric.visa_points(both)[0] == 30
     assert rubric.visa_points(visa_only)[0] == 27
+    assert no_move["status"] == "visa_list" and rubric.visa_points(no_move)[0] == 27
+    # A remote job the AI check found sponsors a visa (with its quote verified).
+    remote = dict(store.get(store_job(store, filters, source_job_id="ai", allowed_locations=[])))
+    remote["ai_check_json"] = json.dumps({"verdict": "sponsors_visa", "verified": True,
+                                          "quote": "We sponsor visas for this role."})
+    remote["eligibility"] = "likely"
+    assert rubric.visa_points(remote)[0] == 27
     worldwide = store.get(store_job(store, filters, source_job_id="w"))
     assert rubric.visa_points(worldwide)[0] == 20  # remote, open worldwide: Lebanon included
     assert rubric.visa_points(worldwide, other_offer="x")[0] == 20  # a remote job is judged as remote
@@ -295,6 +303,12 @@ def test_the_whiteboard_list_is_read_by_code_and_blocked_sites_are_never_fetched
                                      FakeHttp({interviews.HWW_URL: readme}), "m")
     found = web.find("Nobody")
     assert found.answer is None and found.reason.startswith("Not used: that site blocks scripts")
+    # A quote that does not say it by itself (the page's title did) is not used.
+    page = "https://acme.example/pair-programming"
+    vague = interviews.InterviewFinder(FakeLookup({"live_coding": "yes", "rounds": None, "quote": "a 60-minute session with two engineers",
+                                                   "source_url": page, "reason": "r"}),
+                                       FakeHttp({interviews.HWW_URL: readme, page: "<p>We run a 60-minute session with two engineers.</p>"}), "m")
+    assert vague.find("Nobody").reason.startswith("Not used: its quote does not say so by itself")
 
 
 def test_a_track_record_needs_visa_offers_in_two_months(store, filters):

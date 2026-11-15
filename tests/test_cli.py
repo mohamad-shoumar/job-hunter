@@ -187,3 +187,22 @@ def test_a_project_with_no_profile_yet_still_runs_and_says_how_to_start(home, ca
     shutil.rmtree(home / "profile")
     assert jobhunter(home, "stats") == 0
     assert "copy profile/master_profile.example.md there" in capsys.readouterr().err
+
+
+def test_grade_rescore_updates_the_salary_part_with_no_model(home, capsys, monkeypatch):
+    """After FIT_SALARY_FLOORS changes, `grade --rescore` scores again from the stored answer: no model call."""
+    import json
+
+    store = JobStore(home / "data" / "jobs.sqlite")
+    store.conn.execute("UPDATE jobs SET salary_min = 3000, salary_max = 4000, salary_currency = 'USD', "
+                       "salary_period = 'month', salary_raw = '$3,000 - $4,000 a month' WHERE id = 1")
+    answer = {"seniority": "mid", "required_skills": [], "domain": "direct", "domain_why": "", "benefits_quote": "",
+              "equity_quote": "", "interview": {"live_coding": "unknown", "rounds": None, "quote": ""}, "reason": "x"}
+    store.save_fit_grade(1, {"score": 0, "parts": {}, "reason": "x", "answer": answer, "model": "m", "at": "x"})
+    store.commit()
+    store.close()
+    monkeypatch.setenv("FIT_SALARY_FLOORS", "default=30000 USD")  # made up
+    assert jobhunter(home, "grade", "--rescore", "1") == 0
+    grade = json.loads(stored(home, 1)["fit_grade_json"])
+    assert grade["parts"]["salary"][0] == 7 and grade["score"] == sum(p for p, _ in grade["parts"].values())
+    assert "1 scored jobs looked at again" in capsys.readouterr().out

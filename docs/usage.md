@@ -70,7 +70,7 @@ that holds `config/`) and `-v` (debug logging).
 | `jobhunter inbox` | check Gmail for replies and bounces (the daily run does this too) |
 | `jobhunter check` | AI-check shortlisted jobs the rules left `unclear`, newest first (`--limit N`, `--recheck`, or job ids) |
 | `jobhunter dates` | find when undated shortlisted jobs were posted (`--limit N`, `--recheck`, or job ids) |
-| `jobhunter grade` | fit score 0-100 for open jobs, by your rubric (`--no-interviews`, `--regrade`, `--days N`, `--limit N`, or job ids) |
+| `jobhunter grade` | fit score 0-100 for open jobs, by your rubric (`--rescore` with no model, `--no-interviews`, `--regrade`, `--days N`, `--limit N`, or job ids) |
 | `jobhunter show <id>` | everything stored about one job and why it got its status (`-d` adds the description) |
 | `jobhunter reclassify` | judge every stored job again after you edit `config/filters.json`, and rebuild the day files that changed |
 | `jobhunter report --date 2026-09-25` | rebuild one day's file from the database |
@@ -243,8 +243,10 @@ A visa-list country uses its own floor, everything else `default`; the UAE and Q
 A star next to the score is the interview style: green when there is no live coding or coding test, red when
 the posting or the company names one. When the posting does not say, the company is looked up once: on the
 public hiring-without-whiteboards list, then on the web (`interview_model`, at most `max_interview_lookups_per_run` companies a run, best score first), kept for
-`interview_recheck_days`, and its jobs scored again. A job keeps its score; `jobhunter grade --regrade`
-scores the open ones again. The daily run scores open jobs from the last `lookback_days` (7), up to
+`interview_recheck_days`, and its jobs scored again. A web answer counts only when code finds its quote on
+the page it fetched and the quote itself names the step. A job keeps its score; `jobhunter grade --regrade`
+scores the open ones again (a model call each); `jobhunter grade --rescore` only redoes the code parts
+(salary floors, visa, years) from the stored answers, with no model, e.g. after you change `FIT_SALARY_FLOORS`. The daily run scores open jobs from the last `lookback_days` (7), up to
 `max_jobs_per_run` (60).
 
 ## Only new jobs
