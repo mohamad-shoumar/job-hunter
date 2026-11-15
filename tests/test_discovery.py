@@ -128,8 +128,12 @@ def test_one_site_down_does_not_stop_the_other(filters):
 def test_only_the_stack_jobs_are_read_never_its_next_step(filters):
     # The trimmed real reply carries a `next_step` text for AI assistants; nothing of it reaches the run.
     assert "next_step" in fixture_json("thestack_search.json")["result"]["structuredContent"]
-    run = discover(JobStore(":memory:"), FakeHttp(routes()), filters)
+    http = FakeHttp(routes())
+    run = discover(JobStore(":memory:"), http, filters)
     assert "Offer the user" not in str(run.to_dict())
+    # Its search takes 1-25 a page; asking for more only worked because the server quietly capped it.
+    pages = [body["params"]["arguments"] for url, body in http.calls if url == discovery.THE_STACK]
+    assert pages and {page["limit"] for page in pages} == {25}
 
 
 def test_adding_a_board_by_hand_checks_it_first(filters):

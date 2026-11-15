@@ -51,6 +51,8 @@ log = logging.getLogger(__name__)
 
 EUROPEVISAJOBS_FEED = "https://europevisajobs.com/feed.json"
 THE_STACK = "https://mcp.trythestack.co"
+# search_jobs takes 1-25 a page (its tool schema and developers/api.md); it gives `next_offset` for the next page.
+STACK_PAGE = 25
 
 # The visa list's country codes as each site writes them. The Stack takes English country names.
 _EVJ_CODES = {"uk": "GB"}
@@ -72,7 +74,7 @@ class DiscoverConfig:
     europevisajobs: bool = True
     the_stack: bool = True
     the_stack_days: int = 7  # The Stack's listings posted in the last N days
-    max_stack_pages: int = 5  # 100 listings a page, per country
+    max_stack_pages: int = 5  # STACK_PAGE (25) listings a page, per country
     max_new_per_run: int = 15  # boards added in one run; the rest follow on the next runs
 
     @classmethod
@@ -153,7 +155,7 @@ def the_stack(http, countries: dict[str, str], days: int, max_pages: int = 5) ->
     for name, country in countries.items():
         offset = 0
         for _ in range(max_pages):
-            arguments = {"country": name, "posted_within_days": days, "limit": 100, "offset": offset}
+            arguments = {"country": name, "posted_within_days": days, "limit": STACK_PAGE, "offset": offset}
             body = {"jsonrpc": "2.0", "id": 1, "method": "tools/call",
                     "params": {"name": "search_jobs", "arguments": arguments}}
             reply = http.post_json(THE_STACK, body, headers={"Accept": "application/json, text/event-stream"}) or {}
