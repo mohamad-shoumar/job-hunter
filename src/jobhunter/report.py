@@ -13,6 +13,7 @@ import sqlite3
 from datetime import date, datetime
 from pathlib import Path
 
+from .discovery import site_line
 from .fitgrade import grade_of, sort_grade
 from .models import (
     DUPLICATE_ROLE, ELIGIBLE, LIKELY, REJECTED, REVIEW_CLEARED, SHORTLISTED, VISA_LIST,
@@ -303,9 +304,11 @@ def render(day: str, rows: list[sqlite3.Row], sightings: dict[int, list[sqlite3.
             out += [f"- {a['board']} ({_cell(a['company'])}): {_cell(a['reason'])}" for a in watched["added"]]
             out += [f"- {_cell(line)}" for line in watched["errors"]] + [""]
         found = summary.get("discovery")
-        if found and (found["added"] or found["errors"]):
+        if found and (found["added"] or found["errors"] or found.get("by_site")):
             out += [f"**Boards found on visa job sites** (EuropeVisaJobs, The Stack; fetched from the next run): "
                     f"{len(found['added'])}", ""]
+            if found.get("by_site"):
+                out += [f"- Per site: {site_line(found['by_site'])}"]
             out += [f"- {a['board']} ({_cell(a['company'])}): {_cell(a['reason'])}" for a in found["added"]]
             out += [f"- {_cell(line)}" for line in found["errors"]] + [""]
         problems = [(name, e) for name, s in summary["sources"].items() for e in s["errors"]]

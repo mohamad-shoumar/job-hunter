@@ -37,7 +37,10 @@ def discover(store, http, filters, config=CONFIG, outreach=None, now=NOW, dry_ru
 def test_listings_with_target_titles_name_the_boards_to_watch(filters):
     store = JobStore(":memory:")
     run = discover(store, FakeHttp(routes()), filters)
-    assert [a["board"] for a in run.added] == ["ashby:wayve", "greenhouse:navvis", "greenhouse:optiver", "ashby:manex"]
+    # The two sites' listings are taken in turn, each in its own order.
+    assert [a["board"] for a in run.added] == ["ashby:wayve", "ashby:manex", "greenhouse:navvis", "greenhouse:optiver"]
+    assert run.by_site == {"EuropeVisaJobs": {"listed": 4, "wanted": 3, "added": 3},
+                           "The Stack": {"listed": 3, "wanted": 2, "added": 1}}
     assert {(r["kind"], r["slug"]) for r in watched_boards(store)} == {
         ("ashby", "wayve"), ("greenhouse", "navvis"), ("greenhouse", "optiver"), ("ashby", "manex")}
     reasons = {a["board"]: a["reason"] for a in run.added}
@@ -86,14 +89,27 @@ def test_a_guess_that_finds_no_board_waits_a_month(filters):
     assert "greenhouse:optiver" in [a["board"] for a in later.added]
 
 
-def test_at_most_max_new_per_run_boards_are_added_a_run(filters):
+def test_at_most_max_new_per_run_boards_are_added_a_run_shared_between_the_sites(filters):
+    # Read one after the other, EuropeVisaJobs' listings filled the limit before The Stack's were looked at
+    # (2026-11-15: 15 of 15 boards from EuropeVisaJobs). Taken in turn, each site gets its share.
     store = JobStore(":memory:")
     config = {**CONFIG, "discover_boards": {"enabled": True, "max_new_per_run": 2}}
     first = discover(store, FakeHttp(routes()), filters, config=config)
-    assert [a["board"] for a in first.added] == ["ashby:wayve", "greenhouse:navvis"]
+    assert [a["board"] for a in first.added] == ["ashby:wayve", "ashby:manex"]
+    assert {site: n["added"] for site, n in first.by_site.items()} == {"EuropeVisaJobs": 1, "The Stack": 1}
     assert first.notes == ["board limit (2) reached; the rest are added on the next runs"]
     assert [a["board"] for a in discover(store, FakeHttp(routes()), filters, config=config).added] == [
-        "greenhouse:optiver", "ashby:manex"]
+        "greenhouse:navvis", "greenhouse:optiver"]
+
+
+def test_a_site_that_finds_nothing_or_fails_shows_zero(filters):
+    nothing = {**routes(), discovery.THE_STACK: lambda body: EMPTY_SEARCH}
+    run = discover(JobStore(":memory:"), FakeHttp(nothing), filters)
+    assert run.by_site["The Stack"] == {"listed": 0, "wanted": 0, "added": 0}
+    assert discovery.site_line(run.by_site) == ("EuropeVisaJobs 4 listed, 3 target, 3 boards; "
+                                                "The Stack 0 listed, 0 target, 0 boards")
+    down = discover(JobStore(":memory:"), FakeHttp(routes(**{discovery.THE_STACK: RuntimeError("down")})), filters)
+    assert down.by_site["The Stack"]["listed"] == 0 and down.errors == ["The Stack: RuntimeError: down"]
 
 
 def test_a_dry_run_writes_nothing(filters):
@@ -140,9 +156,11 @@ def test_the_daily_run_finds_the_boards_and_fetches_them_from_the_next_run(tmp_p
     summary, reports = pipeline.run(Paths(tmp_path), CONFIG, filters,
                                     pipeline.RunOptions(http=http, now=NOW, ai=False, outreach=False))
     assert [a["board"] for a in summary.discovery.added] == [
-        "ashby:wayve", "greenhouse:navvis", "greenhouse:optiver", "ashby:manex"]
+        "ashby:wayve", "ashby:manex", "greenhouse:navvis", "greenhouse:optiver"]
     assert summary.to_dict()["discovery"]["unreadable"] == {"successfactors": 1}
-    assert "**Boards found on visa job sites**" in "".join(p.read_text() for p in reports)
+    report = "".join(p.read_text() for p in reports)
+    assert "**Boards found on visa job sites**" in report
+    assert "- Per site: EuropeVisaJobs 4 listed, 3 target, 3 boards; The Stack 3 listed, 2 target, 1 boards" in report
     http.routes[greenhouse.API.format(token="optiver")] = {"jobs": []}  # OPTIVER only stubs the title check
     summary2, _ = pipeline.run(Paths(tmp_path), CONFIG, filters,
                                pipeline.RunOptions(http=http, now=NOW + timedelta(days=1), ai=False, outreach=False))
