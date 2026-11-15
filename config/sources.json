@@ -45,7 +45,8 @@
   "smartrecruiters_boards": [
     { "company": "Delivery Hero (talabat, InstaShop)", "board_token": "deliveryhero", "countries": ["ae", "qa"] },
     { "company": "Namshi", "board_token": "Namshi" },
-    { "company": "Kamkalima", "board_token": "Kamkalima" }
+    { "company": "Kamkalima", "board_token": "Kamkalima" },
+    { "company": "ServiceNow", "board_token": "ServiceNow", "countries": ["gb", "nl", "de", "ie", "es", "it", "fi"], "_note": "careers.servicenow.com runs on SmartRecruiters. 815 postings on 2026-11-15, 483 in the US; 81 in these countries, 9 with a target title. No source read this board before (3 ServiceNow rows, from freehire and LinkedIn)." }
   ],
   "pinpoint_boards": [
     { "company": "Tabby", "board_token": "tabby" }
