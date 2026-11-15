@@ -126,7 +126,8 @@ def _posting_title(kind: str, posting: dict) -> str:
     return (posting.get("text") if kind == "lever" else posting.get("title")) or ""
 
 
-def check_board(http, kind: str, slug: str, company: str, title: str) -> str | None:
+def check_board(http, kind: str, slug: str, company: str, title: str,
+                whose: str = "the shortlisted job's title") -> str | None:
     """Why this board is the company's (quotable), or None. Network errors and 404s count as no board."""
     try:
         data = http.get_json(APIS[kind].format(token=slug), params={"mode": "json"} if kind == "lever" else None)
@@ -136,7 +137,7 @@ def check_board(http, kind: str, slug: str, company: str, title: str) -> str | N
     wanted = title_key(title)
     for posting in postings:
         if wanted and title_key(_posting_title(kind, posting)) == wanted:
-            return f'{kind}:{slug} lists "{_posting_title(kind, posting).strip()}", the shortlisted job\'s title'
+            return f'{kind}:{slug} lists "{_posting_title(kind, posting).strip()}", {whose}'
     if kind == "greenhouse":
         for posting in postings:
             name = posting.get("company_name") or ""

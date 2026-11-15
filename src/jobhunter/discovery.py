@@ -218,7 +218,7 @@ def discover(store: JobStore, http, sources_config: dict, filters: Filters, outr
             hit = None
             for slug in slug_guesses(listing.company):
                 run.probed += 1
-                why = check_board(http, "greenhouse", slug, listing.company, listing.title)
+                why = check_board(http, "greenhouse", slug, listing.company, listing.title, whose="the same title")
                 if why:
                     hit = slug, why
                     break

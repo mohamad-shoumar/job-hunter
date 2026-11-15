@@ -74,7 +74,7 @@ that holds `config/`) and `-v` (debug logging).
 | `jobhunter show <id>` | everything stored about one job and why it got its status (`-d` adds the description) |
 | `jobhunter reclassify` | judge every stored job again after you edit `config/filters.json`, and rebuild the day files that changed |
 | `jobhunter report --date 2026-09-25` | rebuild one day's file from the database |
-| `jobhunter boards` | company boards watched because a job there was shortlisted (`--remove ashby:acme` stops one for good, `--all` shows removed ones, `--add ashby:acme --company Acme` watches one you found yourself, after checking it answers) |
+| `jobhunter boards` | company boards watched: a shortlisted job's, one a visa job site links to, or one you added (`--remove ashby:acme` stops one for good, `--all` shows removed ones, `--add ashby:acme --company Acme` watches one you found yourself, after checking it answers) |
 | `jobhunter discover` | watch the company boards EuropeVisaJobs and The Stack point to now, instead of after the daily run (`--dry-run` lists them and writes nothing) |
 | `jobhunter sponsors` | the government lists of visa sponsors (`--update` downloads them; `--company Monzo --place London` looks one up) |
 | `jobhunter stats` / `jobhunter sources` | counts by status and source / which sources are on |

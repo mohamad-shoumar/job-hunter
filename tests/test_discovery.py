@@ -4,8 +4,8 @@ from datetime import timedelta
 
 import pytest
 
-from jobhunter import boards, discovery
-from jobhunter.config import Filters, OutreachConfig
+from jobhunter import boards, discovery, pipeline
+from jobhunter.config import Filters, OutreachConfig, Paths
 from jobhunter.sources import ashby, greenhouse
 from jobhunter.store import JobStore
 from jobhunter.store.watched import watched_boards
@@ -46,8 +46,9 @@ def test_listings_with_target_titles_name_the_boards_to_watch(filters):
                                             'link to its posting there: '
                                             'https://job-boards.eu.greenhouse.io/navvis/jobs/4840884101')
     # A ?gh_jid= link on the company's own site: the guessed board lists the same title.
-    assert reasons["greenhouse:optiver"].startswith('EuropeVisaJobs lists "Software Engineer - Talent Tooling" '
-                                                    '(the Netherlands); greenhouse:optiver lists')
+    assert reasons["greenhouse:optiver"] == ('EuropeVisaJobs lists "Software Engineer - Talent Tooling" (the '
+                                             'Netherlands); greenhouse:optiver lists "Software Engineer - Talent '
+                                             'Tooling", the same title')
     assert reasons["ashby:manex"].startswith('The Stack lists "Software Engineer (f/m/d)" (Germany)')
     # Palantir's security title and SumUp's analyst title are not target roles; Akur8 is in France.
     assert (run.listed, run.wanted) == (7, 5)
@@ -129,3 +130,21 @@ def test_adding_a_board_by_hand_checks_it_first(filters):
     boards.remove(store, "ashby:manex", NOW)
     with pytest.raises(SystemExit, match="stays removed"):
         boards.add_by_hand(store, http, "ashby:manex", "", NOW)
+
+
+def test_the_daily_run_finds_the_boards_and_fetches_them_from_the_next_run(tmp_path, filters):
+    (tmp_path / "config").mkdir()
+    found = {ashby.API.format(token="wayve"): {"jobs": []}, ashby.API.format(token="manex"): {"jobs": []},
+             greenhouse.API.format(token="navvis"): {"jobs": []}}
+    http = FakeHttp(routes(**found))
+    summary, reports = pipeline.run(Paths(tmp_path), CONFIG, filters,
+                                    pipeline.RunOptions(http=http, now=NOW, ai=False, outreach=False))
+    assert [a["board"] for a in summary.discovery.added] == [
+        "ashby:wayve", "greenhouse:navvis", "greenhouse:optiver", "ashby:manex"]
+    assert summary.to_dict()["discovery"]["unreadable"] == {"successfactors": 1}
+    assert "**Boards found on visa job sites**" in "".join(p.read_text() for p in reports)
+    http.routes[greenhouse.API.format(token="optiver")] = {"jobs": []}  # OPTIVER only stubs the title check
+    summary2, _ = pipeline.run(Paths(tmp_path), CONFIG, filters,
+                               pipeline.RunOptions(http=http, now=NOW + timedelta(days=1), ai=False, outreach=False))
+    assert {"ashby", "greenhouse"} <= set(summary2.sources) and summary2.discovery.added == []
+    assert not summary2.sources["ashby"].errors and not summary2.sources["greenhouse"].errors

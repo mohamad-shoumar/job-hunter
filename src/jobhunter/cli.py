@@ -176,7 +176,7 @@ def cmd_discover(args) -> int:
 
 
 def cmd_boards(args) -> int:
-    """The company boards watched because a job there was shortlisted (boards.py)."""
+    """The company boards watched (boards.py): a shortlisted job's, a visa job site's (discovery.py), or yours."""
     from . import boards
     from .http import Http
     from .store.watched import watched_boards
@@ -197,7 +197,8 @@ def cmd_boards(args) -> int:
     finally:
         store.close()
     if not rows:
-        print("no watched boards yet: one is added when a job at a company with a public board is shortlisted")
+        print("no watched boards yet: one is added when a job at a company with a public board is shortlisted, "
+              "when a visa job site links to one (`jobhunter discover`), or with --add")
     for row in rows:
         removed = f"  (removed {row['removed_at'][:10]})" if row["removed_at"] else ""
         print(f"{row['kind'] + ':' + row['slug']:32} {row['company']}  added {row['added_at'][:10]}{removed}")
@@ -930,7 +931,8 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("stats", help="counts by status and source")
     p.set_defaults(func=cmd_stats)
 
-    p = sub.add_parser("boards", help="company job boards watched because a job there was shortlisted")
+    p = sub.add_parser("boards", help="company job boards watched: a shortlisted job's, one a visa job site "
+                                      "links to (discover), or one you added")
     p.add_argument("--add", metavar="KIND:SLUG", help="watch a board by hand, e.g. ashby:manex (checked first)")
     p.add_argument("--company", help="with --add: the company's name (default: the slug)")
     p.add_argument("--remove", metavar="KIND:SLUG", help="stop watching one, e.g. ashby:dualentry (never re-added)")
