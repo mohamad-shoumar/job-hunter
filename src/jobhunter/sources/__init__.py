@@ -56,7 +56,7 @@ BUILDERS = {
 }
 
 # Sections that configure something other than one source (boards.py reads "watch_boards").
-SETTINGS = {"watch_boards"}
+SETTINGS = {"watch_boards", "discover_boards"}
 
 # Checked 2026-09-25. Listed here so a config section for them is explained
 # instead of silently ignored.

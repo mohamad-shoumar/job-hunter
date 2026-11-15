@@ -298,6 +298,12 @@ def render(day: str, rows: list[sqlite3.Row], sightings: dict[int, list[sqlite3.
                     f"{len(watched['added'])}", ""]
             out += [f"- {a['board']} ({_cell(a['company'])}): {_cell(a['reason'])}" for a in watched["added"]]
             out += [f"- {_cell(line)}" for line in watched["errors"]] + [""]
+        found = summary.get("discovery")
+        if found and (found["added"] or found["errors"]):
+            out += [f"**Boards found on visa job sites** (EuropeVisaJobs, The Stack; fetched from the next run): "
+                    f"{len(found['added'])}", ""]
+            out += [f"- {a['board']} ({_cell(a['company'])}): {_cell(a['reason'])}" for a in found["added"]]
+            out += [f"- {_cell(line)}" for line in found["errors"]] + [""]
         problems = [(name, e) for name, s in summary["sources"].items() for e in s["errors"]]
         notes = [(name, n) for name, s in summary["sources"].items() for n in s["notes"]]
         if problems:

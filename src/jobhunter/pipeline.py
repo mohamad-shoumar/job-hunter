@@ -23,9 +23,10 @@ from datetime import date, datetime, time, timedelta
 from functools import partial
 from pathlib import Path
 
-from . import boards, sponsors
+from . import boards, discovery, sponsors
 from .ai_check import AiChecker, CheckRun, build_checker, check_jobs
 from .boards import WatchRun
+from .discovery import DiscoverRun
 from .classify import classify
 from .config import Filters, OutreachConfig
 from .duplicates import Duplicate, fold
@@ -108,6 +109,7 @@ class RunSummary:
     fit_grade: GradeRun | None = None
     outreach: dict | None = None
     boards: WatchRun | None = None
+    discovery: DiscoverRun | None = None
     # Job ids this run touched (new or seen again), and the new ones. Not saved.
     seen_ids: set[int] = field(default_factory=set)
     new_ids: list[int] = field(default_factory=list)
@@ -139,6 +141,7 @@ class RunSummary:
             "fit_grade": _as_dict(self.fit_grade),
             "outreach": self.outreach,
             "boards": _as_dict(self.boards),
+            "discovery": _as_dict(self.discovery),
         }
 
 
@@ -461,6 +464,7 @@ def run(root_paths, sources_config: dict, filters: Filters,
         date_finder = _model(opts.date_finder, build_finder, root_paths.ai_check_file, config_notes)
         fit_grader = _model(opts.fit_grader, build_grader, root_paths.fit_grade_file, config_notes)
     watch = boards.WatchConfig.from_sources(sources_config)
+    discover = discovery.DiscoverConfig.from_sources(sources_config)
 
     store = JobStore(root_paths.db_file)
     own_http = opts.http is None
@@ -511,6 +515,11 @@ def run(root_paths, sources_config: dict, filters: Filters,
             summary.boards = _step("boards", lambda: boards.watch_shortlisted(
                 store, http, sources_config, filters, OutreachConfig.load(root_paths.outreach_file), now, watch,
             ), WatchRun)
+        if watch.enabled and discover.enabled and opts.only is None and not opts.date_range:
+            # Visa job sites that link to company boards not read yet; those boards are fetched from the next run.
+            summary.discovery = _step("board discovery", lambda: discovery.discover(
+                store, http, sources_config, filters, OutreachConfig.load(root_paths.outreach_file), now, discover, watch,
+            ), DiscoverRun)
         if opts.outreach:
             # Date-range runs never spend lookup credits: they would use up the month.
             # A job a listing elsewhere brought back counts as new here: it gets a CV like any

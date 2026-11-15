@@ -48,7 +48,7 @@ SOURCE_CLASSES = {"greenhouse": greenhouse.GreenhouseSource, "lever": lever.Leve
 CONFIG_SECTIONS = {"greenhouse": "greenhouse_boards", "lever": "lever_boards", "ashby": "ashby_boards"}
 
 _BOARD_LINKS = [
-    (re.compile(r"(?:job-boards|boards)\.greenhouse\.io/(?!embed/)([\w-]+)/jobs/\d+", re.I), "greenhouse"),
+    (re.compile(r"(?:job-boards(?:\.eu)?|boards)\.greenhouse\.io/(?!embed/)([\w-]+)/jobs/\d+", re.I), "greenhouse"),
     (re.compile(r"greenhouse\.io/embed/job_board\?(?:[^#]*&)?for=([\w-]+)", re.I), "greenhouse"),
     (re.compile(r"//jobs\.lever\.co/([\w.-]+)/[0-9a-f]{8}-", re.I), "lever"),  # jobs.eu.lever.co has another API
     (re.compile(r"jobs\.ashbyhq\.com/([^/?#\s]+)/[0-9a-f]{8}-", re.I), "ashby"),
@@ -187,7 +187,7 @@ def add_watched_sources(sources: list[Source], store: JobStore, sources_config: 
     return added
 
 
-def _never_watch(key: str, filters: Filters, outreach: OutreachConfig, job_boards: set[str]) -> bool:
+def never_watch(key: str, filters: Filters, outreach: OutreachConfig, job_boards: set[str]) -> bool:
     return (not key or key in filters.blocked_companies or key in job_boards
             or any(company_key(s) == key for s in outreach.skip_companies))
 
@@ -209,7 +209,7 @@ def watch_shortlisted(store: JobStore, http, sources_config: dict, filters: Filt
     done: set[str] = set()
     for job in rows:
         key = company_key(re.sub(r"https?://\S+", " ", job["company"] or ""))
-        if key in done or key in known or _never_watch(key, filters, outreach, job_boards):
+        if key in done or key in known or never_watch(key, filters, outreach, job_boards):
             continue
         done.add(key)
         sightings = [s["source_url"] for s in store.sightings_for([job["id"]])[job["id"]]]
@@ -238,6 +238,31 @@ def watch_shortlisted(store: JobStore, http, sources_config: dict, filters: Filt
         run.added.append({"board": board.name, "company": board.company, "reason": board.reason})
     store.commit()
     return run
+
+
+def add_by_hand(store: JobStore, http, name: str, company: str, now: datetime) -> str:
+    """Watch 'kind:slug' because you said so (a board found in the browser). The board must answer with postings."""
+    kind, _, slug = name.partition(":")
+    kind, slug = kind.strip().lower(), slug.strip()
+    if kind not in KINDS or not slug:
+        raise SystemExit(f"write it as kind:slug with kind one of {', '.join(KINDS)}, e.g. ashby:manex")
+    for row in watched_boards(store, include_removed=True):
+        if (row["kind"], row["slug"].lower()) == (kind, slug.lower()):
+            if row["removed_at"]:
+                raise SystemExit(f"you removed {kind}:{slug} on {row['removed_at'][:10]}; it stays removed")
+            return f"already watched: {kind}:{slug}"
+    try:
+        data = http.get_json(APIS[kind].format(token=slug), params={"mode": "json"} if kind == "lever" else None)
+    except Exception as exc:
+        raise SystemExit(f"{kind}:{slug} did not answer ({type(exc).__name__}): check the slug") from exc
+    postings = _postings(kind, data)
+    if not postings:
+        raise SystemExit(f"{kind}:{slug} answered with no postings: check the slug")
+    company = company or slug
+    add_watched_board(store, kind, slug, company, company_key(company), None,
+                      f"added by hand (jobhunter boards --add); {len(postings)} postings when added", now)
+    store.commit()
+    return f"now watching {kind}:{slug} ({company}, {len(postings)} postings); fetched from the next run"
 
 
 def remove(store: JobStore, name: str, now: datetime) -> bool:

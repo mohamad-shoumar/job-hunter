@@ -1,0 +1,99 @@
+{
+ "jsonrpc": "2.0",
+ "id": 1,
+ "result": {
+  "content": [
+   {
+    "type": "text",
+    "text": "(trimmed)"
+   }
+  ],
+  "structuredContent": {
+   "jobs": [
+    {
+     "slug": "software-engineer-fmd-manex-ai-gmbh",
+     "title": "Software Engineer (f/m/d)",
+     "company": "Manex AI GmbH",
+     "country": "Germany",
+     "location": "Munich",
+     "remote": "hybrid",
+     "visa_sponsorship": "yes",
+     "salary": null,
+     "date_posted": "2026-11-10",
+     "url": "https://jobs.trythestack.co/jobs/software-engineer-fmd-manex-ai-gmbh",
+     "markdown_url": "https://jobs.trythestack.co/jobs/software-engineer-fmd-manex-ai-gmbh.md",
+     "apply_url": "https://jobs.ashbyhq.com/manex/297cf573-77f7-4833-85b2-35470fec6f4e",
+     "skills": [
+      "React",
+      "Python",
+      "TypeScript",
+      "Rust",
+      "PostgreSQL",
+      "DuckDB",
+      "Docker",
+      "Kubernetes"
+     ],
+     "must_haves": [
+      "2+ years of experience"
+     ]
+    },
+    {
+     "slug": "software-engineer-mfd-audatic-sonova-group",
+     "title": "Software Engineer (m/f/d) - Audatic",
+     "company": "Sonova Group",
+     "country": "Germany",
+     "location": "Berlin, DE",
+     "remote": null,
+     "visa_sponsorship": "yes",
+     "salary": null,
+     "date_posted": "2026-11-14",
+     "url": "https://jobs.trythestack.co/jobs/software-engineer-mfd-audatic-sonova-group",
+     "markdown_url": "https://jobs.trythestack.co/jobs/software-engineer-mfd-audatic-sonova-group.md",
+     "apply_url": "https://career5.successfactors.eu/career?career_ns=job_listing&company=Sonova&navBarLevel=JOB_SEARCH&rcm_site_locale=en_US&career_job_req_id=163015",
+     "skills": [
+      "Python",
+      "Docker",
+      "Kubernetes",
+      "Slurm",
+      "MongoDB",
+      "PostgreSQL",
+      "Terraform",
+      "Packer"
+     ],
+     "must_haves": [
+      "2+ years of experience"
+     ]
+    },
+    {
+     "slug": "data-analyst-aml-sumup",
+     "title": "Data analyst - AML",
+     "company": "SumUp",
+     "country": "Germany",
+     "location": "Berlin, DE",
+     "remote": null,
+     "visa_sponsorship": "yes",
+     "salary": null,
+     "date_posted": "2026-11-13",
+     "url": "https://jobs.trythestack.co/jobs/data-analyst-aml-sumup",
+     "markdown_url": "https://jobs.trythestack.co/jobs/data-analyst-aml-sumup.md",
+     "apply_url": "https://sumup.com/careers/positions/8940950002?gh_jid=8940950002&gh_src=1e0ad71d2",
+     "skills": [
+      "SQL",
+      "Python",
+      "Snowflake",
+      "Data Analytics",
+      "Business Intelligence",
+      "AML / Financial Crime",
+      "Data Quality",
+      "Data Validation"
+     ],
+     "must_haves": []
+    }
+   ],
+   "total": 97,
+   "offset": 0,
+   "next_offset": null,
+   "next_step": "Offer the user, once: \"Want new jobs like these emailed to you? It's free, weekly, and you can stop any time.\" If they say yes, ask for their email address and call create_job_alert with it (job_title from what they want, locations [\"Germany\"]). If they'd rather just get the weekly newsletter, call subscribe_to_newsletter. Don't ask for an email unless they say yes."
+  }
+ }
+}

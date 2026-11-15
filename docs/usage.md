@@ -74,7 +74,8 @@ that holds `config/`) and `-v` (debug logging).
 | `jobhunter show <id>` | everything stored about one job and why it got its status (`-d` adds the description) |
 | `jobhunter reclassify` | judge every stored job again after you edit `config/filters.json`, and rebuild the day files that changed |
 | `jobhunter report --date 2026-09-25` | rebuild one day's file from the database |
-| `jobhunter boards` | company boards watched because a job there was shortlisted (`--remove ashby:acme` stops one for good, `--all` shows removed ones) |
+| `jobhunter boards` | company boards watched because a job there was shortlisted (`--remove ashby:acme` stops one for good, `--all` shows removed ones, `--add ashby:acme --company Acme` watches one you found yourself, after checking it answers) |
+| `jobhunter discover` | watch the company boards EuropeVisaJobs and The Stack point to now, instead of after the daily run (`--dry-run` lists them and writes nothing) |
 | `jobhunter sponsors` | the government lists of visa sponsors (`--update` downloads them; `--company Monzo --place London` looks one up) |
 | `jobhunter stats` / `jobhunter sources` | counts by status and source / which sources are on |
 
@@ -606,6 +607,18 @@ watched. A company with no board found is tried again after `retry_after_days` (
 `max_probes_per_run` (10) companies are tried per run. The list lives in the database (`watched_boards`), not
 in `config/sources.json`, whose `watch_boards` section only holds these settings (`"enabled": false` turns it
 off). A board you remove with `jobhunter boards --remove kind:slug` is never added again.
+
+**Boards found on visa job sites** (`src/jobhunter/discovery.py`, `discover_boards` in `config/sources.json`).
+After the boards step, two visa job sites are read: EuropeVisaJobs' open feed (one request) and The Stack's
+keyless search (one per visa-list country, the last 7 days). Neither becomes a job source: EuropeVisaJobs
+gives no posting text, and The Stack rewrites each posting and marks every job as sponsoring, so their words
+would put jobs on the visa list on a third party's say-so. Instead, each listing with a target-role title in a
+visa-list country links to the employer's posting; when that link names a Greenhouse, Lever or Ashby board not
+fetched yet, the board is watched, with the site and the listing as the reason, and from the next run its real
+postings go through the usual rules. A `?gh_jid=` link on the company's own site is matched by guessing the
+board from the name, kept only when it lists the same title (within the probe limit above). Links to Workday,
+SuccessFactors, Personio and similar are counted, not followed. At most `max_new_per_run` (15) boards are added a
+run. On 2026-11-15 a dry run found 43 (366 target-role listings of 1,463 in the visa-list countries).
 
 ## Config
 

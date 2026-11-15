@@ -129,6 +129,8 @@ def cmd_run(args) -> int:
         for line in summary.boards.errors:
             print(f"  {line}")
         print()
+    if summary.discovery and (summary.discovery.added or summary.discovery.errors):
+        _print_discovery(summary.discovery)
     store = JobStore(paths.db_file)
     try:
         _print_report_counts(store, report_paths)
@@ -137,14 +139,55 @@ def cmd_run(args) -> int:
     return 0
 
 
+def _print_discovery(found) -> None:
+    print(f"Boards found on visa job sites: {len(found.added)} "
+          f"({found.wanted} target-role listings of {found.listed} in your visa-list countries)")
+    for added in found.added:
+        print(f"  {added['board']} ({added['company']}): {added['reason']}")
+    if found.unreadable:
+        kinds = ", ".join(f"{kind} {n}" for kind, n in found.unreadable.most_common())
+        print(f"  not readable by the app (counted, not followed): {kinds}")
+    for line in found.notes + found.errors:
+        print(f"  {line}")
+    print()
+
+
+def cmd_discover(args) -> int:
+    """Board discovery now (discovery.py): the boards EuropeVisaJobs and The Stack point to."""
+    from . import discovery
+    from .boards import WatchConfig
+    from .config import OutreachConfig
+    from .http import Http
+
+    paths, sources_config, filters = _load(args)
+    config = discovery.DiscoverConfig.from_sources(sources_config)
+    config.enabled = True
+    store = JobStore(paths.db_file)
+    try:
+        with Http() as http:
+            found = discovery.discover(store, http, sources_config, filters, OutreachConfig.load(paths.outreach_file),
+                                       utcnow(), config, WatchConfig.from_sources(sources_config), dry_run=args.dry_run)
+    finally:
+        store.close()
+    if args.dry_run:
+        print("Dry run: nothing was written.")
+    _print_discovery(found)
+    return 0
+
+
 def cmd_boards(args) -> int:
     """The company boards watched because a job there was shortlisted (boards.py)."""
     from . import boards
+    from .http import Http
     from .store.watched import watched_boards
 
     paths, _, _ = _load(args)
     store = JobStore(paths.db_file)
     try:
+        if args.add:
+            with Http() as http:
+                print(boards.add_by_hand(store, http, args.add, args.company or "", utcnow()))
+            return 0
         if args.remove:
             if not boards.remove(store, args.remove, utcnow()):
                 raise SystemExit(f"not watched: {args.remove} (write it as kind:slug, e.g. ashby:dualentry)")
@@ -888,9 +931,15 @@ def main(argv: list[str] | None = None) -> int:
     p.set_defaults(func=cmd_stats)
 
     p = sub.add_parser("boards", help="company job boards watched because a job there was shortlisted")
+    p.add_argument("--add", metavar="KIND:SLUG", help="watch a board by hand, e.g. ashby:manex (checked first)")
+    p.add_argument("--company", help="with --add: the company's name (default: the slug)")
     p.add_argument("--remove", metavar="KIND:SLUG", help="stop watching one, e.g. ashby:dualentry (never re-added)")
     p.add_argument("--all", action="store_true", help="include removed boards")
     p.set_defaults(func=cmd_boards)
+
+    p = sub.add_parser("discover", help="watch the company boards EuropeVisaJobs and The Stack point to")
+    p.add_argument("--dry-run", action="store_true", help="show what would be added; write nothing")
+    p.set_defaults(func=cmd_discover)
 
     p = sub.add_parser("sources", help="which sources are enabled")
     p.set_defaults(func=cmd_sources)

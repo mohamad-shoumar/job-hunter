@@ -162,6 +162,8 @@ def test_slug_guesses_and_board_links():
     assert boards.slug_guesses("Dual Entry Inc.", "www.dualentry.com") == ["dualentry", "dual-entry"]
     assert boards.slug_guesses("Circle.so") == ["circle"]
     assert boards.board_from_links(["https://job-boards.greenhouse.io/tensorops/jobs/123"])[:2] == ("greenhouse", "tensorops")
+    assert boards.board_from_links(["https://job-boards.eu.greenhouse.io/navvis/jobs/4840884101"])[:2] == (
+        "greenhouse", "navvis")
     assert boards.board_from_links(["https://jobs.lever.co/metabase/5eca795c-48dd-496a-be23-2181068a5450"])[:2] == (
         "lever", "metabase")
     assert boards.board_from_links(["https://acme.com/careers?gh_jid=123", None]) is None

@@ -9,6 +9,14 @@
     "max_probes_per_run": 10,
     "retry_after_days": 30
   },
+  "discover_boards": {
+    "_note": "After the boards step, EuropeVisaJobs' open feed (feed.json, CC BY 4.0) and The Stack's keyless search (mcp.trythestack.co, the last the_stack_days days) are read for listings with a target-role title in a visa_list country. Neither becomes a job: one has no posting text, the other rewrites it. When a listing links to a Greenhouse, Lever or Ashby board not fetched yet, that board is watched (a ?gh_jid= link on the company's own site is guessed from the name, kept only if the board lists the same title, within watch_boards' probe limit). The real postings are read from the next run. Needs watch_boards enabled. `jobhunter discover --dry-run` shows what it would add. See src/jobhunter/discovery.py.",
+    "enabled": true,
+    "europevisajobs": true,
+    "the_stack": true,
+    "the_stack_days": 7,
+    "max_new_per_run": 15
+  },
 
   "_gulf_boards": "Companies in the UAE, Qatar and Lebanon, on their own careers systems (checked 2026-10-10, docs/research). Their jobs are mostly on-site: the relocation rules in config/filters.json decide. Saudi-only companies are left out.",
   "greenhouse_boards": [
