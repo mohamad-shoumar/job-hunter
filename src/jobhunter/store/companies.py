@@ -123,3 +123,25 @@ def set_email_status(store: JobStore, contact_id: int, status: str) -> None:
 def mark_bounced(store: JobStore, address: str) -> None:
     """Every contact with this email address (any case)."""
     store.conn.execute("UPDATE contacts SET email_status = 'bounced' WHERE lower(email) = lower(?)", (address,))
+
+
+# --- interview_styles (interviews.py) ---------------------------------------------
+
+
+def interview_styles(store: JobStore, keys) -> dict[str, sqlite3.Row]:
+    """{company key: its interview_styles row}, for the keys looked up before."""
+    return {r["company_key"]: r for r in rows_in(store, "SELECT * FROM interview_styles WHERE company_key IN ({marks})",
+                                                 keys)}
+
+
+def save_interview_style(store: JobStore, key: str, company: str, answer: dict | None, found_by: str,
+                         source_url: str, reason: str, now: datetime) -> None:
+    import json
+
+    store.conn.execute(
+        "INSERT INTO interview_styles (company_key, company, answer_json, found_by, source_url, reason, checked_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (company_key) DO UPDATE SET company = excluded.company, "
+        "answer_json = excluded.answer_json, found_by = excluded.found_by, source_url = excluded.source_url, "
+        "reason = excluded.reason, checked_at = excluded.checked_at",
+        (key, company, json.dumps(answer) if answer else None, found_by, source_url, reason, iso(now)),
+    )

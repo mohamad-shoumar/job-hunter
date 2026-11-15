@@ -11,7 +11,7 @@ from collections import Counter
 from datetime import date, timedelta
 from pathlib import Path
 
-from . import pipeline
+from . import interviews, pipeline
 from .ai_check import build_checker, check_jobs
 from .posted_date import build_finder, find_dates
 from .classify import classify, recheck_age
@@ -277,15 +277,25 @@ def cmd_grade(args) -> int:
         print(f"grading {len(rows)} of {waiting} jobs with {grader.label}\n")
 
         def show(row, grade):
-            print(f"#{row['id']:<5} {grade['grade']}/5  {row['company']} — {row['title']}")
+            print(f"#{row['id']:<5} {grade['score']:>3}/100  {row['company']} — {row['title']}")
             print(f"       {grade['reason']}")
 
-        result = grade_jobs(store, grader, rows, paths.profile_file, now, on_result=show)
+        result = grade_jobs(store, grader, rows, paths.profile_file, now, filters, on_result=show)
+        if not args.no_interviews:
+            finder, note = interviews.build_finder(grader.config)
+            if finder:
+                print(f"\nlooking up how companies interview with {finder.label}")
+                found = interviews.look_up_interviews(store, finder, grader.config, paths.profile_file, now, filters)
+                print(f"  {found.looked_up} companies looked up, {found.found} found")
+                result.errors += found.errors
+                result.changed_days |= found.changed_days
+            elif note:
+                print(f"  interview lookup off: {note}")
         rebuilt = [write_report(store, paths.reports_dir, day, store.last_run_stats(), now, filters.max_posting_age_days)
                    for day in sorted(result.changed_days)]
     finally:
         store.close()
-    print(f"\n{result.graded} graded (learning from {result.examples or 'no examples'}), about ${result.cost_usd:.3f}")
+    print(f"\n{result.graded} scored, about ${result.cost_usd:.3f}")
     for line in result.notes + result.errors:
         print(f"  {line}")
     for path in rebuilt:
@@ -902,14 +912,16 @@ def main(argv: list[str] | None = None) -> int:
 
     p = sub.add_parser(
         "grade",
-        help="AI fit grade 1-5 for shown jobs, learned from your Applied and skipped jobs (sorting only)",
-        description="Each grade is one model call that reads your profile's facts, `preferences` in "
-        "config/fit_grade.json, and your latest Applied and skipped jobs (with your skip reasons). It only "
-        "sorts: it never changes a job's status. Without ids: the open (New or Saved) shortlisted, needs-review "
-        "and visa-list jobs from the last lookback_days that have no grade yet.",
+        help="Fit score 0-100 for shown jobs, by your rubric (sorting only)",
+        description="The model reads each posting for seniority, required skills, domain, benefits, equity and "
+        "interviews (each quoted); code scores those, years, visa and location, and salary, and adds them up "
+        "(rubric.py). Then companies whose postings do not say how they interview are looked up. It only "
+        "sorts: it never changes a job's status. Without ids: the open (New or Saved) shortlisted and "
+        "visa-list jobs from the last lookback_days that have no score yet.",
     )
     p.add_argument("job_ids", type=int, nargs="*", help="grade these jobs (again, if already graded)")
-    p.add_argument("--regrade", action="store_true", help="grade open jobs again with today's examples")
+    p.add_argument("--regrade", action="store_true", help="score open jobs again")
+    p.add_argument("--no-interviews", action="store_true", help="skip the company interview lookup")
     p.add_argument("--days", type=int, metavar="N", help="look back N report days (default: lookback_days)")
     p.add_argument("--limit", type=int, metavar="N", help="grade at most N jobs")
     p.set_defaults(func=cmd_grade)

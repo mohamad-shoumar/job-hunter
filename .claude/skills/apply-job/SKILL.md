@@ -59,16 +59,17 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
   - The "Code changed these" warnings don't point to a broken line.
   If something critical is wrong, fall back to the general CV (`<Last>_Resume_General.pdf` in
   `resume/output/`), note it for the report and keep going. Don't fix a broken CV by hand.
-- **Mirror it only for grade 4 or 5** (the user's call, 2026-10-31: mirroring is real work, so
-  it goes to the best-fitting jobs). The card shows the grade chip ("grade 4/5"); or
-  `sqlite3 data/jobs.sqlite "select json_extract(fit_grade_json,'$.grade') from jobs where id=<id>"`.
-  - **Grade 4 or 5:** after the quick check, follow the whole `mirror-cv` skill on this job's
+- **Mirror it only for a fit score of 65 or more** (the user's call, 2026-10-31: mirroring is real
+  work, so it goes to the best-fitting jobs; it was "grade 4 or 5" before the 0-100 score of
+  2026-11-15). The card shows the score chip; or
+  `sqlite3 data/jobs.sqlite "select json_extract(fit_grade_json,'$.score') from jobs where id=<id>"`.
+  - **Score 65 or more:** after the quick check, follow the whole `mirror-cv` skill on this job's
     CV, then upload the rebuilt PDF. Do it thoroughly, not as a quick pass. Don't ask anything
     during it: the `.bak` lets the user undo. If mirroring can't end at one page with
     `check_version` printing `[]`, restore the `.bak`, rebuild, upload that and note it.
-  - **Grade 1-3 or no grade:** use the tailored CV as it is (no mirroring), unless the user
+  - **Under 65 or no score:** use the tailored CV as it is (no mirroring), unless the user
     asked to mirror this job. The one hand edit allowed is the one-page fix below.
-- **Every CV, any grade, must be one page with no stray short line** (the user's call,
+- **Every CV, any score, must be one page with no stray short line** (the user's call,
   2026-11-05: the tailoring step often leaves 2 pages, with only the Zapier certification on
   page 2, and lines like "hour." alone). Run the stray-line check from `mirror-cv` (step 5) on
   the PDF before uploading it, and fix what it finds the way `mirror-cv` step 4 "Page count"
@@ -97,7 +98,7 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
   Lebanon, only on job aggregators, or a sign-up you can't do (except Proxify, below). A job whose
   form you filled but the user must finish (a CAPTCHA, a field only they can answer) stays in To
   apply. In the Skip pop-up pick the reason that fits and write a short note that quotes the
-  posting ("UAE-Based Candidates only"): the fit grade learns from both, and the final answer
+  posting ("UAE-Based Candidates only"): both stay with the job, and the final answer
   reuses the note.
 
 ### 3. Fill the form
@@ -344,7 +345,7 @@ Search only on LinkedIn, where the user is already signed in; never use an email
 
 ## At the end
 
-Report one line per job: company, role, grade, where you applied (the URL of the tab left open), CV
+Report one line per job: company, role, fit score, where you applied (the URL of the tab left open), CV
 used (mirrored or not; if mirrored, the posting's must-haves the profile doesn't have, so the user
 can add any that are true), salary entered and anything you guessed. Under it, its one LinkedIn contact: name, title, profile
 URL, step/group and why (AUB grad, Arab or Muslim name, the company size for a CEO, the link to the user if any), email if public, and

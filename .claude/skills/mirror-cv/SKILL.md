@@ -1,6 +1,6 @@
 ---
 name: mirror-cv
-description: Mirror one job posting's own words in that job's tailored CV - put the posting's terms first in the skills rows, bring the bullets that match its duties to the top (un-hiding cut ones), and use its spelling where it means the same thing - without adding any fact the profile doesn't have. Use when the user says "mirror", "mirroring", "match the posting's wording" or "make the CV fit this job better" for a job in the app; apply-job also runs it on every job graded 4 or 5.
+description: Mirror one job posting's own words in that job's tailored CV - put the posting's terms first in the skills rows, bring the bullets that match its duties to the top (un-hiding cut ones), and use its spelling where it means the same thing - without adding any fact the profile doesn't have. Use when the user says "mirror", "mirroring", "match the posting's wording" or "make the CV fit this job better" for a job in the app; apply-job also runs it on every job with a fit score of 65 or more.
 ---
 
 # Mirror a job posting in its tailored CV

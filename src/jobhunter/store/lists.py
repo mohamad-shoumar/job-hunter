@@ -45,7 +45,7 @@ JOB_VIEWS = {
 _ORDER_BY_VIEW = {"linkedin_waiting": "a.linkedin_accepted_at ASC, j.id DESC"}
 _DEFAULT_ORDER = """COALESCE(j.report_date, substr(j.first_seen, 1, 10)) DESC,
                  CASE j.status WHEN :shortlisted THEN 0 ELSE 1 END,
-                 COALESCE(json_extract(j.fit_grade_json, '$.grade'), 3) DESC, j.fit_score DESC, j.id DESC"""
+                 COALESCE(json_extract(j.fit_grade_json, '$.score'), 50) DESC, j.fit_score DESC, j.id DESC"""
 # Years asked, in brackets that don't overlap: a job that doesn't say is only in "none".
 YEARS = {"lt3": "j.required_yoe < 3", "3-4": "j.required_yoe >= 3 AND j.required_yoe < 4",
          "4-5": "j.required_yoe >= 4 AND j.required_yoe < 5", "5+": "j.required_yoe >= 5",
@@ -115,10 +115,11 @@ def new_jobs(store: JobStore, status: str, since: datetime) -> list[sqlite3.Row]
     return store.conn.execute(
         """
         SELECT j.id, j.title, j.company, j.status, j.fit_score, j.report_date,
-               json_extract(j.fit_grade_json, '$.grade') AS fit_grade FROM jobs j
+               json_extract(j.fit_grade_json, '$.score') AS fit_grade,
+               json_extract(j.fit_grade_json, '$.star') AS fit_star FROM jobs j
         LEFT JOIN applications a ON a.job_id = j.id
         WHERE (a.job_id IS NULL OR a.stage = ?) AND j.status = ? AND j.first_seen >= ?
-        ORDER BY COALESCE(json_extract(j.fit_grade_json, '$.grade'), 3) DESC, j.fit_score DESC, j.id DESC
+        ORDER BY COALESCE(json_extract(j.fit_grade_json, '$.score'), 50) DESC, j.fit_score DESC, j.id DESC
         """,
         (NEW, status, iso(since)),
     ).fetchall()
@@ -128,7 +129,8 @@ def jobs_to_grade(store: JobStore, statuses, since_day: str, regrade: bool = Fal
     """Jobs with one of `statuses` from report days since `since_day` (YYYY-MM-DD) that are still New or Saved,
     newest first. Without `regrade`, only the ones with no fit grade yet."""
     statuses = tuple(statuses)
-    ungraded = "" if regrade else " AND j.fit_grade_json IS NULL"
+    # An old 1-5 grade (before the rubric, 2026-11-15) has no score: it is scored again.
+    ungraded = "" if regrade else " AND json_extract(j.fit_grade_json, '$.score') IS NULL"
     marks = ", ".join("?" for _ in statuses)
     return store.conn.execute(
         f"SELECT j.* FROM jobs j LEFT JOIN applications a ON a.job_id = j.id "
@@ -163,4 +165,13 @@ def skipped_jobs(store: JobStore, limit: int) -> list[sqlite3.Row]:
         "WHERE a.stage = ? AND a.closed_reason = 'skipped' "
         "ORDER BY (a.skip_reason IS NOT NULL OR a.skip_note IS NOT NULL) DESC, a.updated_at DESC LIMIT ?",
         (CLOSED, limit),
+    ).fetchall()
+
+
+def company_postings(store: JobStore, company: str, exclude_id: int, limit: int = 30) -> list[sqlite3.Row]:
+    """Other stored postings of the same company name that mention a visa (fitgrade.other_offer reads them)."""
+    return store.conn.execute(
+        "SELECT id, description, first_seen FROM jobs WHERE lower(company) = lower(?) AND id != ? "
+        "AND (description LIKE '%visa%' OR description LIKE '%sponsor%') ORDER BY id DESC LIMIT ?",
+        (company, exclude_id, limit),
     ).fetchall()

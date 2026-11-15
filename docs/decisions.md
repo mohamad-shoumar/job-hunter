@@ -73,6 +73,8 @@ Every sighting is kept, so the report lists every site a job was seen on.
 
 **Date:** 2026-10-19
 
+**Replaced by [decision 26](#26-a-fit-score-out-of-100-from-my-own-rubric) on 2026-11-15.** It still only sorts; what it scores changed.
+
 **Context:** Many jobs pass the rules every day, and I needed the best ones at the top.
 
 **Decision:** DeepSeek grades each shown job 1 to 5, with one sentence why. It learns only from examples: my profile's facts, a short `preferences` text in my words, the jobs I marked Applied, and the jobs I skipped with a one-tap reason (Too senior, Wrong stack, ...). The grade only orders the report, the To apply column and which jobs get a CV first. It never changes a job's status, never hides a job and never rejects one. A posting that asks for 5+ years is ranked down by the grade, not rejected.
@@ -345,3 +347,31 @@ The model never writes a Summary: the Summary paragraph is mine and is copied wo
 **Why:** (draft: check) The duplicate copies were not a display problem. They were separate rows with separate statuses, so each one got its own CV from the daily run, its own place in the report and its own card in To apply, and a role I had already applied to came back looking new. Rejecting the copy is what the rest of the project does with a verdict: it stays stored so it never returns as new, it carries a reason I can read, and `reclassify` works the whole rule out again from scratch, so changing the rule undoes it. The company box is the opposite kind of problem - every one of Deliveroo's 15 roles is a real job - so it stays display only and lets me choose from inside the box.
 
 **Trade-off:** A keeper can still be rejected later in the same daily run - the date lookup and the AI check run after `ingest`, and nothing re-folds until the next run or a `reclassify` - so a role can briefly show no copy at all; ranking dated copies above undated ones makes the likeliest case rare. A fresh re-posting of a role I applied to is now hidden behind a rejection, so if a company re-posts because the first opening closed, I will not see the new one in the shortlist; it is in Rejected with the reason naming the job it was folded into. The place rule is a word-subset test, not a gazetteer: "Netherlands / Belgium" and "Netherlands" read as one place, and a company that writes its location two unrelated ways ("Worldwide" against "Remote - India") reads as two. Grouping by company in the Jobs tab pulls a company's older jobs up under its newest day's heading; each row still shows its own date.
+
+## 26. A fit score out of 100, from my own rubric
+
+**Date:** 2026-11-15
+
+**Context:** Each job showed two numbers: "fit 9" (a count of skill keywords, weighted in `filters.json`) and "grade 4/5" (DeepSeek, learning from the jobs I applied to and skipped). Two scores side by side were confusing, and the grade was told not to look at visas or location at all, which are what matter most to me after the role itself.
+
+**Decision:** One number, 0-100, by a rubric I wrote:
+
+| Part | Points |
+|---|---|
+| Seniority (mid or junior 15, senior 9, staff and above 0, not stated 15) | 15 |
+| Technical skills: required skills my profile names / required skills x 12 | 12 |
+| Years: meets 8, one short 5, two short 3 | 8 |
+| Domain: direct 5, transferable 3, unrelated 0 | 5 |
+| Visa and location: visa + relocation 30; visa or relocation help 27; a track record (on a sponsor register, or their other postings offered a visa in two or more different months) 23; remote and open to Lebanon 20; nothing confirmed 15 | 30 |
+| Base salary: the top of the range reaches my floor for that country 7, else 0 | 7 |
+| Benefits named 1, equity named 2 | 3 |
+| Interview style: no live coding 20 (4 rounds 18, 5+ 15) with a green star; live coding or a coding test (HackerRank, ...) 0 with a red star; not known 10 | 20 |
+
+Code adds up every part. Claude Code (`claude-code:opus`, on my Claude login) reads the posting only for what needs reading: the level, the required skills, the domain, benefits, equity and what it says about interviews, each with a quote that code must find in the posting, or that part scores nothing. Years, visa and location, and salary are scored by code alone, from the data the rules already keep. The salary floors are `FIT_SALARY_FLOORS` in `.env`, never in a tracked file. When a posting does not say how they interview, the company is looked up once (`interviews.py`): first on the public hiring-without-whiteboards list, read by code, then on the web, where the answer only counts when code finds its quote on the page it fetches itself; Glassdoor, Reddit, Blind, levels.fyi and Kununu block or forbid scripts, so they are never used. It is kept per company for 90 days. Germany has no sponsor register, and "Blue Card" is in none of the 35,800 stored postings, so the best track record a script can check is our own stored postings ([research](research/2026-11-15-hiring-track-record-and-interview-style.md)). The skill-keyword count stays only to break ties, off the screen.
+
+**Tested:** 30 of my old jobs (15 applied, 15 skipped with a reason) scored on a copy of the database: applied 65 on average, skipped 56; an applied job outscored a skipped one about 70% of the time. Many skips were for things the rubric does not score (not open to me, a junk listing).
+
+**Why:** (draft: check) The grade could not see what I care about most, and a 1-5 number from a model cannot say why a job is a 3. With parts, each number has a reason I can check: "visa 27: offers a visa: ..." or "interview 0: live coding on HackerRank". Quotes keep the model honest the same way they do in the AI check.
+
+**Trade-off:** My Applied and Skip choices no longer move the score; the skip reasons are still kept with each job. The rubric does not score an AI-native company, a German job above a Dutch one, or full-time above contract: those would need parts of their own. A job with no pay stated scores 0 for salary, so a job that hides its pay loses 7 points to one that shows it. Claude Code is slower than DeepSeek (about half a minute a job) and counts against my plan. The rough exchange rates in `rubric.py` only compare a salary with a floor in another currency.
+

@@ -37,8 +37,8 @@ Without a profile, the run still finds and judges jobs; it just makes no CVs, co
 
 | key or tool | used for | without it |
 | --- | --- | --- |
-| `DEEPSEEK_API_KEY` | AI check step 1, fit grade, tailored CVs, and the email's one AI line when `pitch_mode` is `"ai"` | those steps are skipped |
-| the `claude` CLI (Claude Code), signed in | AI check step 2 (web search), posting-date lookups, cover letters | the AI check uses DeepSeek only; dates come from job pages only; no cover letters |
+| `DEEPSEEK_API_KEY` | AI check step 1, tailored CVs, and the email's one AI line when `pitch_mode` is `"ai"` | those steps are skipped |
+| the `claude` CLI (Claude Code), signed in | AI check step 2 (web search), posting-date lookups, the fit score and its interview lookups, cover letters | the AI check uses DeepSeek only; dates come from job pages only; no fit score; no cover letters |
 | `ANTHROPIC_API_KEY` | only a `claude-*` model in a config file, and the contact lookup's "search the web" backup | the "Search the web with Claude" button is off |
 | `HUNTER_API_KEY` | finding who to email | you add contacts by hand (or use the backup above) |
 | `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD` | sending, and reading replies and bounces | no sending |
@@ -58,7 +58,7 @@ that holds `config/`) and `-v` (debug logging).
 | `jobhunter run --from 2026-09-20 --to 2026-09-27` | one report per day for that range (see [Date ranges](#date-ranges)) |
 | `jobhunter run --days 7` | the same for the last 7 days, today included |
 | `jobhunter run --sources himalayas,lever` | only these sources (`--skip serpapi` leaves some out) |
-| `jobhunter run --no-ai` | no model calls: no posting-date lookups, AI check, fit grade, CVs, cover letters or AI-written email lines |
+| `jobhunter run --no-ai` | no model calls: no posting-date lookups, AI check, fit score, CVs, cover letters or AI-written email lines |
 | `jobhunter run --no-outreach` | no contact lookups, drafts, CVs, cover letters or inbox check |
 | `jobhunter run --no-report` | store and classify only |
 | `jobhunter serve` | the web app: jobs, who to email, drafts, sending, tracking (`--port`, `--no-open`) |
@@ -70,7 +70,7 @@ that holds `config/`) and `-v` (debug logging).
 | `jobhunter inbox` | check Gmail for replies and bounces (the daily run does this too) |
 | `jobhunter check` | AI-check shortlisted jobs the rules left `unclear`, newest first (`--limit N`, `--recheck`, or job ids) |
 | `jobhunter dates` | find when undated shortlisted jobs were posted (`--limit N`, `--recheck`, or job ids) |
-| `jobhunter grade` | AI fit grade 1-5 for open jobs, learned from your Applied and skipped jobs (`--regrade`, `--days N`, `--limit N`, or job ids) |
+| `jobhunter grade` | fit score 0-100 for open jobs, by your rubric (`--no-interviews`, `--regrade`, `--days N`, `--limit N`, or job ids) |
 | `jobhunter show <id>` | everything stored about one job and why it got its status (`-d` adds the description) |
 | `jobhunter reclassify` | judge every stored job again after you edit `config/filters.json`, and rebuild the day files that changed |
 | `jobhunter report --date 2026-09-25` | rebuild one day's file from the database |
@@ -93,7 +93,7 @@ parts:
   Jobs rejected only for being too old are counted, not listed.
 - **Sources**: how many listings each source returned, and any errors.
 
-Each company shows its best job (by grade, then fit), and its other jobs are named under it ("Also at
+Each company shows its best job (by score), and its other jobs are named under it ("Also at
 Palantir (16 more)"). This is display only: no job is hidden from the database or the app.
 
 A second run on the same day adds to the same file. A job appears in one daily file only, and never again
@@ -155,7 +155,7 @@ Jobs in the UAE or Qatar, and jobs in the EU and UK that sponsor a visa, have th
 - **Years of experience**, read from the posting's own sentence, which the reason quotes:
   `Asks for 5+ years (a stretch): "5+ years building production backend systems"`. It reads "Minimum 5
   years", "(typically 8+ years)", "4-7 years in ...". A "nice to have" cancels only the years in its own
-  sentence. 6+ is rejected; 5 is a "stretch" note that the fit grade ranks down.
+  sentence. 6+ is rejected; 5 is a "stretch" note that the fit score's years part ranks down.
 - **AI and forward-deployed roles** (`junior_only`) are wanted only at junior level: rejected when the title
   says "senior" or "lead", or the posting asks for 3+ years in any field. A title that also says backend or
   full stack keeps the usual rules ([decision 8](decisions.md#8-ai-and-forward-deployed-roles-only-at-junior-level)).
@@ -219,27 +219,33 @@ checked once, and the result is stored, so `reclassify` keeps it. For older wait
 `jobhunter check --limit 250`. A found quote proves the words exist, not that the AI read them right, so the
 link is always shown.
 
-### 6. Fit grade, for sorting only
+### 6. Fit score, for sorting only
 
-`src/jobhunter/fitgrade.py`, `config/fit_grade.json`
+`src/jobhunter/fitgrade.py`, `src/jobhunter/rubric.py`, `src/jobhunter/interviews.py`, `config/fit_grade.json`
 
-The steps above decide a job's status. The grade never changes it, never hides a job and never rejects one.
+The steps above decide a job's status. The score never changes it, never hides a job and never rejects one.
 It only decides the order: the report, the To apply column and which jobs get a CV first show the best
-grade first.
+score first.
 
-DeepSeek (`deepseek-v4-flash`, about $0.0015 a job) grades each shown job 1-5 with one sentence why, after
-reading:
+Each shown job gets 0-100 points by your rubric (decision 26 in `docs/decisions.md`): skills match 40
+(seniority 15, technical skills 12, years 8, domain 5), visa and location 30, salary and company 30 (base
+salary 7, benefits 1, equity 2, interview style 20). Claude Code reads the posting for the level, required
+skills, domain, benefits, equity and interviews, each quoted; code checks the quotes and adds up every part.
+Years, visa and location, and salary are code alone. Set the salary floors in `.env`:
 
-- your profile's facts (no contact details);
-- `preferences` in `config/fit_grade.json`, in your words;
-- your latest choices: jobs you marked **Applied**, and jobs you **skipped**, with the reason you picked
-  (Too senior, Wrong stack, Not open to me, Agency, repost or gig, Not my kind of role, Pay too low, Other)
-  and your note.
+```
+FIT_SALARY_FLOORS=nl=<amount> EUR, de=<amount> EUR, uk=<amount> GBP, default=<amount> USD
+```
 
-There are no preference rules to keep up to date: each Applied or Skip changes the examples the next grades
-read, so the grades follow what you actually do. Stages you set by hand (Reached out, Interviewing) are not
-used. A job keeps its grade; `jobhunter grade --regrade` grades the open ones again with today's examples.
-The daily run grades open jobs from the last `lookback_days` (7), up to `max_jobs_per_run` (60).
+A visa-list country uses its own floor, everything else `default`; the UAE and Qatar use
+`RELOCATION_MIN_MONTHLY_USD`. No pay stated scores 0.
+
+A star next to the score is the interview style: green when there is no live coding or coding test, red when
+the posting or the company names one. When the posting does not say, the company is looked up once: on the
+public hiring-without-whiteboards list, then on the web (`interview_model`, at most `max_interview_lookups_per_run` companies a run, best score first), kept for
+`interview_recheck_days`, and its jobs scored again. A job keeps its score; `jobhunter grade --regrade`
+scores the open ones again. The daily run scores open jobs from the last `lookback_days` (7), up to
+`max_jobs_per_run` (60).
 
 ## Only new jobs
 
@@ -259,7 +265,7 @@ Every sighting is kept in the `sightings` table, so the report lists every site 
 
 A job is judged once, when it is first seen. After you change a rule or `config/filters.json`, run
 `jobhunter reclassify` to judge the stored jobs again. It keeps the stored AI checks, posting dates and
-grades.
+fit scores.
 
 ## Outreach and tracking
 
@@ -408,7 +414,7 @@ adds a row to `applications.csv` when that file exists, and never overwrites a C
 added instead). The box also lists what the posting asks for that is not in your profile.
 
 `jobhunter tailor <id>` does the same from the terminal. The daily run tailors its new shortlisted jobs
-(`auto_tailor`, up to `max_cvs_per_run`: 5), best grade first. It also catches up on shortlisted jobs from
+(`auto_tailor`, up to `max_cvs_per_run`: 5), best score first. It also catches up on shortlisted jobs from
 the last `catch_up_days` (7) that still have none (one that failed on a network error at wake-up is tried
 again the next day), but only jobs still at New or Saved, and never one that already has a CV you made for
 that company.
@@ -626,7 +632,7 @@ run. On 2026-11-15 a dry run found 43 (366 target-role listings of 1,463 in the 
 - `config/filters.json`: blocked companies, agencies, title words, the years caps, posting age, fit weights,
   and the relocation and visa-list rules. Run `jobhunter reclassify` after changing it.
 - `config/ai_check.json`: the posting-date lookup and the AI check (steps 4 and 5).
-- `config/fit_grade.json`: the fit grade (step 6), including your `preferences`.
+- `config/fit_grade.json`: the fit score (step 6).
 - `config/outreach.json`: who to target by size, the job-board skip list, lookup and send limits, follow-up
   days, the email text, the models, the resume folder, and the CV and cover letter settings.
 - `config/cover_letter_guidelines.md`: how cover letters read.

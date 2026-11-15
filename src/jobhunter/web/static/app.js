@@ -63,24 +63,34 @@ function stageChip(stage, reason, skipReason) {
   const why = reason === "skipped" && skipReason ? `: ${(state.status?.skip_reasons || {})[skipReason] || skipReason}` : "";
   return `<span class="chip ${STAGE_CHIP[stage] || ""}">${esc(stageLabel(stage, reason))}${esc(why)}</span>`;
 }
-// The AI fit grade (sorting only): 1-5, its one-sentence reason on hover.
+// The fit score (sorting only): 0-100 by your rubric, each part's points on hover, and a star for the
+// interviews: green when there is no live coding, red when the posting or the company names it.
+const STAR = { good: ["star-good", "No live coding or coding test"], bad: ["star-bad", "Live coding or a coding test"] };
+function starMark(star) {
+  const [cls, title] = STAR[star] || [];
+  return cls ? `<span class="${cls}" title="${title}">★</span>` : "";
+}
 function gradeChip(g) {
   if (!g) return "";
-  const tone = g.grade >= 4 ? "good" : g.grade <= 2 ? "warn" : "";
-  return `<span class="chip ${tone}" title="${esc(g.reason)}">grade ${g.grade}/5</span>`;
+  const tone = g.score >= 70 ? "good" : g.score < 45 ? "warn" : "";
+  const parts = Object.entries(g.parts || {}).map(([k, [p]]) => `${k} ${p}`).join(" · ");
+  return `<span class="chip ${tone}" title="${esc(g.reason)}
+${esc(parts)}">${g.score}</span>${starMark(g.star)}`;
 }
+// Today's lists get only the number and the star from the server.
+const scoreChip = (score, star) => score == null ? "" : `<span class="chip">${score}</span>${starMark(star)}`;
 const companyKey = (r) => (r.company || "").trim().toLowerCase() || `#${r.id}`;
 // The two Jobs tab views that show one box per company: the jobs still waiting for a decision.
 const GROUPED_VIEWS = new Set(["shortlisted", "visa_list"]);
 
-// A job with no grade yet sorts in the middle (3), as on the server (fitgrade.UNGRADED).
+// A job with no score yet sorts in the middle (50), as on the server (fitgrade.UNGRADED).
 // One board fetch can bring a whole company at once (17 Palantir London roles on 2026-10-21, 15 at
-// Deliveroo on 2026-11-13): a company's jobs are grouped, best first (grade, then fit), and shown
+// Deliveroo on 2026-11-13): a company's jobs are grouped, best first (score, then skills), and shown
 // under one box. Display only; every job keeps its status.
 // `order` sorts the companies by their best job; without it they keep the grade order.
 function byCompany(rows, grade, order) {
   const groups = new Map();
-  [...rows].sort((a, b) => (grade(b) || 3) - (grade(a) || 3) || (b.fit ?? b.fit_score ?? 0) - (a.fit ?? a.fit_score ?? 0))
+  [...rows].sort((a, b) => (grade(b) ?? 50) - (grade(a) ?? 50) || (b.fit ?? b.fit_score ?? 0) - (a.fit ?? a.fit_score ?? 0))
     .forEach((r) => {
       const key = companyKey(r);
       groups.has(key) ? groups.get(key).push(r) : groups.set(key, [r]);
@@ -118,11 +128,11 @@ function companyBox(jobs, drawRow) {
     </button>
   </div>`;
 }
-// Why you skip a job: one tap, plus an optional note. The fit grade learns from these.
+// Why you skip a job: one tap, plus an optional note, kept with the job.
 function skipPicker(id) {
   const reasons = Object.entries(state.status?.skip_reasons || {});
   return `<div class="skip-picker" data-skip-job="${id}">
-    <div class="small muted">Why skip it? The fit grade learns from this.</div>
+    <div class="small muted">Why skip it?</div>
     <input class="skip-note" placeholder="In your own words (optional), then pick a reason or press Enter">
     <div class="row">${reasons.map(([key, label]) => `<button class="btn small" data-skip-reason="${key}">${esc(label)}</button>`).join("")}</div>
   </div>`;
@@ -262,7 +272,7 @@ async function loadJobs() {
   // are then grouped into one box under that day, each row still showing its own date.
   const place = new Map();
   data.jobs.forEach((j, i) => place.has(companyKey(j)) || place.set(companyKey(j), i));
-  const groups = byCompany(data.jobs, (j) => j.fit_grade?.grade,
+  const groups = byCompany(data.jobs, (j) => j.fit_grade?.score,
     (a, b) => place.get(companyKey(a)) - place.get(companyKey(b)));
   let lastDay = null;
   list.innerHTML = groups.map((jobs) => {
@@ -294,7 +304,6 @@ function jobRow(j) {
       </div>
       <div class="job-side">
         ${gradeChip(j.fit_grade)}
-        <span class="chip" title="Fit score from your skills">fit ${j.fit}</span>
         ${j.required_yoe ? `<span class="small" title="Years of experience the posting asks for">${j.required_yoe}+ yrs</span>` : ""}
         ${j.salary ? `<span class="small">${esc(j.salary)}</span>` : ""}
         <span class="small muted">${j.posted_at ? "posted " + esc(day(j.posted_at)) : "found " + esc(day(j.first_seen))}</span>
@@ -353,7 +362,7 @@ function renderDrawer() {
         <h2>${esc(j.title)}</h2>
         <div class="muted">${esc(co.name)} · job #${j.id}</div>
         <div class="job-meta" style="margin-top:6px">${statusChip(j.status, j.eligibility)} ${stageChip(stage, app.closed_reason, app.skip_reason)}
-          ${gradeChip(j.fit_grade)} <span class="chip">fit ${j.fit}</span></div>
+          ${gradeChip(j.fit_grade)}</div>
       </div>
       <button class="btn" data-action="close" title="Close (Esc)">✕</button>
     </div>
@@ -387,9 +396,10 @@ function whySection(d) {
       <ul class="small">${j.eligibility_reasons.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>
       ${ai ? `<div class="small"><b>AI check:</b> ${esc(ai.verdict)}${ai.verified ? "" : " (quote not verified)"} · ${esc(ai.reason)}
         ${ai.quote ? `<div class="quote">“${esc(ai.quote)}” ${ai.source_url ? `<a href="${esc(ai.source_url)}" target="_blank" rel="noopener">source</a>` : ""}</div>` : ""}</div>` : ""}
-      ${j.fit_grade ? `<div style="margin-top:6px"><b>Fit grade ${j.fit_grade.grade}/5</b> <span class="small muted">${esc(j.fit_grade.reason)} (${esc(j.fit_grade.model)}, from your Applied and skipped jobs)</span></div>` : ""}
-      <div style="margin-top:6px"><b>Fit ${j.fit}</b> <span class="small muted">${esc(j.relevance_reasons.join("; "))}</span></div>
-      <div class="small muted">${esc(j.skills.join(", "))}</div>
+      ${j.fit_grade ? `<div style="margin-top:6px"><b>Fit score ${j.fit_grade.score}/100</b> ${starMark(j.fit_grade.star)} <span class="small muted">${esc(j.fit_grade.reason)} (${esc(j.fit_grade.model)})</span></div>
+        <div class="kv small">${Object.entries(j.fit_grade.parts || {}).map(([k, [p, why]]) => `<div>${esc(k)} ${p}</div><div>${esc(why)}</div>`).join("")}</div>` : ""}
+      <div style="margin-top:6px"><b>Role</b> <span class="small muted">${esc(j.relevance_reasons.join("; "))}</span></div>
+      <div class="small muted">Skills named: ${esc(j.skills.join(", ") || "none")}</div>
       <div class="kv small" style="margin-top:8px">${details.map(([k, v]) => `<div>${esc(k)}</div><div>${esc(v)}</div>`).join("")}</div>
       <div class="small" style="margin-top:6px">Seen on: ${j.seen_on.map((s) => `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.source)}</a>`).join(", ")}</div>
     </div>`;
@@ -622,9 +632,9 @@ async function renderToday() {
     <div class="cards">
       ${card("Replies to answer", t.replies.map((r) => item(r, `<div class="quote">${esc(r.reply_from || "")}: ${esc(r.reply_snippet || "")}</div>`)), "No new replies. Click Check inbox to look.")}
       ${card("Follow-ups due", t.follow_ups_due.map((r) => item(r, `<div class="small muted">to ${esc(r.email || "?")} · follow-up ${r.follow_ups + 1} · due ${esc(day(r.next_follow_up_at))}</div>`)), "Nothing due.")}
-      ${card("New shortlisted to triage", onePerCompany(t.new_jobs, (r) => r.fit_grade).map((r) => item(r, ` ${r.fit_grade ? `<span class="chip">grade ${r.fit_grade}/5</span>` : ""} <span class="chip">fit ${r.fit_score}</span>
+      ${card("New shortlisted to triage", onePerCompany(t.new_jobs, (r) => r.fit_grade).map((r) => item(r, ` ${scoreChip(r.fit_grade, r.fit_star)}
         <span class="row" style="margin-top:4px"><button class="btn small" data-quick="saved" data-id="${r.id}">Save</button><button class="btn small danger" data-quick="skipped" data-id="${r.id}">Skip</button>${moreButton(r)}</span>`)), "All caught up.")}
-      ${card("New on the visa list (EU/UK)", onePerCompany(t.new_visa_jobs || [], (r) => r.fit_grade).map((r) => item(r, ` ${r.fit_grade ? `<span class="chip">grade ${r.fit_grade}/5</span>` : ""} <span class="chip">fit ${r.fit_score}</span>
+      ${card("New on the visa list (EU/UK)", onePerCompany(t.new_visa_jobs || [], (r) => r.fit_grade).map((r) => item(r, ` ${scoreChip(r.fit_grade, r.fit_star)}
         <span class="row" style="margin-top:4px"><button class="btn small" data-quick="saved" data-id="${r.id}">Save</button><button class="btn small danger" data-quick="skipped" data-id="${r.id}">Skip</button>${moreButton(r)}</span>`)), "None this week.")}
       ${t.unsure_sends.length ? card("Sends to double-check", t.unsure_sends.map((r) => item(r, `<div class="small muted">Gmail didn't confirm ${esc(r.subject)}: Check inbox resolves it.</div>`)), "") : ""}
       ${card("Ghosted this week", t.ghosted.map((r) => item(r, `<div class="small muted">closed ${esc(day(r.at))}</div>`)), "None.")}
@@ -669,7 +679,7 @@ async function renderPipeline() {
     api("/api/jobs?view=shortlisted"), api("/api/jobs?view=visa_list&days=2"), api("/api/jobs?view=tracked"),
     api("/api/jobs?view=closed"), api("/api/jobs?view=closed_rejected").catch(() => null),
   ]);
-  const grade = (j) => j.fit_grade?.grade;
+  const grade = (j) => j.fit_grade?.score;
   // A saved job is in the tracked list too (and a visa-list one may be older than the two days): it shows once, in To apply.
   const waiting = [...open.jobs, ...visa.jobs].filter(toApplyStage);
   const ids = new Set(waiting.map((j) => j.id));
@@ -697,7 +707,7 @@ async function renderPipeline() {
         <div class="small muted">${esc(j.company)}</div>
         <div class="job-meta small" style="margin-top:4px">
           ${j.status === "visa_list" ? `<span class="chip info">visa</span>` : ""}
-          ${col.key === "to_apply" ? `<span class="chip">posted ${esc(day(postedAt(j)))}</span>${gradeChip(j.fit_grade)}<span class="chip">fit ${j.fit}</span>${j.has_cv ? `<span class="chip good">CV</span>` : ""}${j.has_cover ? `<span class="chip good">letter</span>` : ""}` : ""}
+          ${col.key === "to_apply" ? `<span class="chip">posted ${esc(day(postedAt(j)))}</span>${gradeChip(j.fit_grade)}${j.has_cv ? `<span class="chip good">CV</span>` : ""}${j.has_cover ? `<span class="chip good">letter</span>` : ""}` : ""}
           ${j.applied_at ? `<span class="chip">applied ${esc(day(j.applied_at))}</span>` : ""}${j.emailed_at ? `<span class="chip info">emailed ${esc(day(j.emailed_at))}</span>` : ""}
           ${!j.applied_at && !j.emailed_at && j.reached_out_at && col.key === "reached_out" ? `<span class="chip">reached out ${esc(day(j.reached_out_at))}</span>` : ""}
           ${j.stage === "reached_out" && j.next_follow_up_at ? `<span class="chip ${new Date(j.next_follow_up_at) <= new Date() ? "warn" : ""}">follow-up ${esc(day(j.next_follow_up_at))}</span>` : ""}

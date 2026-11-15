@@ -161,6 +161,18 @@ CREATE TABLE IF NOT EXISTS applications (
     linkedin_replied_at TEXT
 );
 
+-- The fit score's interview lookup (interviews.py): one row per company, what its interviews
+-- are like and the quote that says so. A new table: no migration needed.
+CREATE TABLE IF NOT EXISTS interview_styles (
+    company_key TEXT PRIMARY KEY,
+    company TEXT NOT NULL,
+    answer_json TEXT,
+    found_by TEXT,
+    source_url TEXT,
+    reason TEXT,
+    checked_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     job_id INTEGER NOT NULL REFERENCES jobs(id),

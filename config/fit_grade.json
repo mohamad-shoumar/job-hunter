@@ -1,18 +1,17 @@
 {
-  "_about": "AI fit grade (src/jobhunter/fitgrade.py): DeepSeek grades each shown job 1-5 for how much you would want it, with one sentence why. Sorting only: it never changes a job's status, never hides or rejects one. It learns from your choices, not from rules: each call reads your profile's facts, `preferences` below, your latest Applied jobs and your skipped jobs with the reason you picked. `enabled` controls the daily run; `jobhunter grade` works either way.",
+  "_about": "Fit score (src/jobhunter/fitgrade.py, rubric.py): each shown job gets 0-100 points by your rubric (skills match 40, visa and location 30, salary and company 30, with the interview style 20 of those). Sorting only: it never changes a job's status, never hides or rejects one. The model reads the posting for seniority, required skills, domain, benefits, equity and interviews, each quoted; code checks the quotes and adds up every part. The salary floors are FIT_SALARY_FLOORS in .env, never here. `enabled` controls the daily run; `jobhunter grade` works either way.",
 
   "enabled": true,
-  "_model": "deepseek-* uses DEEPSEEK_API_KEY. deepseek-v4-flash is about $0.0015 a job (~4,500 tokens: the profile, a 3,500-character posting and ~50 example lines), so a few cents a day; deepseek-v4-pro about 4x that.",
-  "model": "deepseek-v4-flash",
+  "_model": "claude-code:opus uses the Claude Code CLI on your Claude login (no API bill, about 20-40 s a job, counts against your plan). deepseek-v4-flash also works (DEEPSEEK_API_KEY, about $0.002 a job).",
+  "model": "claude-code:opus",
   "_max_jobs_per_run": "A cap per run. The rest wait for the next run or `jobhunter grade`.",
   "max_jobs_per_run": 60,
-  "_lookback_days": "Shown jobs filed under the last this-many days are graded while you have not acted on them (New or Saved).",
+  "_lookback_days": "Shown jobs filed under the last this-many days are scored while you have not acted on them (New or Saved).",
   "lookback_days": 7,
-  "_examples": "How many of your latest choices each call reads. Skips with a reason come first.",
-  "max_liked_examples": 20,
-  "max_skipped_examples": 30,
-  "description_chars": 3500,
-  "_preferences": "What you want, in your words. The model weighs it after your Applied and skipped jobs. No contact details or pay figures here: this file is in git.",
-  "preferences": "I have about 3 years of experience. I want jobs relevant to my experience and the things I'm good at. Most listings ask for 5+ years of experience and very few match 3+, which is what I'm looking for: rank jobs that ask for 5 or more years lower. My AI experience is junior level: AI roles that are very specialised and clearly want more than that should rank lower.",
-  "workers": 4
+  "description_chars": 6000,
+  "workers": 4,
+  "_interview": "When a posting does not say how they interview, the company is looked up once on the web (Claude Code with web search), its quote checked on the page code fetches, and kept for interview_recheck_days. At most max_interview_lookups_per_run companies a run, best score first. 0 turns it off.",
+  "interview_model": "claude-code:sonnet",
+  "max_interview_lookups_per_run": 15,
+  "interview_recheck_days": 90
 }

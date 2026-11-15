@@ -578,6 +578,12 @@ def _contact_json(contact: sqlite3.Row | None, targets: list[str] | None = None)
     return data
 
 
+def _grade(row: sqlite3.Row) -> dict | None:
+    """The fit score for the page: its total, parts, star and reason (not the model's raw answer)."""
+    grade = grade_of(row)
+    return {k: v for k, v in grade.items() if k != "answer"} if grade else None
+
+
 def _job_summary(row: sqlite3.Row, contact: sqlite3.Row | None, config: OutreachConfig) -> dict:
     """A row of the job list; `contact` is its chosen_contact (looked up for the whole list at once)."""
     reasons = _reasons(row, "eligibility_reasons_json")
@@ -589,7 +595,7 @@ def _job_summary(row: sqlite3.Row, contact: sqlite3.Row | None, config: Outreach
         "report_date": row["report_date"], "source": row["source"],
         "apply_url": row["application_url"] or row["source_url"],
         "stage": row["stage"] or "new", "closed_reason": row["closed_reason"], "skip_reason": row["skip_reason"],
-        "fit_grade": grade_of(row), "has_draft": bool(row["has_draft"]),
+        "fit_grade": _grade(row), "has_draft": bool(row["has_draft"]),
         "draft_blocked": bool(row["draft_blocked"]), "emailed_at": row["emailed_at"], "applied_at": row["applied_at"],
         "has_cv": bool(row["has_cv"]), "has_cover": bool(row["has_cover"]),
         "replied_at": row["replied_at"], "next_follow_up_at": row["next_follow_up_at"],
@@ -641,7 +647,7 @@ def _job_detail(store: JobStore, row: sqlite3.Row, config: OutreachConfig, servi
             "apply_url": row["application_url"] or row["source_url"], "description": row["description"],
             "reject_reason": row["reject_reason"],
             "ai_check": json.loads(row["ai_check_json"]) if row["ai_check_json"] else None,
-            "fit_grade": grade_of(row),
+            "fit_grade": _grade(row),
             "seen_on": [{"source": s["source"], "url": s["source_url"]} for s in sightings],
         },
         "company": {**dict(company), "targets": [ROLE_LABELS[t] for t in targets], "why": why,

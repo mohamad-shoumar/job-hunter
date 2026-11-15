@@ -38,7 +38,7 @@ flowchart LR
     S["Sources<br/>job APIs, ATS boards, RSS"] --> I["Ingest + dedup"]
     I --> R["Rules<br/>eligibility, relevance, freshness"]
     R --> DB[("SQLite<br/>the memory")]
-    DB --> O["Optional steps<br/>posting dates, AI check, fit grade,<br/>watched boards, outreach"]
+    DB --> O["Optional steps<br/>posting dates, AI check, fit score,<br/>watched boards, outreach"]
     O --> DB
     DB --> REP["Daily report<br/>reports/YYYY-MM-DD.md"]
     W["Web app<br/>jobhunter serve, 127.0.0.1"] <--> DB
@@ -50,7 +50,7 @@ flowchart LR
 3. **Rules.** Plain code gives each new job one status (shortlisted, visa list, rejected) and
    the quote it rests on. Rejected jobs stay stored, so they never come back as "new".
 4. **Optional steps.** Models look only at what the rules could not settle, and code checks what they say.
-   The fit grade only sorts. Each step can fail without stopping the run.
+   The fit score only sorts. Each step can fail without stopping the run.
 5. **Report.** Each day's Markdown file is rebuilt from the database, so a rule change can redo any day.
 
 | area | modules | what it owns |
@@ -60,7 +60,7 @@ flowchart LR
 | Rules | `classify.py`, `eligibility.py`, `geo.py`, `relevance.py`, `extract.py`, `agency.py`, `relocation.py`, `gulf.py`, `visa.py` | the status and its quoted reason |
 | Memory | `store/` | every SQL statement: the schema with numbered migrations, one module per group of tables |
 | Model helpers | `llm.py`, `grounding.py`, `profile.py` | one JSON answer from DeepSeek, Claude or the Claude Code CLI; `find_quote`; the shared fact checks; reading the profile |
-| Model steps | `ai_check.py`, `posted_date.py`, `fitgrade.py` | the AI eligibility check, posting dates, the fit grade |
+| Model steps | `ai_check.py`, `posted_date.py`, `fitgrade.py` | the AI eligibility check, posting dates, the fit score |
 | Writing | `cv.py`, `cover.py`, `pitch.py` | a tailored CV, a cover letter, a cold email, each line checked against the profile |
 | Outreach | `contacts.py`, `hunter.py`, `mailer.py`, `tracking.py`, `outreach.py` | who to email, Gmail sending and reading, stages and follow-ups |
 | Web app | `web/` | a FastAPI JSON API and one page, locked to your own browser |
@@ -110,7 +110,7 @@ On 2026-10-26 that first run judged 501 new jobs: 7 shortlisted, 53 to review an
 its reason. `jobhunter show <id>` prints everything about one job.
 
 Everything else is optional. Settings live in `config/*.json` (sources, rules, models, outreach) and keys in
-`.env` (copy `.env.example`). With `DEEPSEEK_API_KEY` and the Claude Code CLI, the AI check, fit grade,
+`.env` (copy `.env.example`). With `DEEPSEEK_API_KEY` and the Claude Code CLI, the AI check, fit score,
 tailored CVs and cover letters turn on; Hunter and Gmail turn on outreach. For your own CVs and emails, copy
 `profile/master_profile.example.md` and `resume/resume.example.md` (both made up) and fill them in. The
 [manual](docs/usage.md) covers setup, every command and the daily schedule.

@@ -359,13 +359,15 @@ def test_skip_with_a_reason_for_the_fit_grade(client):
     assert [(j["id"], j["skip_reason"]) for j in closed] == [(1, "wrong_stack")]
 
 
-def test_lists_carry_the_fit_grade_and_put_the_best_first(client, home):
+def test_lists_carry_the_fit_score_and_put_the_best_first(client, home):
     store = JobStore(home / "data" / "jobs.sqlite")
-    store.save_fit_grade(2, {"grade": 5, "reason": "Python backend, 3+ years.", "model": "m", "at": "x"})
-    store.save_fit_grade(1, {"grade": 2, "reason": "Asks for 7+ years.", "model": "m", "at": "x"})
+    store.save_fit_grade(2, {"score": 81, "parts": {"years": [8, "x"]}, "star": "good", "reason": "Python backend, 3+ years.",
+                             "answer": {"seniority": "mid"}, "model": "m", "at": "x"})
+    store.save_fit_grade(1, {"score": 35, "parts": {}, "reason": "Asks for 7+ years.", "model": "m", "at": "x"})
     store.close()
     jobs = client.get("/api/jobs?view=shortlisted").json()["jobs"]
-    assert [(j["id"], j["fit_grade"]["grade"]) for j in jobs] == [(2, 5), (1, 2)]
+    assert [(j["id"], j["fit_grade"]["score"]) for j in jobs] == [(2, 81), (1, 35)]
+    assert "answer" not in jobs[0]["fit_grade"] and jobs[0]["fit_grade"]["star"] == "good"
     assert client.get("/api/jobs/2").json()["job"]["fit_grade"]["reason"] == "Python backend, 3+ years."
 
 

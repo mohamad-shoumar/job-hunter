@@ -116,8 +116,10 @@ def _job_block(n: int, row: sqlite3.Row, sightings: list[sqlite3.Row], prepared:
     lines += [f"  - {r}" for r in reasons[1:]]
     grade = grade_of(row)
     if grade:
-        lines.append(f"- **Fit grade:** {grade['grade']}/5 — {grade['reason']}")
-    lines.append(f"- **Fit:** {row['fit_score']} · {'; '.join(relevance)}" + (f" · {', '.join(skills[:10])}" if skills else ""))
+        star = {"good": " ★ no live coding", "bad": " ★ live coding"}.get(grade.get("star") or "", "")
+        lines.append(f"- **Fit score:** {grade['score']}/100{star} — {grade['reason']}")
+        lines.append("  - " + " · ".join(f"{name} {points}" for name, (points, _) in grade["parts"].items()))
+    lines.append(f"- **Role:** {'; '.join(relevance)}" + (f" · skills named: {', '.join(skills[:10])}" if skills else ""))
     lines.append(f"- **Details:** {' · '.join(details)}")
     if row["location_raw"]:
         lines.append(f"- **Location as posted:** {row['location_raw']}")
@@ -267,9 +269,11 @@ def render(day: str, rows: list[sqlite3.Row], sightings: dict[int, list[sqlite3.
             out += [""] if ai["notes"] or ai["errors"] else []
         fit = summary.get("fit_grade")
         if fit:
-            grades = ", ".join(f"{n}× {g}/5" for g, n in sorted(fit["grades"].items(), reverse=True)) or "none"
-            learned = f", learning from {fit['examples']}" if fit.get("examples") else ""
-            out += [f"**Fit grades** ({fit['model']}{learned}): {fit['graded']} graded ({grades}), "
+            grades = ", ".join(f"{n}× {g}s" for g, n in sorted(fit["grades"].items(), key=lambda x: -int(x[0])))
+            found = fit.get("interviews") or {}
+            looked = (f"; interview lookups: {found['looked_up']} companies, {found['found']} found"
+                      if found.get("looked_up") else "")
+            out += [f"**Fit scores** ({fit['model']}): {fit['graded']} scored ({grades or 'none'}){looked}, "
                     f"about ${fit['cost_usd']:.2f}", ""]
             out += [f"- {_cell(line)}" for line in fit["notes"] + fit["errors"]]
             out += [""] if fit["notes"] or fit["errors"] else []

@@ -23,7 +23,7 @@ from datetime import date, datetime, time, timedelta
 from functools import partial
 from pathlib import Path
 
-from . import boards, discovery, sponsors
+from . import boards, discovery, interviews, sponsors
 from .ai_check import AiChecker, CheckRun, build_checker, check_jobs
 from .boards import WatchRun
 from .discovery import DiscoverRun
@@ -91,6 +91,8 @@ class RunOptions:
     ai_checker: AiChecker | None = None
     date_finder: DateFinder | None = None
     fit_grader: FitGrader | None = None
+    # The fit score's company interview lookup; built from config/fit_grade.json only when fit_grader is too.
+    interview_finder: interviews.InterviewFinder | None = None
     http: Http | None = None
     now: datetime | None = None
 
@@ -381,13 +383,20 @@ def ai_check_days(store: JobStore, checker: AiChecker, days: list[str], filters:
     return result
 
 
-def grade_recent(store: JobStore, grader: FitGrader, profile_file: Path, now: datetime) -> GradeRun:
-    """Fit-grade the ungraded shown jobs of the last lookback_days, newest first, up to the per-run cap."""
+def grade_recent(store: JobStore, grader: FitGrader, profile_file: Path, now: datetime,
+                 filters: Filters | None = None, finder: interviews.InterviewFinder | None = None) -> GradeRun:
+    """Score the unscored shown jobs of the last lookback_days, newest first, up to the per-run cap; then look up
+    how the best-scored companies interview, when their postings do not say, and score their jobs again."""
     rows = to_grade(store, now, grader.config.lookback_days)
     limit = grader.config.max_jobs_per_run
-    result = grade_jobs(store, grader, rows[:limit], profile_file, now)
+    result = grade_jobs(store, grader, rows[:limit], profile_file, now, filters)
     if len(rows) > limit:
         result.notes.append(f"{len(rows) - limit} more left for the next run or `jobhunter grade`")
+    if finder:
+        found = interviews.look_up_interviews(store, finder, grader.config, profile_file, now, filters)
+        result.interviews = found.to_dict()
+        result.errors += [f"interview lookup: {line}" for line in found.errors]
+        result.changed_days |= found.changed_days
     return result
 
 
@@ -458,11 +467,15 @@ def run(root_paths, sources_config: dict, filters: Filters,
     opts = options or RunOptions()
     now = opts.now or utcnow()
     sources, config_notes = build_sources(sources_config)
-    ai_checker = date_finder = fit_grader = None
+    ai_checker = date_finder = fit_grader = interview_finder = None
     if opts.ai:
         ai_checker = _model(opts.ai_checker, build_checker, root_paths.ai_check_file, config_notes)
         date_finder = _model(opts.date_finder, build_finder, root_paths.ai_check_file, config_notes)
         fit_grader = _model(opts.fit_grader, build_grader, root_paths.fit_grade_file, config_notes)
+        interview_finder = opts.interview_finder
+        if fit_grader and opts.fit_grader is None and interview_finder is None:
+            interview_finder, note = interviews.build_finder(fit_grader.config)
+            config_notes += [note] if note else []
     watch = boards.WatchConfig.from_sources(sources_config)
     discover = discovery.DiscoverConfig.from_sources(sources_config)
 
@@ -507,7 +520,8 @@ def run(root_paths, sources_config: dict, filters: Filters,
         if fit_grader and not opts.date_range:
             # After the AI check (it can move a job to the shortlist), before the CVs (made best grade first).
             summary.fit_grade = _step("fit grade",
-                                      lambda: grade_recent(store, fit_grader, root_paths.profile_file, now),
+                                      lambda: grade_recent(store, fit_grader, root_paths.profile_file, now, filters,
+                                                           interview_finder),
                                       partial(GradeRun, model=fit_grader.label))
             touched |= summary.fit_grade.changed_days
         if watch.enabled:
