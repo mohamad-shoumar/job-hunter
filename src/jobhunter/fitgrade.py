@@ -121,7 +121,7 @@ class FitGradeConfig:
     workers: int = 4
     # The company interview lookup (interviews.py): its model, and how many companies a run.
     interview_model: str = "claude-code:sonnet"
-    max_interview_lookups_per_run: int = 15
+    max_interview_lookups_per_run: int = 10
     interview_recheck_days: int = 90
 
     @classmethod
