@@ -99,6 +99,7 @@ and [contact-discovery.md](contact-discovery.md#the-test-on-20-real-openings-202
 | [message-templates.md](message-templates.md) | every message, with character counts, and why each line is there |
 | [followup-plan.md](followup-plan.md) | what to send after the invite, when, and when to stop |
 | [outreach-experiments.md](outreach-experiments.md) | what the data shows so far, the one test worth running, the weekly 15-minute review |
+| [posting-schedule.md](posting-schedule.md) | when to post your own LinkedIn posts (days, Beirut times) and three things to try (2026-11-16) |
 | [critical-review.md](critical-review.md) | an independent reviewer's challenges, and what changed because of them |
 
 ## What this is based on
