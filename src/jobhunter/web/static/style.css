@@ -160,6 +160,7 @@ input[type=text], input[type=email], input[type=search] { width: 100%; }
 table { width: 100%; border-collapse: collapse; }
 td, th { text-align: left; padding: 6px 4px; border-top: 1px solid var(--line); }
 th { color: var(--muted); font-weight: 500; font-size: 12px; }
+tr.today-slot td { background: var(--good-bg); }
 .bar { height: 6px; background: var(--panel-2); border-radius: 3px; overflow: hidden; }
 .bar > span { display: block; height: 100%; background: var(--accent); }
 

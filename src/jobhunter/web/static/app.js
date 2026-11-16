@@ -185,7 +185,7 @@ async function loadStatus() {
 
 function route() {
   const [tab, id] = (location.hash.slice(1) || "today").split("/");
-  state.tab = ["today", "jobs", "pipeline", "stats"].includes(tab) ? tab : "today";
+  state.tab = ["today", "jobs", "pipeline", "stats", "cheatsheet"].includes(tab) ? tab : "today";
   document.querySelectorAll("#tabs a").forEach((a) => a.classList.toggle("active", a.dataset.tab === state.tab));
   render();
   const jobId = id ? Number(id) : null;
@@ -194,7 +194,7 @@ function route() {
 }
 
 function render() {
-  ({ today: renderToday, jobs: renderJobs, pipeline: renderPipeline, stats: renderStats })[state.tab]();
+  ({ today: renderToday, jobs: renderJobs, pipeline: renderPipeline, stats: renderStats, cheatsheet: renderCheatSheet })[state.tab]();
 }
 
 // --- jobs ----------------------------------------------------------------------
@@ -349,7 +349,7 @@ function setDetail(detail, message) {
 function refreshInBackground() {
   loadStatus().catch(() => {});
   if (state.tab === "jobs") loadJobs().catch(() => {});
-  else if (state.tab !== "stats") render();
+  else if (state.tab !== "stats" && state.tab !== "cheatsheet") render();
 }
 
 function renderDrawer() {
@@ -750,6 +750,38 @@ async function renderStats() {
       <div class="card"><h2>Reply rate by company size</h2>${table(Object.entries(s.by_size), "People")}</div>
       <div class="card"><h2>Hunter credits</h2><div id="credits" class="muted">Checking is free.</div>
         <button class="btn" data-action-global="credits" style="margin-top:8px">Check credits</button></div>
+    </div>`;
+}
+
+// --- cheat sheet ----------------------------------------------------------------------
+// Fixed notes to keep at hand (no API call). Germany is one hour behind Beirut all year:
+// both move their clocks on the last Sunday of March and of October.
+
+const POST_SLOTS = [
+  { day: "Tuesday", beirut: "2 PM", germany: "1 PM", what: "Industry question or debate" },
+  { day: "Wednesday", beirut: "5 PM", germany: "4 PM", what: "Strongest technical or opinion post" },
+  { day: "Thursday", beirut: "5 PM", germany: "4 PM", what: "Personal engineering story" },
+  { day: "Friday", beirut: "4 PM", germany: "3 PM", what: "Funny or relatable developer post" },
+];
+
+const POST_TIPS = [
+  ["Hook people in the first two lines.", "The opening decides whether someone expands the post. Use a surprising claim, a specific result or an interesting failure."],
+  ["Ask a question developers really disagree about.", "For example: \u201cShould developers still review every line of AI-generated code?\u201d Specific questions get more discussion than \u201cthoughts?\u201d. Metricool\u2019s 2026 study: posts with questions got substantially more comments."],
+  ["Test PDF carousels and multi-image posts.", "Good for tutorials, lessons and checklists. Metricool found they often beat single-image and video posts."],
+];
+
+function renderCheatSheet() {
+  const today = new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "Asia/Beirut" }).format(new Date());
+  $("#main").innerHTML = `
+    <div class="cards">
+      <div class="card"><h2>When to post on LinkedIn</h2>
+        <table><tr><th>Day</th><th>Beirut</th><th>Germany</th><th>Post</th></tr>${POST_SLOTS.map((s) => `
+          <tr${s.day === today ? ' class="today-slot"' : ""}><td>${esc(s.day)}${s.day === today ? ' <span class="chip good">today</span>' : ""}</td>
+            <td><b>${esc(s.beirut)}</b></td><td>${esc(s.germany)}</td><td>${esc(s.what)}</td></tr>`).join("")}</table>
+        <div class="small muted" style="margin-top:8px">Slots to test, not proven for your audience (European tech people, recruiters, hiring managers).
+          Buffer (4.8M posts): Wednesday 4 PM was the best slot overall, late afternoons beat mornings. Sprout Social: Tuesday to Thursday, working hours.</div></div>
+      <div class="card"><h2>What to try</h2>
+        <ul>${POST_TIPS.map(([head, why]) => `<li><b>${esc(head)}</b><div class="small muted">${esc(why)}</div></li>`).join("")}</ul></div>
     </div>`;
 }
 
