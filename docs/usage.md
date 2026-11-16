@@ -362,8 +362,9 @@ The name, city, phone and LinkedIn come from `MY_NAME`, `MY_LOCATION`, `MY_PHONE
 - The title loses noise like "- Remote" or "(m/f/d)".
 - Emails go out as plain text ("LinkedIn: https://...") plus an HTML copy, where "LinkedIn" is a link.
 - The first email carries a CV: a PDF from `cv_dir` (`resume/output`). The job's tailored CV (below) wins,
-  then a file named after the company (`Doe_FullStack_Acme_Sep2026.pdf`), else `default_cv` (empty means
-  `<Last name>_Resume_General.pdf`, the master CV). You can pick another, or "No CV", per job. Follow-ups
+  then one in a folder named after the company (`FullStack_Acme_Sep2026/Jane_Doe.pdf`), else `default_cv`
+  (empty means `General/Jane_Doe.pdf`, the master CV). Every CV PDF is named after you and nothing else
+  (`MY_NAME` in `.env`, words joined by `_`), so each sits in a folder of its own. You can pick another, or "No CV", per job. Follow-ups
   carry no attachment.
 
 **`pitch_mode: "ai"`.** The model in `pitch_model` writes the one sentence after "I just applied for the

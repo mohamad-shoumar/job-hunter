@@ -218,9 +218,10 @@ class OutreachConfig:
     ghost_after_business_days: int = 7
     daily_send_cap: int = 15
     daily_guessed_cap: int = 3
-    # CVs to attach: PDFs in this folder. A file whose name contains the company (e.g.
-    # Doe_FullStack_LigaData_Sep2026.pdf) is picked for that company, else default_cv. Empty
-    # default_cv means the master CV build.py makes: <Last name>_Resume_General.pdf.
+    # CVs to attach: PDFs in this folder, each in a folder of its own and named after you only
+    # (FullStack_LigaData_Sep2026/Jane_Doe.pdf). One whose folder contains the company is picked
+    # for that company, else default_cv. Empty default_cv means the master CV build.py makes:
+    # General/<First>_<Last>.pdf.
     # A relative path is inside the project folder.
     cv_dir: str = "resume/output"
     default_cv: str = ""

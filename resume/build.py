@@ -1,20 +1,23 @@
 #!/usr/bin/env python3
 """Build resume PDFs from text files.
 
-  python3 build.py                     master (resume.md) -> output/<Last>_Resume_General.pdf
+  python3 build.py                     master (resume.md) -> output/General/<First>_<Last>.pdf
   python3 build.py sync                copy the bullets and titles from the profile into resume.md
   python3 build.py new Backend Stripe [lead fullstack ...]
                                        copy the master to versions/Backend_Stripe_<MonYYYY>.md,
                                        print the optional bullets with those tags and the title
                                        for them, and add a row to applications.csv
-  python3 build.py versions/X.md       that version -> output/<Last>_X.pdf
+  python3 build.py versions/X.md       that version -> output/X/<First>_<Last>.pdf
+
+Every CV PDF is named after you and nothing else (<First>_<Last>.pdf, what an employer sees when
+you upload it), so each one gets a folder of its own, named after the version it was built from.
 
 Lines starting with // are notes: they are kept in the text file but never printed.
 [GitHub](https://github.com/you/repo) prints "GitHub" as a link.
 
 Your name and contact lines come from MY_NAME, MY_EMAIL, MY_PHONE, MY_LINKEDIN, MY_GITHUB,
 MY_PORTFOLIO and MY_LOCATION in the project's .env (they win over "# Name" and "email: ..."
-lines here), so resume.md needs none of them. <Last> is the last word of your name.
+lines here), so resume.md needs none of them. <First>_<Last> is your whole name, words joined by "_".
 A portfolio prints as its address without https:// (example.com), so it reads on paper too.
 
 The bullets live in the profile (PROFILE), each tagged: [core] is always printed,
@@ -100,10 +103,17 @@ def link(url):
     return url if url.startswith(("http://", "https://")) else "https://" + url
 
 
-def owner_last_name(lines):
-    """The last word of MY_NAME, else of the file's "# Name" line: the start of each PDF's name."""
+def owner_file_name(lines):
+    """MY_NAME, else the file's "# Name" line, as a file name: "Jane Q. Doe" -> "Jane_Q_Doe" (every CV's name)."""
     name = my_details().get("name") or next((line.strip()[2:] for line in lines if line.strip().startswith("# ")), "")
-    return re.sub(r"[^A-Za-z0-9-]", "", (name.split() or [""])[-1]) or "Resume"
+    words = [w for w in (re.sub(r"[^A-Za-z0-9-]", "", w) for w in name.split()) if w]
+    return "_".join(words) or "Resume"
+
+
+def cv_pdf(src):
+    """Where a CV's PDF goes: output/<version>/<First>_<Last>.pdf, output/General/... for the master."""
+    folder = "General" if src.resolve() == MASTER else src.stem
+    return OUTPUT / folder / f"{owner_file_name(src.read_text().splitlines())}.pdf"
 
 
 def esc(text):
@@ -204,11 +214,10 @@ def build_html(lines, force_compact=False):
 
 
 def build(src):
-    OUTPUT.mkdir(exist_ok=True)
-    name = "Resume_General" if src.resolve() == MASTER else src.stem
     lines = src.read_text().splitlines()
-    out_pdf = OUTPUT / f"{owner_last_name(lines)}_{name}.pdf"
-    out_html = OUTPUT / f"{owner_last_name(lines)}_{name}.html"
+    out_pdf = cv_pdf(src)
+    out_pdf.parent.mkdir(parents=True, exist_ok=True)
+    out_html = out_pdf.with_suffix(".html")
     # A CV that spills onto a second page is printed again in the compact layout.
     for compact in (False, True):
         out_html.write_text(build_html(lines, force_compact=compact))
@@ -393,7 +402,7 @@ def new_version(role, company, tags=()):
         writer = csv.writer(f)
         if is_new:
             writer.writerow(TRACKER_COLUMNS)
-        writer.writerow([company, role, f"output/{owner_last_name(lines)}_{dest.stem}.pdf", today.isoformat(), "",
+        writer.writerow([company, role, str(cv_pdf(dest).relative_to(HERE)), today.isoformat(), "",
                          "Draft", ""])
 
     rel = dest.relative_to(HERE)

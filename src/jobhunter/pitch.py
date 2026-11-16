@@ -341,8 +341,29 @@ def to_html(body: str) -> str:
 
 
 def cv_options(config: OutreachConfig) -> list[str]:
+    """The CVs in cv_dir, as paths relative to it: build.py writes each into a folder of its own
+    (Backend_Acme_Sep2026/<First>_<Last>.pdf, every PDF named after you), so these come first; PDFs
+    straight in cv_dir (the older <Last>_Backend_Acme_Sep2026.pdf) follow."""
     folder = Path(config.cv_dir).expanduser()
-    return sorted(p.name for p in folder.glob("*.pdf")) if folder.is_dir() else []
+    if not folder.is_dir():
+        return []
+    nested = sorted(p.relative_to(folder).as_posix() for p in folder.glob("*/*.pdf"))
+    return nested + sorted(p.name for p in folder.glob("*.pdf"))
+
+
+def cv_rel(config: OutreachConfig, pdf: Path) -> str | None:
+    """A PDF's name as cv_options lists it, or None when it is not in cv_dir (or one folder down)."""
+    folder = Path(config.cv_dir).expanduser().resolve()
+    pdf = pdf.resolve()
+    if pdf.parent == folder or pdf.parent.parent == folder:
+        return pdf.relative_to(folder).as_posix()
+    return None
+
+
+def cv_label(option: str) -> str:
+    """What names a CV: its folder (Backend_Acme_Sep2026), else the file's own stem."""
+    path = Path(option)
+    return path.parent.name if path.parent.name else path.stem
 
 
 def cv_for(config: OutreachConfig, company: str, chosen: str | None) -> Path | None:
@@ -354,7 +375,7 @@ def cv_for(config: OutreachConfig, company: str, chosen: str | None) -> Path | N
     if chosen in options:
         return folder / chosen
     key = re.sub(r"[^a-z0-9]", "", company.lower())
-    named = [o for o in options if key and key in re.sub(r"[^a-z0-9]", "", o.lower())]
+    named = [o for o in options if key and key in re.sub(r"[^a-z0-9]", "", cv_label(o).lower())]
     if named:
         return folder / named[0]
     name = default_cv(config, options)
@@ -362,11 +383,12 @@ def cv_for(config: OutreachConfig, company: str, chosen: str | None) -> Path | N
 
 
 def default_cv(config: OutreachConfig, options: list[str] | None = None) -> str | None:
-    """default_cv from outreach.json, else the master CV build.py makes (<Last name>_Resume_General.pdf)."""
+    """default_cv from outreach.json, else the master CV build.py makes (General/<First>_<Last>.pdf, or
+    the older <Last>_Resume_General.pdf)."""
     options = cv_options(config) if options is None else options
     if config.default_cv:
         return config.default_cv if config.default_cv in options else None
-    return next((o for o in options if o.endswith("_Resume_General.pdf")), None)
+    return next((o for o in options if o.startswith("General/") or o.endswith("_Resume_General.pdf")), None)
 
 
 def follow_up(seq: int, subject: str, contact: sqlite3.Row | None, company: str, title: str,

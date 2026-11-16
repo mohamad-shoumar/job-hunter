@@ -57,10 +57,10 @@ from .errors import BadRequest
 from .extract import extract_skills
 from .grounding import capitalized_words, fact_has, number_context, unsupported_seniority
 from .llm import JsonModel, Usage, json_model, key_note
-from .pitch import cv_for, role_family
+from .pitch import cv_for, cv_rel, role_family
 from .profile import Profile, load_profile, sections, split_tags, strip_notes
 from .store import JobStore
-from .store.applications import add_event, get_application, save_tailored_cv
+from .store.applications import add_event, get_application, save_tailored_cv, set_cv_file
 from .text import iso
 
 MAX_NEW_WORDS = 4
@@ -725,7 +725,9 @@ def role_label(title: str) -> str:
 def _new_stem(folder: Path, title: str, company: str, now: datetime) -> str:
     """Backend_Acme_Sep2026, with _2, _3... when that name is taken (never overwrite a CV made by hand)."""
     base = f"{role_label(title)}_{camel(company)[:30] or 'Company'}_{now:%b%Y}"
-    taken = {p.stem for p in (folder / "versions").glob("*.md")} | {p.stem for p in (folder / "output").glob("*.pdf")}
+    output = folder / "output"
+    taken = ({p.stem for p in (folder / "versions").glob("*.md")} | {p.stem for p in output.glob("*.pdf")}
+             | {p.name for p in output.glob("*") if p.is_dir()})
     stem, n = base, 1
     while stem in taken or any(t.endswith(f"_{stem}") for t in taken):
         n += 1
@@ -799,7 +801,8 @@ def tailor_for_job(store: JobStore, job_id: int, writer: CvWriter, profile_path:
         pdf, pages = builder(folder, source)
     if pages > 1:
         plan.notes.append(f"It is {pages} pages even in compact mode: cut a bullet in {source}")
-    attachable = pdf.parent.resolve() == Path(config.cv_dir).expanduser().resolve()
+    file = cv_rel(config, pdf)  # Backend_Acme_Sep2026/<First>_<Last>.pdf: what cv_file and the app name it by
+    attachable = file is not None
     if not attachable:
         plan.notes.append(f"build.py wrote {pdf.parent}, not cv_dir ({config.cv_dir}), so it cannot be attached")
     tracker = folder / "applications.csv"
@@ -810,7 +813,7 @@ def tailor_for_job(store: JobStore, job_id: int, writer: CvWriter, profile_path:
 
     posting = f"{job['title']}\n{job['description'] or ''}"
     meta = {
-        "stem": stem, "file": pdf.name, "path": str(pdf), "source": str(source.relative_to(folder)), "pages": pages,
+        "stem": stem, "file": file or pdf.name, "path": str(pdf), "source": str(source.relative_to(folder)), "pages": pages,
         "headline": plan.headline, "changes": plan.changes, "notes": plan.notes,
         "tags": tags, "titles": plan.titles,
         "gaps": sorted(set(extract_skills(posting)) - profile.skills),
@@ -818,8 +821,8 @@ def tailor_for_job(store: JobStore, job_id: int, writer: CvWriter, profile_path:
         "written_at": iso(now),
     }
     attach = attachable and (pick or not app["cv_file"] or (old is not None and app["cv_file"] == old["file"]))
-    save_tailored_cv(store, job_id, meta, now, attach=pdf.name if attach else None)
-    add_event(store, job_id, "cv", f"CV tailored: {pdf.name}" + (" (again)" if old else ""), now)
+    save_tailored_cv(store, job_id, meta, now, attach=file if attach else None)
+    add_event(store, job_id, "cv", f"CV tailored: {meta['file']}" + (" (again)" if old else ""), now)
     store.commit()
     return meta
 
@@ -832,10 +835,19 @@ def tailor_for_job(store: JobStore, job_id: int, writer: CvWriter, profile_path:
 MAX_EDIT_CHARS = 40_000
 
 
+def version_stem(config: OutreachConfig, pdf: Path) -> str | None:
+    """The versions/<stem>.md a PDF was built from: its folder (X/<First>_<Last>.pdf), or the part after
+    the last name for an older PDF straight in cv_dir (<Last>_X.pdf)."""
+    if pdf.parent.resolve() != Path(config.cv_dir).expanduser().resolve():
+        return pdf.parent.name
+    return pdf.stem.split("_", 1)[1] if "_" in pdf.stem else None
+
+
 def version_of(config: OutreachConfig, company: str, app) -> Path | None:
     """The versions/<name>.md behind the job's CV, or None.
 
-    First the CV the job uses (build.py makes output/<Last name>_X.pdf from versions/X.md), then its
+    First the CV the job uses (build.py makes output/X/<First>_<Last>.pdf from versions/X.md; older ones
+    are output/<Last>_X.pdf), then its
     tailored one. The general CV (resume.md) is not editable here: change the profile and run
     `build.py sync` for that. Only a file that already exists in versions/ is ever returned.
     """
@@ -843,8 +855,8 @@ def version_of(config: OutreachConfig, company: str, app) -> Path | None:
     versions = (folder / "versions").resolve()
     candidates = []
     pdf = cv_for(config, company, app["cv_file"] if app is not None else None)
-    if pdf is not None and "_" in pdf.stem:
-        candidates.append(folder / "versions" / f"{pdf.stem.split('_', 1)[1]}.md")
+    if pdf is not None and (stem := version_stem(config, pdf)):
+        candidates.append(folder / "versions" / f"{stem}.md")
     meta = tailored_of(app)
     if meta and meta.get("source"):
         candidates.append(folder / str(meta["source"]))
@@ -937,12 +949,20 @@ def save_version(store: JobStore, job_id: int, config: OutreachConfig, profile_p
             source.write_text(text)
     pdf, pages = builder(folder, source)
     rel = str(source.relative_to(folder))
+    file = cv_rel(config, pdf) or pdf.name
     meta = tailored_of(app)
     if meta and (folder / str(meta.get("source", ""))).resolve() == source:
-        meta.update(edited_at=iso(now), pages=pages, file=pdf.name, path=str(pdf))
+        meta.update(edited_at=iso(now), pages=pages, file=file, path=str(pdf))
         save_tailored_cv(store, job_id, meta, now)
-    add_event(store, job_id, "cv", f"CV edited by you: {pdf.name}", now)
+    # A CV picked by name before CVs had a folder each (<Last>_X.pdf) now follows the PDF just built
+    # (X/<First>_<Last>.pdf), so the job never keeps the copy without your edit.
+    chosen = app["cv_file"] if app is not None else None
+    if chosen and chosen != "none" and chosen != file and cv_rel(config, pdf) is not None:
+        old_pdf = Path(config.cv_dir).expanduser() / chosen
+        if version_stem(config, old_pdf) == source.stem:
+            set_cv_file(store, job_id, file)
+    add_event(store, job_id, "cv", f"CV edited by you: {file}", now)
     store.commit()
     notes = [] if pages <= 1 else [f"It is {pages} pages even in the compact layout: cut a line"]
-    return {"source": rel, "file": pdf.name, "pages": pages, "notes": notes,
+    return {"source": rel, "file": file, "pages": pages, "notes": notes,
             "checks": check_version(source.read_text(), profile_path)}

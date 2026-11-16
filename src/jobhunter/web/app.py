@@ -58,7 +58,7 @@ from ..mailer import (
 )
 from ..models import NEW, SAVED, STAGE_LABELS, STAGES
 from ..pipeline import local_day
-from ..pitch import PitchWriter, build_writer, cv_for, cv_options, draft_for_job, edit_draft, reassemble, word_count
+from ..pitch import PitchWriter, build_writer, cv_for, cv_options, cv_rel, draft_for_job, edit_draft, reassemble, word_count
 from ..profile import load_profile
 from ..report import salary_text
 from ..store import JobStore
@@ -515,13 +515,14 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
             raise UpstreamError(f"Writing the cover letter failed: {error_line(exc)}") from exc
         return _job_detail(store, store.get(job_id), config, services, profile(), now())
 
-    @app.get("/api/cv/{name}")
+    @app.get("/api/cv/{name:path}")
     def cv_pdf(name: str, download: bool = False):
         """A CV from cv_dir, shown in the browser (or saved, with ?download=1). Only names listed there, so no
         other file can be read."""
         if name not in cv_options(config):
             return JSONResponse({"error": f"no CV named {name} in {config.cv_dir}"}, status_code=404)
-        return FileResponse(Path(config.cv_dir).expanduser() / name, media_type="application/pdf", filename=name,
+        return FileResponse(Path(config.cv_dir).expanduser() / name, media_type="application/pdf",
+                            filename=Path(name).name,
                             content_disposition_type="attachment" if download else "inline",
                             headers={"Cache-Control": "no-store"})
 
@@ -664,7 +665,7 @@ def _job_detail(store: JobStore, row: sqlite3.Row, config: OutreachConfig, servi
         "outgoing": preview, "outgoing_error": preview_error,
         "earlier_at_company": [dict(e) for e in earlier],
         "cv": {"options": cv_options(config), "chosen": app["cv_file"] if app else None,
-               "file": (lambda f: f.name if f else None)(cv_for(config, company["name"], app["cv_file"] if app else None)),
+               "file": (lambda f: cv_rel(config, f) if f else None)(cv_for(config, company["name"], app["cv_file"] if app else None)),
                "folder": config.cv_dir, "tailored": tailored_of(app),
                "source": (lambda s: s.name if s else None)(version_of(config, company["name"], app))},
         "cover": _cover_json(config, app),

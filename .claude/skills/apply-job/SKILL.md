@@ -57,8 +57,7 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
   - The headline makes sense for this role.
   - There is no Summary section, and no `TODO` or leftover tag such as `[core]`.
   - The "Code changed these" warnings don't point to a broken line.
-  If something critical is wrong, fall back to the general CV (`<Last>_Resume_General.pdf` in
-  `resume/output/`), note it for the report and keep going. Don't fix a broken CV by hand.
+  If something critical is wrong, fall back to the general CV (`resume/output/General/<First>_<Last>.pdf`), note it for the report and keep going. Don't fix a broken CV by hand.
 - **Mirror it only for a fit score of 65 or more** (the user's call, 2026-10-31: mirroring is real
   work, so it goes to the best-fitting jobs; it was "grade 4 or 5" before the 0-100 score of
   2026-11-15). The card shows the score chip; or
