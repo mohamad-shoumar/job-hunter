@@ -146,6 +146,9 @@ def visa_points(row: sqlite3.Row, relocation: Relocation | None = None,
         return _visa_offer("the AI check found a visa offer", check.get("quote", ""), check.get("quote", ""))
     if register:
         return TRACK_RECORD, f"the company is on {register}"
+    site = next((r for r in reasons if "a visa-sponsorship job site, lists" in r or "list of visa-sponsoring employers" in r), None)
+    if site:  # sponsor_sites.py: the site checked the sponsorship, the posting does not say it
+        return TRACK_RECORD, _short(site.split("; ", 1)[-1].split(". The posting", 1)[0], 200)
     if other_offer and row["remote_status"] != REMOTE:
         return TRACK_RECORD, f'their other postings offered a visa: "{_short(other_offer, 200)}"'
     if row["remote_status"] == REMOTE and row["status"] != VISA_LIST:

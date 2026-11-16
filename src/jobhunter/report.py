@@ -310,6 +310,8 @@ def render(day: str, rows: list[sqlite3.Row], sightings: dict[int, list[sqlite3.
             if found.get("by_site"):
                 out += [f"- Per site: {site_line(found['by_site'])}"]
             out += [f"- {a['board']} ({_cell(a['company'])}): {_cell(a['reason'])}" for a in found["added"]]
+            out += [f"- Kept after The Stack listed it: #{k['job_id']} {_cell(k['company'])} - {_cell(k['title'])} "
+                    f"({k['status']})" for k in found.get("kept", [])]
             out += [f"- {_cell(line)}" for line in found["errors"]] + [""]
         problems = [(name, e) for name, s in summary["sources"].items() for e in s["errors"]]
         notes = [(name, n) for name, s in summary["sources"].items() for n in s["notes"]]

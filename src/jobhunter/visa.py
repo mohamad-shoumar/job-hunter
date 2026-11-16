@@ -10,6 +10,13 @@ sponsors visas, each quoted:
   relocation_offered  it offers help moving, not a visa by name: "For internationals: all-in
                       relocation package". Weaker; the reason says to ask
   visa_register       the company is on that country's government sponsor list (sponsors.py)
+  sponsor_site        a visa-sponsorship job site lists this role (The Stack) or the company
+                      (JobDelulu) as sponsoring (sponsor_sites.py; the user's call 2026-11-16:
+                      those sites check sponsorship themselves, and a posting rarely says it)
+  visa_silent         in a country in `silent_ok` (Germany: a Blue Card needs no company
+                      register), a posting in English that says nothing either way (the
+                      user's call 2026-11-16). Weakest; the fit score's visa part ranks it low
+                      unless the company has other evidence
 
 Rejected, quoted:
 
@@ -38,6 +45,7 @@ import re
 from dataclasses import dataclass, field
 
 from .models import HYBRID, NOT_ELIGIBLE, ONSITE, REMOTE, VISA_SPONSOR, Assessment, Job
+from .sponsor_sites import SponsorSites
 from .sponsors import LISTS, Registers
 from .text import normalize_words
 
@@ -99,7 +107,8 @@ _TRANSFER = re.compile(
 _NEEDS_PERMIT = re.compile(
     r"\b(?:right|authori[sz]ed|authori[sz]ation|eligible|eligibility|entitled|permitted|permission)\s+to\s+work\s+"
     r"(?:in|within|for)\s+(?:the\s+)?(?:uk|u\.k\.|united\s+kingdom|britain|eu|e\.u\.|european\s+union|eea|europe|"
-    r"netherlands|germany|ireland|spain|italy|finland)\b"
+    r"netherlands|germany|ireland|spain|italy|finland|denmark|sweden|france|belgium|poland|portugal|canada|"
+    r"australia|new\s+zealand)\b"
     r"|\bvalid\s+(?:work(?:ing)?\s+(?:permit|visa)|residence\s+permit)\b|\bexisting\s+right\s+to\s+work\b"
     r"|\b(?:eu|e\.u\.|eea)\s+(?:citizen(?:ship)?s?|passport|nationals?)\b|\b(?:pre-?)?settled\s+status\b"
     r"|\bindefinite\s+leave\s+to\s+remain\b"
@@ -129,6 +138,16 @@ _FUNCTION_WORDS = {
                 "se", "tu", "tus", "como", "más", "mas"},
     "italian": {"il", "di", "che", "per", "con", "una", "del", "della", "nostro", "nostra", "sei", "sono", "gli",
                 "nel", "nella", "alla", "dei", "delle"},
+    "french": {"et", "le", "la", "les", "des", "du", "nous", "vous", "pour", "avec", "une", "est", "pas", "dans",
+               "sur", "notre", "nos", "votre", "vos", "qui", "être", "chez"},
+    "danish": {"og", "til", "af", "vi", "du", "din", "dit", "ikke", "på", "som", "har", "det", "hos", "eller",
+               "også", "vores", "skal", "jer", "mere", "kan"},
+    "swedish": {"och", "att", "är", "för", "med", "vi", "du", "din", "ditt", "inte", "på", "som", "har", "det",
+                "hos", "eller", "också", "vår", "våra", "ska", "till", "av"},
+    "polish": {"się", "jest", "nie", "oraz", "dla", "jak", "że", "od", "jesteś", "twoje", "nasz", "nasze",
+               "będzie", "naszego", "który", "która", "pracy", "zespołu", "lub", "przez"},
+    "portuguese": {"os", "com", "para", "uma", "da", "dos", "das", "não", "nao", "nosso", "nossa", "você", "voce",
+                   "em", "ao", "seu", "sua", "é", "na", "no"},
     "finnish": {"ja", "on", "tai", "sekä", "seka", "meillä", "meilla", "sinulla", "olet", "kanssa", "että", "etta",
                 "tämä", "tama", "jos", "myös", "myos"},
 }
@@ -148,7 +167,10 @@ class VisaRules:
     # Languages you don't speak (the profile lists Arabic and English): a posting that asks for one is rejected.
     languages: list[str] = field(default_factory=list)
     refresh_days: int = 7
+    # Countries where a posting silent about visas is kept (code visa_silent), the user's call 2026-11-16.
+    silent_ok: list[str] = field(default_factory=list)
     registers: Registers | None = None  # set by cli._load from data/sponsors/
+    sites: SponsorSites | None = None  # the same, data/sponsors/sites.json
 
     @classmethod
     def from_dict(cls, data: dict | None) -> VisaRules | None:
@@ -158,7 +180,8 @@ class VisaRules:
                              [w for w in (normalize_words(p) for p in c.get("places", [])) if w])
                      for code, c in data["countries"].items() if not code.startswith("_")]
         return cls(countries=countries, languages=[lang.lower() for lang in data.get("languages", [])],
-                   refresh_days=int(data.get("refresh_days", 7)))
+                   refresh_days=int(data.get("refresh_days", 7)),
+                   silent_ok=[code.lower() for code in data.get("silent_ok", [])])
 
     @property
     def label(self) -> str:
@@ -166,28 +189,51 @@ class VisaRules:
         return ", ".join(names[:-1]) + " or " + names[-1] if len(names) > 1 else "".join(names)
 
     def place_in(self, texts: list[str]) -> tuple[str, Country] | None:
-        """The first location text that names a place in one of the countries.
+        """The first location text that names a place in one of the countries (see `places_in`)."""
+        found = self.places_in(texts)
+        return found[0] if found else None
 
-        "Dublin, OH" and "London, Ontario" are not: a text that also names a US
-        state, Canada or the US is skipped.
+    def places_in(self, texts: list[str]) -> list[tuple[str, Country]]:
+        """Each location text that names a place in one of the countries, one per country, in order.
+
+        "Dublin, OH" is not: a text that also names a US state or the US is skipped.
+        "London, Ontario" is Canada when Canada is one of the countries, else skipped too;
+        the same for Australia and New Zealand.
         """
+        codes = {c.code: c for c in self.countries}
+        out: dict[str, tuple[str, Country]] = {}
         for text in texts:
             if _ELSEWHERE.search(text or ""):
+                continue
+            marked = [code for code, pattern in _COUNTRY_MARKERS.items() if pattern.search(text or "")]
+            if marked:
+                if marked[0] in codes:
+                    out.setdefault(marked[0], (text, codes[marked[0]]))
                 continue
             words = f" {normalize_words(text)} "
             for country in self.countries:
                 if any(f" {p} " in words for p in country.places):
-                    return text, country
-        return None
+                    out.setdefault(country.code, (text, country))
+                    break
+        return list(out.values())
 
 
 # Only the codes of states that have a town named like one of the places (Dublin OH, Berlin NH,
-# Rome GA, Reading PA, London ON, Amsterdam NY, Munich ND, ...). Never DE: "Berlin, DE" is Germany.
+# Rome GA, Reading PA, Amsterdam NY, Munich ND, ...). Never DE: "Berlin, DE" is Germany.
 _ELSEWHERE = re.compile(
-    r",\s*(?:AL|AR|CA|CO|CT|GA|KY|MA|MD|ME|MI|MN|MS|MT|ND|NH|NY|OH|PA|SC|TN|TX|VA|WI|ON)\b"
-    r"|(?i:\b(?:united\s+states|usa|u\.s\.a?|canada|ohio|california|massachusetts|ontario|georgia|texas|"
-    r"new\s+hampshire|connecticut|virginia|indiana|kentucky|australia|new\s+zealand|south\s+africa|india)\b)"
+    r",\s*(?:AL|AR|CA|CO|CT|GA|KY|MA|MD|ME|MI|MN|MS|MT|ND|NH|NY|OH|PA|SC|TN|TX|VA|WI)\b"
+    r"|(?i:\b(?:united\s+states|usa|u\.s\.a?|ohio|california|massachusetts|georgia|texas|"
+    r"new\s+hampshire|connecticut|virginia|indiana|kentucky|south\s+africa|india)\b)"
 )
+# Countries whose towns share names with ones on the list (London ON, Perth WA, Wellington): a text
+# naming one of these is that country when it is on the list, else elsewhere.
+_COUNTRY_MARKERS = {
+    "ca": re.compile(r",\s*(?:ON|BC|QC|AB|NS|MB)\b|(?i:\b(?:canada|ontario|british\s+columbia|quebec|québec|"
+                     r"alberta|nova\s+scotia|manitoba)\b)"),
+    # Never WA or SA after a comma: Washington state, Saudi Arabia.
+    "au": re.compile(r",\s*(?:NSW|VIC|QLD|ACT)\b|(?i:\b(?:australia|new\s+south\s+wales|queensland)\b)"),
+    "nz": re.compile(r"(?i:\bnew\s+zealand\b|\baotearoa\b)"),
+}
 
 
 def _sentences(text: str) -> list[str]:
@@ -280,7 +326,8 @@ def language_needed(job: Job, languages: list[str]) -> str | None:
     if not languages:
         return None
     text = job.description or ""
-    names = "|".join(re.escape(lang) for lang in languages) + "|deutsch|nederlands|español|espanol|italiano|suomi"
+    names = "|".join(re.escape(lang) for lang in languages) + (
+        "|deutsch|nederlands|español|espanol|italiano|suomi|français|francais|dansk|svenska|polski|português|portugues")
     asks = re.compile(
         # "Fluent German", "fluency in Dutch", "You speak German at C1", "Native or bilingual-level French"
         rf"\b(?:fluent|fluency|fluently|native|proficient|proficiency|speak|speaks|speaking|bilingual)\b[^.\n]{{0,30}}?"
@@ -298,7 +345,7 @@ def language_needed(job: Job, languages: list[str]) -> str | None:
         m = asks.search(sentence)
         if m and not _SOFTENER.search(sentence):
             return f'Asks for a language your profile does not list: "{_short(sentence)}"'
-    words = re.findall(r"[a-zäöüßéèàáíóúñ]+", text.lower())
+    words = re.findall(r"[^\W\d_]+", text.lower())
     if len(words) >= 40:
         for language, common in _FUNCTION_WORDS.items():
             if language in languages and sum(w in common for w in words) / len(words) >= _WRITTEN_IN_SHARE:
@@ -313,6 +360,15 @@ def _moves_elsewhere(text: str, country: Country) -> bool:
     """'Relocation to Cyprus' for a job filed under the Netherlands."""
     m = _RELOCATE_TO.search(text or "")
     return bool(m) and not any(f" {p} " in f" {normalize_words(m.group(1))} " for p in country.places)
+
+
+def assess_visa_places(job: Job, found: list[tuple[str, Country]], rules: VisaRules) -> Assessment:
+    """Judged in each visa-list country the job names; the first that keeps it wins, else the first verdict.
+
+    "Stockholm, Sweden; London, UK": the UK sponsor register keeps it even though Sweden has none.
+    """
+    verdicts = [assess_visa(job, place, country, rules) for place, country in found]
+    return next((v for v in verdicts if v.verdict == VISA_SPONSOR), verdicts[0])
 
 
 def assess_visa(job: Job, place: str, country: Country, rules: VisaRules) -> Assessment:
@@ -362,6 +418,13 @@ def assess_visa(job: Job, place: str, country: Country, rules: VisaRules) -> Ass
                                          + ("The posting does not mention visas: ask" if job.description
                                             else "This source gives no posting text: read it and ask")],
                           "visa_register")
+    site = rules.sites.find(job.company, job.title, country.code) if rules.sites and job.remote_status != REMOTE else None
+    if site:
+        return Assessment(VISA_SPONSOR, [f'{where}, {country.name}; {site.quote()}. The posting does not mention visas: ask'],
+                          "sponsor_site")
+    if country.code in rules.silent_ok and job.remote_status != REMOTE and job.description:
+        return Assessment(VISA_SPONSOR, [f'{where}, {country.name}; the posting says nothing about visas either way '
+                                         f'(kept in {country.name} on your call): ask before applying'], "visa_silent")
     if job.remote_status == REMOTE:
         missing = "and a remote role for people living there rarely comes with one"
     elif country.code in LISTS:

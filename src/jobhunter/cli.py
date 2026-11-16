@@ -38,9 +38,11 @@ def _load(args) -> tuple[Paths, dict, Filters]:
               "profile/master_profile.example.md there and fill it in.", file=sys.stderr)
     filters = Filters.load(paths.filters_file)
     if filters.visa:
+        from .sponsor_sites import SponsorSites
         from .sponsors import Registers
 
         filters.visa.registers = Registers.load(paths.sponsors_dir)
+        filters.visa.sites = SponsorSites.load(paths.sponsors_dir)
     return paths, load_json(paths.sources_file), filters
 
 
@@ -214,6 +216,7 @@ def cmd_sponsors(args) -> int:
     """The government lists of visa sponsors the visa list checks companies against (sponsors.py)."""
     from . import sponsors
     from .http import Http
+    from .sponsor_sites import import_csv
 
     paths, _, filters = _load(args)
     if args.update:
@@ -223,6 +226,23 @@ def cmd_sponsors(args) -> int:
             print(line)
         print("run `jobhunter reclassify` to re-check stored jobs against them")
         return 1 if errors and not done else 0
+    if args.import_sites:
+        if not filters.visa or filters.visa.sites is None:
+            raise SystemExit("no visa_list countries in config/filters.json")
+        # "Germany", "United Kingdom" -> the visa list's code, through the same place words as the jobs.
+        codes = {}
+        for name in ("Netherlands", "Germany", "Finland", "United Kingdom", "Ireland", "Spain", "Italy", "Denmark",
+                     "Sweden", "France", "Belgium", "Poland", "Portugal", "Canada", "Australia", "New Zealand"):
+            found = filters.visa.place_in([name])
+            if found:
+                codes[name.lower()] = found[1].code
+        added, unknown = import_csv(filters.visa.sites, Path(args.import_sites), args.site, codes, utcnow())
+        filters.visa.sites.save()
+        print(f"{added} new {args.site} entries in {filters.visa.sites.path}")
+        if unknown:
+            print(f"not on the visa list, left out: {', '.join(unknown)}")
+        print("run `jobhunter reclassify` to re-check stored jobs against them")
+        return 0
     registers = filters.visa.registers if filters.visa else None
     if args.company:
         if not registers or not registers.index:
@@ -996,6 +1016,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--update", action="store_true", help="download the lists now")
     p.add_argument("--company", help="look a company up in each list")
     p.add_argument("--place", help="with --company: the job's town, for one-word names (e.g. London)")
+    p.add_argument("--import-sites", metavar="CSV",
+                   help="a Company,Country CSV of employers a visa-sponsorship site lists (sponsor_sites.py)")
+    p.add_argument("--site", default="JobDelulu", help="with --import-sites: the site's name")
     p.set_defaults(func=cmd_sponsors)
 
     args = parser.parse_args(argv)

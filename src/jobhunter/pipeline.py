@@ -27,11 +27,11 @@ from . import boards, discovery, interviews, sponsors
 from .ai_check import AiChecker, CheckRun, build_checker, check_jobs
 from .boards import WatchRun
 from .discovery import DiscoverRun
-from .classify import classify
+from .classify import classify, recheck_age
 from .config import Filters, OutreachConfig
 from .duplicates import Duplicate, fold
 from .extract import enrich
-from .identity import fingerprint
+from .identity import company_key, fingerprint
 from .fitgrade import FitGrader, GradeRun, build_grader, grade_jobs, to_grade
 from .http import Http, wait_for_network
 from .models import DUPLICATE_ROLE, REJECTED, SHORTLISTED, UNCLEAR, VISA_LIST, Classification, Job
@@ -40,6 +40,7 @@ from .outreach import run_outreach
 from .report import write_report
 from .sources import Source, SourceResult, build_sources
 from .sources.base import describe_error
+from .sponsor_sites import SponsorSites
 from .store import JobStore, row_to_job
 from .text import iso, normalize_words, parse_datetime, utcnow
 
@@ -207,6 +208,32 @@ def _rejudge(previous, job: Job, filters: Filters, now: datetime) -> Rejudged | 
                     was=previous["reject_code"], where_was=previous["location_raw"],
                     now_is=cls.status, where_now=job.location_raw, source=job.source,
                     classification=cls)
+
+
+def rejudge_sponsor_sites(store: JobStore, filters: Filters, now: datetime, companies: set[str]) -> list[dict]:
+    """Stored jobs rejected `no_visa_evidence` at companies a visa-sponsorship site has just listed, judged again.
+
+    Board discovery reads The Stack after the day's jobs are judged, and a stored job is only
+    touched when listed again, so without this a role The Stack lists the day after it was
+    rejected would stay rejected (sponsor_sites.py). The same steps as `jobhunter reclassify`,
+    for these rows only; anything else that rejects the job still does. The caller commits.
+    """
+    kept = []
+    for row in store.with_reject_code("no_visa_evidence"):
+        if company_key(row["company"]) not in companies:
+            continue
+        job = row_to_job(row)
+        job.required_yoe = None  # read from the text, as in reclassify
+        job = enrich(job)
+        cls = classify(job, filters, now, check_age=recheck_age(row))
+        if cls.status == REJECTED:
+            continue
+        store.update_extracted(row["id"], job)
+        store.update_classification(row["id"], cls)
+        fold(store, row["fingerprint"])
+        kept.append({"job_id": row["id"], "company": row["company"], "title": row["title"],
+                     "status": store.get(row["id"])["status"], "report_date": row["report_date"]})
+    return kept
 
 
 def fetch_all(sources: list[Source], http: Http, workers: int = 6, retry_after: float = 60.0) -> list[SourceResult]:
@@ -409,6 +436,8 @@ def refresh_sponsors(root_paths, filters: Filters, http: Http, now: datetime, su
         summary.config_notes += [f"sponsor lists: {line}" for line in done + errors]
     if due or filters.visa.registers is None:
         filters.visa.registers = sponsors.Registers.load(folder)
+    if filters.visa.sites is None:
+        filters.visa.sites = SponsorSites.load(folder)
 
 
 def _model(given, build, config_file: Path, notes: list[str]):
@@ -534,6 +563,10 @@ def run(root_paths, sources_config: dict, filters: Filters,
             summary.discovery = _step("board discovery", lambda: discovery.discover(
                 store, http, sources_config, filters, OutreachConfig.load(root_paths.outreach_file), now, discover, watch,
             ), DiscoverRun)
+            if summary.discovery.new_site_companies:
+                summary.discovery.kept = rejudge_sponsor_sites(store, filters, now, summary.discovery.new_site_companies)
+                store.commit()
+                touched |= {k["report_date"] for k in summary.discovery.kept if k["report_date"]}
         if opts.outreach:
             # Date-range runs never spend lookup credits: they would use up the month.
             # A job a listing elsewhere brought back counts as new here: it gets a CV like any

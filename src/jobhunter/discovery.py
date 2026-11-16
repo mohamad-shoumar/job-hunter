@@ -41,6 +41,7 @@ from .boards import (
 from .config import Filters, OutreachConfig
 from .identity import company_key
 from .relevance import check_title
+from .sponsor_sites import SiteEntry, SponsorSites
 from .sources.base import describe_error
 from .store import JobStore
 from .store.companies import job_board_keys
@@ -56,8 +57,10 @@ STACK_PAGE = 25
 
 # The visa list's country codes as each site writes them. The Stack takes English country names.
 _EVJ_CODES = {"uk": "GB"}
+# Europe only: asked for Canada, Australia and New Zealand on 2026-11-16 it listed nothing.
 _STACK_NAMES = {"nl": "Netherlands", "de": "Germany", "fi": "Finland", "uk": "United Kingdom", "ie": "Ireland",
-                "es": "Spain", "it": "Italy"}
+                "es": "Spain", "it": "Italy", "dk": "Denmark", "se": "Sweden", "fr": "France", "be": "Belgium",
+                "pl": "Poland", "pt": "Portugal"}
 _GH_JID = re.compile(r"[?&]gh_jid=\d+", re.I)
 _UNREADABLE = [(kind, re.compile(pattern, re.I)) for kind, pattern in (
     ("workday", r"myworkdayjobs\.com|workday\.com"), ("successfactors", r"successfactors|sapsf"),
@@ -110,12 +113,15 @@ class DiscoverRun:
     by_site: dict[str, dict[str, int]] = field(default_factory=dict)
     notes: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+    # Companies The Stack listed a role at for the first time (sponsor_sites.py): their stored
+    # `no_visa_evidence` jobs are judged again (pipeline.rejudge_sponsor_sites).
+    new_site_companies: set[str] = field(default_factory=set)
+    kept: list[dict] = field(default_factory=list)  # jobs that judging again kept
 
     def to_dict(self) -> dict:
         return {"listed": self.listed, "wanted": self.wanted, "added": self.added, "probed": self.probed,
                 "unreadable": dict(self.unreadable), "by_site": self.by_site, "notes": self.notes,
-                "errors": self.errors}
-
+                "errors": self.errors, "kept": self.kept}
 
 
 def site_line(by_site: dict[str, dict[str, int]]) -> str:
@@ -199,6 +205,18 @@ def listings(http, filters: Filters, config: DiscoverConfig, run: DiscoverRun) -
     return found
 
 
+def save_stack_listings(sites: SponsorSites, countries, found: list[Listing], now: datetime, run: DiscoverRun) -> None:
+    """Every role The Stack lists is visa evidence for that job (sponsor_sites.py), whatever its title."""
+    codes, day = {c.name: c.code for c in countries}, now.date().isoformat()
+    for listing in found:
+        code = codes.get(listing.country)
+        if listing.site == "The Stack" and code and listing.company.strip() and listing.title.strip():
+            entry = SiteEntry("The Stack", listing.company.strip(), code, listing.title.strip(), listing.url, day)
+            if sites.add(entry):
+                run.new_site_companies.add(company_key(listing.company))
+    sites.save()
+
+
 def discover(store: JobStore, http, sources_config: dict, filters: Filters, outreach: OutreachConfig,
              now: datetime, config: DiscoverConfig | None = None, watch: WatchConfig | None = None,
              dry_run: bool = False) -> DiscoverRun:
@@ -211,6 +229,8 @@ def discover(store: JobStore, http, sources_config: dict, filters: Filters, outr
         return run
     found = in_turn(listings(http, filters, config, run))
     run.listed = len(found)
+    if filters.visa.sites is not None and not dry_run:
+        save_stack_listings(filters.visa.sites, filters.visa.countries, found, now, run)
     configured = configured_boards(sources_config)
     rows = watched_boards(store, include_removed=True)
     known = {f"{r['kind']}:{r['slug'].lower()}" for r in rows}

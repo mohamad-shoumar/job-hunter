@@ -40,7 +40,7 @@ from .geo import (
 from .gulf import GulfRemote
 from .models import ELIGIBLE, HYBRID, LIKELY, NOT_ELIGIBLE, ONSITE, REMOTE, UNCLEAR, Assessment, Job
 from .relocation import Relocation, assess_relocation
-from .visa import VisaRules, assess_visa
+from .visa import VisaRules, assess_visa_places
 
 # --- description scanning ---------------------------------------------------
 
@@ -216,9 +216,9 @@ def assess_eligibility(job: Job, relocation: Relocation | None = None, visa: Vis
     if place and (job.remote_status in (ONSITE, HYBRID) or not any(m.kind in POSITIVE_KINDS for m in everything)):
         return assess_relocation(job, place, relocation)
     # On-site or hybrid in a country you would need a work visa for ("London"): the visa list decides.
-    found = visa.place_in(field_texts + [m.evidence for m in title_matches]) if visa else None
+    found = visa.places_in(field_texts + [m.evidence for m in title_matches]) if visa else []
     if found and job.remote_status in (ONSITE, HYBRID):
-        return assess_visa(job, *found, visa)
+        return assess_visa_places(job, found, visa)
 
     if job.remote_status in (ONSITE, HYBRID):
         where = job.location_raw or ", ".join(job.allowed_locations) or "no location given"
@@ -231,7 +231,7 @@ def assess_eligibility(job: Job, relocation: Relocation | None = None, visa: Vis
     # A remote job open to Lebanon stays one ("Berlin / REMOTE (CET ±3)"). Only one limited to
     # people living there ("Remote (UK)") means moving, so the visa list decides.
     if found and remote.verdict == NOT_ELIGIBLE:
-        return assess_visa(job, *found, visa)
+        return assess_visa_places(job, found, visa)
     return remote
 
 

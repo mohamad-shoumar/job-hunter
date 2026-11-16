@@ -362,6 +362,11 @@ class JobStore:
     def jobs_for_report(self, day: str) -> list[sqlite3.Row]:
         return self.conn.execute("SELECT * FROM jobs WHERE report_date = ? ORDER BY id", (day,)).fetchall()
 
+    def with_reject_code(self, code: str) -> list[sqlite3.Row]:
+        """Every job rejected with this code, oldest first."""
+        return self.conn.execute("SELECT * FROM jobs WHERE status = ? AND reject_code = ? ORDER BY id",
+                                 (REJECTED, code)).fetchall()
+
     def with_status(self, *statuses: str) -> list[sqlite3.Row]:
         """Every job with one of these statuses, newest first."""
         marks = ", ".join("?" * len(statuses))

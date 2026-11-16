@@ -18,7 +18,17 @@
     {"name": "Aspire Software", "why": "you skipped its role and asked to add Aspire to rejected companies (2026-10-29)"},
     {"name": "Wise", "why": "you skipped its role and asked to add Wise to rejected companies (2026-11-01)"},
     {"name": "Bending Spoons", "why": "you skipped its roles and asked to add it to rejected companies (2026-10-25)"},
-    {"name": "ElevenLabs", "why": "you skipped its role with the note \"Add elevenlabs to rejected companies\" (2026-11-12)"}
+    {"name": "ElevenLabs", "why": "you skipped its role with the note \"Add elevenlabs to rejected companies\" (2026-11-12)"},
+    {"name": "amo", "why": "live coding in its interviews; you asked to reject companies that do it (2026-11-16): its own page: \"These are remote live coding sessions.\" (amo.co/interview-at-amo)"},
+    {"name": "Anthropic", "why": "live coding in its interviews; you asked to reject companies that do it (2026-11-16): its careers page: \"For technical roles, we use live coding tools like Colab and CodeSignal.\""},
+    {"name": "Mistral AI", "why": "live coding in its interviews; you asked to reject companies that do it (2026-11-16): its own posting: \"Engineers are assessed in their preferred language during a live coding session.\""},
+    {"name": "Helsing", "why": "live coding in its interviews; you asked to reject companies that do it (2026-11-16): its posting: \"Round 2: Live Coding\"; a 2024 candidate: \"It was a live coding interview via Coderpad.\""},
+    {"name": "N26", "why": "live coding in its interviews; you asked to reject companies that do it (2026-11-16): three Berlin candidates 2024-2025: \"Live coding session with two engineers – 1 hour\""},
+    {"name": "Perk", "why": "live coding in its interviews; you asked to reject companies that do it (2026-11-16): TravelPerk's new name; candidates 2020-2025: \"a live coding session with two different engineers, lasting 1.5 hours\""},
+    {"name": "TravelPerk", "why": "live coding in its interviews; you asked to reject companies that do it (2026-11-16): candidates 2020-2025: \"a live coding session with two different engineers, lasting 1.5 hours\""},
+    {"name": "Wayve", "why": "live coding in its interviews; you asked to reject companies that do it (2026-11-16): four candidates 2024-2025: \"Choice of 2 whiteboard coding exercises\", \"Easy/medium leetcode\""},
+    {"name": "Quantum-Systems", "why": "live coding in its interviews; you asked to reject companies that do it (2026-11-16): two 2025 candidates: \"technical with live coding\"; the company's hiring page says the same"},
+    {"name": "Arondite", "why": "live coding in its interviews; you asked to reject companies that do it (2026-11-16): candidates: \"Initial call with a short live coding problem\"; and its posting requires an existing UK right to work"}
   ],
 
   "_agencies": "Staffing agencies and talent marketplaces: they repost other companies' jobs, sell vetted developers or pay per task. Rejected (code agency) with what matched: a name below, a whole word in the company name, or a phrase in the posting. not_agencies: real companies a name word would catch. Checked against the stored jobs 2026-10-10: 'our clients', 'talent pool' and 'talent network' are left out because real companies (Zscaler, Percona, GitLab) use them.",
@@ -91,10 +101,10 @@
     "places": ["Kuwait", "Kuwait City", "Bahrain", "Manama"]
   },
 
-  "_visa_list": "Countries you would move to on a work visa. A target role there (on-site, hybrid, or remote for people living there) goes to the separate visa list (status visa_list) only with evidence the employer sponsors visas, quoted: the posting offers one, a Hacker News header says VISA, or the company is on that country's government sponsor list (uk, nl, ie: data/sponsors/, `jobhunter sponsors --update`, refreshed by the daily run every refresh_days). Rejected, quoted: the posting refuses or wants a right to work you don't have (no_sponsor), asks for or is written in one of `languages` (language_required: your profile lists Arabic and English only), or says nothing (no_visa_evidence). The phrases are in src/jobhunter/visa.py. Places in a location that also names a US state, the US or Canada are skipped ('Dublin, OH'); 'Cambridge' (MA), 'Wales' (New South Wales) and 'England' (New England) are left out; London, UK and United Kingdom cover them. Researched 2026-10-13 (docs/research).",
+  "_visa_list": "Countries you would move to on a work visa. A target role there (on-site, hybrid, or remote for people living there) goes to the separate visa list (status visa_list) only with evidence the employer sponsors visas, quoted: the posting offers one, a Hacker News header says VISA, or the company is on that country's government sponsor list (uk, nl, ie: data/sponsors/, `jobhunter sponsors --update`, refreshed by the daily run every refresh_days). Also kept: a role The Stack lists, or a company on JobDelulu's sponsor list (sponsor_sites.py, the user's call 2026-11-16), and in `silent_ok` countries a posting that says nothing either way. Rejected, quoted: the posting refuses or wants a right to work you don't have (no_sponsor), asks for or is written in one of `languages` (language_required: your profile lists Arabic and English only), or says nothing (no_visa_evidence). The phrases are in src/jobhunter/visa.py. Places in a location that also names a US state or the US are skipped ('Dublin, OH'), and one naming Canada, Australia or New Zealand counts as that country ('London, Ontario' is Canada); 'Cambridge' (MA), 'Wales' (New South Wales) and 'England' (New England) are left out; London, UK and United Kingdom cover them. Researched 2026-10-13 (docs/research).",
   "visa_list": {
     "refresh_days": 7,
-    "languages": ["german", "dutch", "finnish", "spanish", "italian", "french"],
+    "languages": ["german", "dutch", "finnish", "spanish", "italian", "french", "danish", "swedish", "polish", "portuguese"],
     "countries": {
       "nl": {"name": "the Netherlands", "places": [
         "Netherlands", "The Netherlands", "Holland", "Nederland", "Amsterdam", "Rotterdam", "The Hague", "Den Haag",
@@ -110,8 +120,26 @@
       "ie": {"name": "Ireland", "places": ["Ireland", "Republic of Ireland", "Dublin", "Cork", "Galway", "Limerick"]},
       "es": {"name": "Spain", "places": [
         "Spain", "España", "Madrid", "Barcelona", "Valencia", "Malaga", "Málaga", "Seville", "Sevilla", "Bilbao"]},
-      "it": {"name": "Italy", "places": ["Italy", "Italia", "Milan", "Milano", "Rome", "Roma", "Turin", "Torino", "Bologna", "Florence"]}
-    }
+      "it": {"name": "Italy", "places": ["Italy", "Italia", "Milan", "Milano", "Rome", "Roma", "Turin", "Torino", "Bologna", "Florence"]},
+      "_added": "The nine below added on the user's call, 2026-11-16 (their list of 19 countries; the UAE and Qatar keep the relocation rules, Kuwait the remote-only gulf_remote rules). Canada, Australia and New Zealand: towns sharing a name with one elsewhere (London ON, Perth, Victoria, Waterloo, Hamilton, Wellington) are left out; visa._COUNTRY_MARKERS reads 'Ontario', ', ON', 'NSW' and the like.",
+      "dk": {"name": "Denmark", "places": ["Denmark", "Danmark", "Copenhagen", "København", "Kobenhavn", "Aarhus", "Odense", "Aalborg"]},
+      "se": {"name": "Sweden", "places": ["Sweden", "Sverige", "Stockholm", "Gothenburg", "Göteborg", "Malmö", "Malmo", "Uppsala", "Lund", "Linköping"]},
+      "fr": {"name": "France", "places": [
+        "France", "Paris", "Lyon", "Marseille", "Toulouse", "Nantes", "Bordeaux", "Lille", "Grenoble", "Sophia Antipolis",
+        "Montpellier", "Rennes"]},
+      "be": {"name": "Belgium", "places": [
+        "Belgium", "België", "Belgique", "Brussels", "Bruxelles", "Brussel", "Antwerp", "Antwerpen", "Ghent", "Gent",
+        "Leuven", "Liège", "Mechelen"]},
+      "pl": {"name": "Poland", "places": [
+        "Poland", "Polska", "Warsaw", "Warszawa", "Kraków", "Krakow", "Wrocław", "Wroclaw", "Gdańsk", "Gdansk",
+        "Poznań", "Poznan", "Łódź", "Lodz", "Katowice"]},
+      "pt": {"name": "Portugal", "places": ["Portugal", "Lisbon", "Lisboa", "Porto", "Braga", "Coimbra", "Aveiro"]},
+      "ca": {"name": "Canada", "places": ["Canada", "Toronto", "Vancouver", "Montreal", "Montréal", "Ottawa", "Calgary", "Edmonton", "Kitchener"]},
+      "au": {"name": "Australia", "places": ["Australia", "Sydney", "Melbourne", "Brisbane", "Canberra", "Adelaide"]},
+      "nz": {"name": "New Zealand", "places": ["New Zealand", "Aotearoa", "Auckland", "Christchurch"]}
+    },
+    "_silent_ok": "Countries where a posting in English that says nothing about visas either way is kept (code visa_silent): the user's call 2026-11-16 for Germany, where a Blue Card needs no company sponsor register. The fit score's visa part ranks these low unless the company has other evidence.",
+    "silent_ok": ["de"]
   },
 
   "_title_include": "A title must contain at least one of these, or be an AI engineering role: 'AI', 'LLM', 'GenAI' or 'Agentic' followed within three words by engineer/developer ('AI Harness Engineer'; relevance.py). Lead titles (Technical Lead, Engineering Lead) are left out on purpose: when they state years, most ask for 5+ (checked 2026-10-19).",
