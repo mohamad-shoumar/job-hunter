@@ -32,7 +32,7 @@ from .fitgrade import sort_grade
 from .llm import error_line
 from .mailer import check_inbox, mail_account
 from .models import SHORTLISTED
-from .pitch import build_writer, cv_for, default_cv, draft_for_job
+from .pitch import build_writer, cv_for, cv_rel, default_cv, draft_for_job
 from .profile import load_profile
 from .store import JobStore
 from .store.applications import get_application
@@ -97,7 +97,7 @@ def run_outreach(store: JobStore, paths: Paths, new_ids: list[int], now: datetim
                 return True
             # An older job may already have a CV you made for the company: the one the email attaches.
             chosen = cv_for(config, clean_company_name(row["company"])[0], app["cv_file"] if app else None)
-            return row["id"] not in new_ids_set and chosen is not None and chosen.name != default_cv(config)
+            return row["id"] not in new_ids_set and chosen is not None and cv_rel(config, chosen) != default_cv(config)
 
         if config.auto_tailor:
             prepare(summary, "cvs", "cv", waiting, has_cv, config.max_cvs_per_run, lambda: build_cv_writer(config),

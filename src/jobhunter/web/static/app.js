@@ -405,12 +405,17 @@ function whySection(d) {
     </div>`;
 }
 
+// A CV is Backend_Acme_Sep2026/<First>_<Last>.pdf (a folder each), or an older PDF straight in the folder.
+function cvUrl(file) {
+  return `/api/cv/${file.split("/").map(encodeURIComponent).join("/")}`;
+}
+
 function cvLink(file, label = "View ↗") {
-  return `<a class="btn small" href="/api/cv/${encodeURIComponent(file)}" target="_blank" rel="noopener" title="Open the PDF">${esc(label)}</a>`;
+  return `<a class="btn small" href="${cvUrl(file)}" target="_blank" rel="noopener" title="Open the PDF">${esc(label)}</a>`;
 }
 
 function cvDownload(file) {
-  return `<a class="btn small" href="/api/cv/${encodeURIComponent(file)}?download=1" download="${esc(file)}" title="Save the PDF to your Downloads">Download ↓</a>`;
+  return `<a class="btn small" href="${cvUrl(file)}?download=1" download="${esc(file.split("/").pop())}" title="Save the PDF to your Downloads">Download ↓</a>`;
 }
 
 function cvSection(d) {

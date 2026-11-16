@@ -1,6 +1,7 @@
 """Tailored CVs: the profile facts, the fact check, the file, the PDF step (faked) and the web app."""
 
 import csv
+import importlib.util
 import json
 import re
 import shutil
@@ -14,12 +15,13 @@ from jobhunter.config import OutreachConfig, Paths
 from jobhunter.cv import (
     MAX_BULLET_WORDS, TAG_RULES, CvWriter, TailorError, build_pdf, check_bullet, check_headline, check_version,
     cv_headline, job_tags, load_facts, plan_from, printed_title, render, restore_bold, role_label, save_version, scan,
-    select, split_items, tailor_for_job, tailored_of, version_of,
+    _new_stem, select, split_items, tailor_for_job, tailored_of, version_of,
 )
 from jobhunter.llm import JsonModel
 from jobhunter.models import NEW
 from jobhunter.store import JobStore
-from jobhunter.store.applications import events_for, get_application
+from jobhunter.pitch import cv_for, cv_options, default_cv
+from jobhunter.store.applications import events_for, get_application, set_cv_file
 from jobhunter.text import iso
 from jobhunter.web.app import create_app
 
@@ -301,7 +303,8 @@ def resume(tmp_path):
 
 
 class FakeBuild:
-    """Writes output/Shoumar_<name>.pdf like build.py; `pages` are the page counts it reports, in order."""
+    """Writes output/<name>/Jane_Doe.pdf like build.py (every CV named after you, a folder each); `pages` are
+    the page counts it reports, in order."""
 
     def __init__(self, *pages):
         self.pages = list(pages)
@@ -309,7 +312,8 @@ class FakeBuild:
 
     def __call__(self, folder, source):
         self.sources.append(source.read_text())
-        pdf = folder / "output" / f"Shoumar_{source.stem}.pdf"
+        pdf = folder / "output" / source.stem / "Jane_Doe.pdf"
+        pdf.parent.mkdir(parents=True, exist_ok=True)
         pdf.write_bytes(b"%PDF")
         return pdf, self.pages.pop(0) if self.pages else 1
 
@@ -327,7 +331,7 @@ def test_tailoring_writes_the_version_builds_it_and_attaches_it(resume, filters)
     job_id = store_job(store, filters, description="We build serverless Python on AWS. Kafka is a plus.")
     build = FakeBuild(2, 1)
     meta = tailor_for_job(store, job_id, writer(GOOD), PROFILE_FILE, config_for(resume), NOW, builder=build)
-    assert meta["file"] == "Shoumar_Backend_Acme_Sep2026.pdf" and meta["source"] == "versions/Backend_Acme_Sep2026.md"
+    assert meta["file"] == "Backend_Acme_Sep2026/Jane_Doe.pdf" and meta["source"] == "versions/Backend_Acme_Sep2026.md"
     assert meta["pages"] == 1 and "compact: yes" in build.sources[1] and "compact: yes" not in build.sources[0]
     assert meta["gaps"] == ["kafka"] and meta["headline"] == "Senior Backend Engineer"  # the posting's title, cleaned
     assert "title: Senior Backend Engineer\n" in build.sources[1]
@@ -338,7 +342,7 @@ def test_tailoring_writes_the_version_builds_it_and_attaches_it(resume, filters)
     assert app["cv_file"] == meta["file"] and app["stage"] == NEW
     assert (resume / "versions" / "Backend_Acme_Sep2026.md").read_text() == build.sources[1]
     rows = list(csv.reader((resume / "applications.csv").open()))
-    assert rows[1][:3] == ["Acme", "Senior Backend Engineer (Python)", "output/Shoumar_Backend_Acme_Sep2026.pdf"]
+    assert rows[1][:3] == ["Acme", "Senior Backend Engineer (Python)", "output/Backend_Acme_Sep2026/Jane_Doe.pdf"]
 
     again = tailor_for_job(store, job_id, writer(GOOD), PROFILE_FILE, config_for(resume), NOW, builder=FakeBuild())
     assert again["file"] == meta["file"] and len(list(csv.reader((resume / "applications.csv").open()))) == 2
@@ -372,7 +376,7 @@ def test_a_cv_made_by_hand_is_never_overwritten(resume, filters):
     store = JobStore(":memory:")
     meta = tailor_for_job(store, store_job(store, filters), writer(GOOD), PROFILE_FILE, config_for(resume), NOW,
                           builder=FakeBuild())
-    assert meta["file"] == "Shoumar_Backend_Acme_Sep2026_2.pdf"
+    assert meta["file"] == "Backend_Acme_Sep2026_2/Jane_Doe.pdf"
     assert (resume / "versions" / "Backend_Acme_Sep2026.md").read_text() == "by hand"
 
 
@@ -397,7 +401,7 @@ def test_the_daily_run_tailors_new_shortlisted_jobs(resume, filters, tmp_path, m
     store = JobStore(":memory:")
     job_id = store_job(store, filters)
     summary = outreach.run_outreach(store, Paths(tmp_path), [job_id], NOW)
-    assert summary["cvs"] == [f"#{job_id}: Shoumar_Backend_Acme_Sep2026.pdf"] and summary["errors"] == []
+    assert summary["cvs"] == [f"#{job_id}: Backend_Acme_Sep2026/Jane_Doe.pdf"] and summary["errors"] == []
     assert outreach.run_outreach(store, Paths(tmp_path), [job_id], NOW)["cvs"] == []  # once per job
     other = store_job(store, filters, source_job_id="2", company="Globex")
     assert outreach.run_outreach(store, Paths(tmp_path), [other], NOW, lookups=False)["cvs"] == []  # a date range
@@ -440,14 +444,15 @@ def test_tailor_attaches_the_cv_and_the_page_can_show_it(cv_client):
     assert cv_client.get("/api/jobs/1").json()["cv"]["file"] == "Shoumar_Resume_General.pdf"
     assert cv_client.post("/api/jobs/1/tailor", json={}).status_code == 403  # needs the token
     detail = cv_client.post("/api/jobs/1/tailor", json={}, headers=AUTH).json()
-    assert detail["cv"]["file"] == "Shoumar_Backend_Acme_Sep2026.pdf" == detail["tailored"]["file"]
+    assert detail["cv"]["file"] == "Backend_Acme_Sep2026/Jane_Doe.pdf" == detail["tailored"]["file"]
     assert detail["cv"]["tailored"]["changes"][1:] == GOOD["changes"]
-    pdf = cv_client.get("/api/cv/Shoumar_Backend_Acme_Sep2026.pdf")
+    pdf = cv_client.get("/api/cv/Backend_Acme_Sep2026/Jane_Doe.pdf")
     assert pdf.status_code == 200 and pdf.headers["content-type"] == "application/pdf"
     assert pdf.headers["content-disposition"].startswith("inline")
-    saved = cv_client.get("/api/cv/Shoumar_Backend_Acme_Sep2026.pdf?download=1")
+    saved = cv_client.get("/api/cv/Backend_Acme_Sep2026/Jane_Doe.pdf?download=1")
     assert saved.status_code == 200 and saved.headers["content-disposition"].startswith("attachment")
-    assert "Shoumar_Backend_Acme_Sep2026.pdf" in saved.headers["content-disposition"]
+    assert 'filename="Jane_Doe.pdf"' in saved.headers["content-disposition"]  # your name only, no role or date
+    assert cv_client.get("/api/cv/Backend_Acme_Sep2026%2FJane_Doe.pdf").status_code == 200  # an encoded slash too
 
 
 def test_a_failed_model_or_build_py_is_a_bad_gateway(cv_client):
@@ -477,6 +482,10 @@ def test_job_sites_can_fetch_a_cv_but_nothing_else(cv_client):
 def test_only_cvs_in_the_folder_can_be_read(cv_client):
     assert cv_client.get("/api/cv/resume.md").status_code == 404
     assert cv_client.get("/api/cv/..%2Fresume.md").status_code == 404
+    cv_client.post("/api/jobs/1/tailor", json={}, headers=AUTH)  # a CV in a folder of its own
+    for path in ("Backend_Acme_Sep2026/../../resume.md", "Backend_Acme_Sep2026/..%2F..%2Fresume.md",
+                 "Backend_Acme_Sep2026/Jane_Doe.pdf/..", "../output/Backend_Acme_Sep2026/Jane_Doe.pdf"):
+        assert cv_client.get(f"/api/cv/{path}").status_code == 404, path
 
 
 # --- your edits ------------------------------------------------------------------------------
@@ -530,9 +539,14 @@ def test_a_cv_made_by_hand_can_be_edited_but_not_the_general_one(resume, filters
         save_version(store, job_id, config, PROFILE_FILE, NOW, "# Me\n", builder=FakeBuild())
     (resume / "versions").mkdir()
     (resume / "versions" / "Backend_Clera_Sep2026.md").write_text("# Me\n- a line you want gone\n")
-    (resume / "output" / "Shoumar_Backend_Clera_Sep2026.pdf").write_bytes(b"%PDF")  # build.py made it from that file
+    # An older build.py made <Last>_<version>.pdf straight in output/: still found, and a job that picked
+    # it follows the rebuilt PDF, now <version>/<First>_<Last>.pdf.
+    (resume / "output" / "Shoumar_Backend_Clera_Sep2026.pdf").write_bytes(b"%PDF")
+    tracking.ensure_application(store, job_id, NOW)
+    set_cv_file(store, job_id, "Shoumar_Backend_Clera_Sep2026.pdf")
     result = save_version(store, job_id, config, PROFILE_FILE, NOW, "# Me\n", builder=FakeBuild())
-    assert result["source"] == "versions/Backend_Clera_Sep2026.md" and result["file"] == "Shoumar_Backend_Clera_Sep2026.pdf"
+    assert result["source"] == "versions/Backend_Clera_Sep2026.md" and result["file"] == "Backend_Clera_Sep2026/Jane_Doe.pdf"
+    assert get_application(store, job_id)["cv_file"] == "Backend_Clera_Sep2026/Jane_Doe.pdf"
     assert (resume / "versions" / "Backend_Clera_Sep2026.md").read_text() == "# Me\n"
     with pytest.raises(TailorError, match="empty"):
         save_version(store, job_id, config, PROFILE_FILE, NOW, "  \n", builder=FakeBuild())
@@ -558,7 +572,51 @@ def test_the_cv_text_can_be_edited_in_the_app(cv_client):
     assert cv_client.put("/api/jobs/1/cv-text", json={"text": text}).status_code == 403  # needs the token
     assert cv_client.put("/api/jobs/1/cv-text", json={}, headers=AUTH).status_code == 400
     saved = cv_client.put("/api/jobs/1/cv-text", json={"text": text}, headers=AUTH).json()
-    assert saved["cv_saved"]["file"] == "Shoumar_Backend_Acme_Sep2026.pdf" and saved["cv"]["tailored"]["edited_at"]
+    assert saved["cv_saved"]["file"] == "Backend_Acme_Sep2026/Jane_Doe.pdf" and saved["cv"]["tailored"]["edited_at"]
     assert cv_client.get("/api/jobs/1/cv-text").json()["text"] == text
     assert cv_client.post("/api/jobs/1/tailor", json={}, headers=AUTH).status_code == 400  # asks before replacing
     assert cv_client.post("/api/jobs/1/tailor", json={"replace_edits": True}, headers=AUTH).status_code == 200
+
+
+# --- every CV is named after you, a folder each -------------------------------------------------
+
+
+def test_two_cvs_with_the_same_name_stay_apart(resume, filters):
+    store = JobStore(":memory:")
+    acme = store_job(store, filters)
+    doe = store_job(store, filters, company="Doe Labs", title="Backend Engineer")
+    config = config_for(resume)
+    for job_id in (acme, doe):
+        tailor_for_job(store, job_id, writer(GOOD), PROFILE_FILE, config, NOW, builder=FakeBuild())
+    assert cv_options(config) == ["Backend_Acme_Sep2026/Jane_Doe.pdf", "Backend_DoeLabs_Sep2026/Jane_Doe.pdf",
+                                  "Shoumar_Resume_General.pdf"]
+    assert get_application(store, doe)["cv_file"] == "Backend_DoeLabs_Sep2026/Jane_Doe.pdf"
+    # A company is matched on the CV's folder, never on your name in the file: "Doe" is not Jane Doe's CV.
+    assert cv_for(config, "Acme", None) == resume / "output" / "Backend_Acme_Sep2026" / "Jane_Doe.pdf"
+    assert cv_for(config, "Doe", None) == resume / "output" / "Backend_DoeLabs_Sep2026" / "Jane_Doe.pdf"
+    assert cv_for(config, "Jane", None) == resume / "output" / "Shoumar_Resume_General.pdf"  # the default
+    for job_id in (acme, doe):
+        assert version_of(config, "", get_application(store, job_id)).parent == resume / "versions"
+    assert _new_stem(resume, "Backend Engineer", "Acme", NOW) == "Backend_Acme_Sep2026_2"  # the folder is taken
+
+
+def test_the_general_cv_is_in_its_own_folder(resume):
+    (resume / "output" / "General").mkdir()
+    (resume / "output" / "General" / "Jane_Doe.pdf").write_bytes(b"%PDF")
+    assert default_cv(config_for(resume)) == "General/Jane_Doe.pdf"
+
+
+def test_build_py_names_every_pdf_after_you_only(tmp_path, monkeypatch):
+    spec = importlib.util.spec_from_file_location("resume_build", ROOT / "resume" / "build.py")
+    build = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(build)
+    monkeypatch.setattr(build, "ENV_FILE", tmp_path / "no.env")
+    monkeypatch.setattr(build, "OUTPUT", tmp_path / "output")
+    monkeypatch.setattr(build, "MASTER", tmp_path / "resume.md")
+    monkeypatch.setenv("MY_NAME", "Jane Q. Doe")
+    (tmp_path / "resume.md").write_text("# Someone Else\n")
+    (tmp_path / "Backend_Acme_Sep2026.md").write_text("# Someone Else\n")
+    assert build.cv_pdf(tmp_path / "Backend_Acme_Sep2026.md") == tmp_path / "output" / "Backend_Acme_Sep2026" / "Jane_Q_Doe.pdf"
+    assert build.cv_pdf(tmp_path / "resume.md") == tmp_path / "output" / "General" / "Jane_Q_Doe.pdf"
+    monkeypatch.delenv("MY_NAME")
+    assert build.cv_pdf(tmp_path / "resume.md").name == "Someone_Else.pdf"  # no MY_NAME: the file's "# Name"

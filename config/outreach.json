@@ -46,7 +46,7 @@
   "daily_send_cap": 15,
   "daily_guessed_cap": 3,
 
-  "_cv": "The CV attached to first emails: a PDF in cv_dir (a relative path is inside this project). A file whose name contains the company (Doe_FullStack_LigaData_Sep2026.pdf) is used for that company, else default_cv; empty means the master CV build.py makes, <Last name>_Resume_General.pdf (your name is MY_NAME in .env). You can pick another per job in the app.",
+  "_cv": "The CV attached to first emails: a PDF in cv_dir (a relative path is inside this project). Every CV is named after you only (MY_NAME in .env: Jane_Doe.pdf), each in a folder of its own; one whose folder contains the company (FullStack_LigaData_Sep2026/Jane_Doe.pdf) is used for that company, else default_cv; empty means the master CV build.py makes, General/Jane_Doe.pdf. You can pick another per job in the app.",
   "cv_dir": "resume/output",
   "default_cv": "",
 

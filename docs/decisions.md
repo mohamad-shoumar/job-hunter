@@ -375,3 +375,15 @@ Code adds up every part. Claude Code (`claude-code:opus`, on my Claude login) re
 
 **Trade-off:** My Applied and Skip choices no longer move the score; the skip reasons are still kept with each job. The rubric does not score an AI-native company, a German job above a Dutch one, or full-time above contract: those would need parts of their own. A job with no pay stated scores 0 for salary, so a job that hides its pay loses 7 points to one that shows it. Claude Code is slower than DeepSeek (about half a minute a job) and counts against my plan. The rough exchange rates in `rubric.py` only compare a salary with a floor in another currency.
 
+## 27. Every CV is named after me, and nothing else
+
+**Date:** 2026-11-16
+
+**Context:** Each CV PDF was named after its role, company and month (`Shoumar_ForwardDeployed_Andercore_Nov2026.pdf`), and that is the file name an employer sees when I upload it.
+
+**Decision:** Every CV PDF is my name only, `<First>_<Last>.pdf` from `MY_NAME`. Hundreds of files cannot share one name in one folder, so `build.py` puts each in a folder named after the version it was built from (`output/ForwardDeployed_Andercore_Nov2026/<First>_<Last>.pdf`, the master in `output/General/`). The app names a CV by that folder and file together, and picks a company's CV by the folder.
+
+**Why:** (draft: check) A file name with the company and the month tells the employer the CV was made for them, and an old one sent by mistake shows another company's name.
+
+**Trade-off:** The PDFs no longer say which job they are for on their own: the folder does. Older PDFs straight in `output/` keep their names and still work; rebuilding one writes the new layout. Cover letters keep their old names.
+
