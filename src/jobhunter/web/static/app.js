@@ -629,12 +629,33 @@ async function drawerAction(action, el) {
 
 // --- today -----------------------------------------------------------------------
 
+// Today's top picks: the latest daily digest (digest.py, written by the evening run), each job with its
+// project idea. Nothing is built from here: a project waits for your go.
+function digestCard(d) {
+  const label = !d.day ? "" : d.day === d.today ? "today" : `from ${d.day}`;
+  const pick = (p) => {
+    const i = p.idea || {};
+    const stack = (i.stack || []).map((s) => esc(s.name) + (s.yours ? "" : ' <span class="muted">(new to you)</span>')).join(", ");
+    return `<li><a data-open="${p.job_id}"><b>${esc(p.title)}</b></a> <span class="muted">· ${esc(p.company)}</span>
+      ${scoreChip(p.fit_grade, p.fit_star)}${p.stage !== "new" ? ` <span class="chip">${esc(state.status?.stage_labels?.[p.stage] || p.stage)}</span>` : ""}
+      <div style="margin-top:4px"><b>${esc(p.project_title)}</b> <span class="muted small">· ${esc(String(i.hours ?? "?"))} h</span></div>
+      <div class="small">${esc(i.problem || "")}</div>
+      ${i.quote ? `<div class="quote">“${esc(i.quote)}”</div>` : ""}
+      ${(i.does || []).length ? `<ul class="small idea-lines">${i.does.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>` : ""}
+      ${stack ? `<div class="small muted">Stack: ${stack}</div>` : ""}</li>`;
+  };
+  return `<div class="card"><h2>Today's top picks <span class="muted small">${esc(label)}</span></h2>${
+    d.picks.length ? `<ul>${d.picks.map(pick).join("")}</ul>`
+      : `<div class="muted">No digest yet. The evening run writes one (or run <code>jobhunter digest</code>).</div>`}</div>`;
+}
+
 async function renderToday() {
-  const t = await api("/api/today");
+  const [t, d] = await Promise.all([api("/api/today"), api("/api/digest").catch(() => ({ picks: [] }))]);
   const item = (r, extra = "") => `<li><a data-open="${r.job_id || r.id}"><b>${esc(r.title)}</b></a> <span class="muted">· ${esc(r.company)}</span>${extra}</li>`;
   const card = (title, rows, empty) => `<div class="card"><h2>${title} <span class="muted small">${rows.length || ""}</span></h2>${rows.length ? `<ul>${rows.join("")}</ul>` : `<div class="muted">${empty}</div>`}</div>`;
   $("#main").innerHTML = `
     <div class="cards">
+      ${digestCard(d)}
       ${card("Replies to answer", t.replies.map((r) => item(r, `<div class="quote">${esc(r.reply_from || "")}: ${esc(r.reply_snippet || "")}</div>`)), "No new replies. Click Check inbox to look.")}
       ${card("Follow-ups due", t.follow_ups_due.map((r) => item(r, `<div class="small muted">to ${esc(r.email || "?")} · follow-up ${r.follow_ups + 1} · due ${esc(day(r.next_follow_up_at))}</div>`)), "Nothing due.")}
       ${card("New shortlisted to triage", onePerCompany(t.new_jobs, (r) => r.fit_grade).map((r) => item(r, ` ${scoreChip(r.fit_grade, r.fit_star)}

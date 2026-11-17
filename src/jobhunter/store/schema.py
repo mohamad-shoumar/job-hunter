@@ -15,6 +15,31 @@ from __future__ import annotations
 
 import sqlite3
 
+# Proof-of-work projects (spec 6.1): one small build for one job, from the daily digest's idea (digest.py
+# writes `suggested` rows; the digest's date is in idea_json) to a repo you agreed, read and made public.
+# Status names are in models.py. In SCHEMA, and migration 5 makes it in an older database.
+_PROJECTS = ("""
+CREATE TABLE IF NOT EXISTS projects (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id INTEGER REFERENCES jobs(id),
+    title TEXT NOT NULL,
+    idea_json TEXT,
+    stack TEXT,
+    repo_path TEXT,
+    repo_url TEXT,
+    scope_json TEXT,
+    status TEXT NOT NULL,
+    agreed_at TEXT,
+    built_at TEXT,
+    read_at TEXT,
+    published_at TEXT,
+    cited_at TEXT,
+    notes TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);""", """
+CREATE INDEX IF NOT EXISTS projects_job ON projects (job_id);""")
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS runs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -241,7 +266,7 @@ CREATE TABLE IF NOT EXISTS board_probes (
     probed_at TEXT NOT NULL,
     note TEXT
 );
-"""
+""" + ";\n".join(_PROJECTS) + ";\n"
 
 
 def _add_columns(conn: sqlite3.Connection, table: str, columns: dict[str, str]) -> None:
@@ -288,9 +313,17 @@ def _v4_linkedin_followup(conn: sqlite3.Connection) -> None:
                                         "linkedin_accepted_at": "TEXT", "linkedin_replied_at": "TEXT"})
 
 
+def _v5_projects(conn: sqlite3.Connection) -> None:
+    """The projects table (spec 6.1), first used by the daily digest (digest.py, package 1.2a): one row per
+    project idea for a job, `suggested` until you agree to build it. SCHEMA makes it too (CREATE ... IF NOT
+    EXISTS), so this only makes sure, and the version number records it."""
+    for statement in _PROJECTS:
+        conn.execute(statement)
+
+
 # Migration n is MIGRATIONS[n - 1]. Only ever add to the end; each one must be safe to run on a database
 # that SCHEMA has just created, since a new database runs them all too.
-MIGRATIONS = [_v1_added_columns, _v2_review_cleared, _v3_linkedin_note, _v4_linkedin_followup]
+MIGRATIONS = [_v1_added_columns, _v2_review_cleared, _v3_linkedin_note, _v4_linkedin_followup, _v5_projects]
 LATEST_VERSION = len(MIGRATIONS)
 
 

@@ -10,6 +10,7 @@ functions here and decides what to do with the rows.
   companies.py     companies and contacts (contacts.py)
   mail.py          sent_mail and mail_seen (mailer.py)
   watched.py       watched_boards and board_probes (boards.py)
+  projects.py      projects: proof-of-work project ideas and builds (digest.py)
 
 The functions outside jobs.py take the JobStore as their first argument. None
 of them commits: the caller decides when, so it can commit before a slow

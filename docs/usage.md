@@ -71,6 +71,7 @@ that holds `config/`) and `-v` (debug logging).
 | `jobhunter check` | AI-check shortlisted jobs the rules left `unclear`, newest first (`--limit N`, `--recheck`, or job ids) |
 | `jobhunter dates` | find when undated shortlisted jobs were posted (`--limit N`, `--recheck`, or job ids) |
 | `jobhunter grade` | fit score 0-100 for open jobs, by your rubric (`--rescore` with no model, `--no-interviews`, `--regrade`, `--days N`, `--limit N`, or job ids) |
+| `jobhunter digest` | the day's top 3-5 jobs (one per company, fit score 60+) and one small project idea each, in `reports/digest_<date>.md` (`--date`, `--top N`); the evening run does it with `--digest` |
 | `jobhunter show <id>` | everything stored about one job and why it got its status (`-d` adds the description) |
 | `jobhunter reclassify` | judge every stored job again after you edit `config/filters.json`, and rebuild the day files that changed |
 | `jobhunter report --date 2026-09-25` | rebuild one day's file from the database |
@@ -659,6 +660,7 @@ A second one (`scripts/local.jobhunter.evening.plist`, installed the same way) r
 posted 14:00-17:00 Lebanon time (the US morning), so with the 09:00 run alone they wait until the next
 morning; the evening run puts them in the same day's report. SerpApi runs only in the evening run (the morning
 one has `--skip serpapi`), so its credits last the month and it sees the day's US postings.
+It ends with the daily digest (`--digest`): the day's final list, its top jobs and a project idea each.
 
 ```sh
 launchctl kickstart gui/$(id -u)/local.jobhunter.daily    # run now

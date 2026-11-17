@@ -1,5 +1,5 @@
 """Command line: `jobhunter run | serve | contacts | tailor | rebuild-cv | cover | inbox | check | dates | grade |
-report | reclassify | show | stats | boards | sources | sponsors`. docs/usage.md has the manual."""
+digest | report | reclassify | show | stats | boards | sources | sponsors`. docs/usage.md has the manual."""
 
 from __future__ import annotations
 
@@ -138,7 +138,49 @@ def cmd_run(args) -> int:
         _print_report_counts(store, report_paths)
     finally:
         store.close()
+    if args.digest:
+        _run_digest_step(paths, args.no_ai)
     return 0
+
+
+def _run_digest_step(paths: Paths, no_ai: bool) -> None:
+    """The evening run's digest of the day's final list. A failure is printed and logged, never the run's."""
+    day = pipeline.local_day(utcnow()).isoformat()
+    try:
+        _digest(paths, day, None, ideas=not no_ai)
+    except Exception as exc:  # the run's work is done and saved; the digest must not undo its exit code
+        logging.getLogger(__name__).exception("digest failed")
+        print(f"Digest failed: {' '.join(str(exc).split())[:300]}")
+
+
+def _digest(paths: Paths, day: str, top: int | None, ideas: bool = True) -> int:
+    from .digest import DigestConfig, build_writer, run_digest
+
+    config = DigestConfig.load(paths.digest_file)
+    writer, note = build_writer(config) if ideas else (None, "no model calls (--no-ai)")
+    store = JobStore(paths.db_file)
+    try:
+        result = run_digest(store, writer, config, paths.profile_file, paths.reports_dir, day, utcnow(), top)
+    finally:
+        store.close()
+    print(f"Digest {day}: {len(result.picks)} of {result.candidates} open jobs picked, {result.added} new ideas"
+          + (f", {result.unscored} with no fit score yet" if result.unscored else "")
+          + (f", about ${result.cost_usd:.2f}" if result.cost_usd else ""))
+    for pick in result.picks:
+        title = pick.idea["title"] if pick.idea else "-"
+        print(f"  #{pick.row['id']:<6} {pick.score:>3}/100  {pick.row['company']} — {pick.row['title']}")
+        print(f"          idea: {title}" + (f"  ({pick.note})" if pick.note else ""))
+    for line in ([note] if note else []) + result.notes + result.errors:
+        print(f"  {line}")
+    print(f"{result.path}")
+    return 1 if result.errors and not result.added and not any(p.idea for p in result.picks) else 0
+
+
+def cmd_digest(args) -> int:
+    """The day's top jobs (one per company, by fit score) and one project idea each: reports/digest_<date>.md."""
+    paths, _, _ = _load(args)
+    day = (args.date or pipeline.local_day(utcnow())).isoformat()
+    return _digest(paths, day, args.top)
 
 
 def _print_discovery(found) -> None:
@@ -865,7 +907,22 @@ def main(argv: list[str] | None = None) -> int:
                    "AI-written email lines")
     p.add_argument("--no-outreach", action="store_true",
                    help="skip contact lookups, drafts, CVs, cover letters and the inbox check")
+    p.add_argument("--digest", action="store_true",
+                   help="at the end, write today's digest (`jobhunter digest`); a digest failure never fails the run")
     p.set_defaults(func=cmd_run)
+
+    p = sub.add_parser(
+        "digest",
+        help="the day's top 3-5 jobs and one small project idea each: reports/digest_<date>.md",
+        description="Code picks the jobs filed that day (shortlisted or visa list, still New), one per company, "
+        "by fit score, only scores of min_score or more (config/digest.json). The model writes one idea per job "
+        "from the posting and your Skills section; code drops an idea whose quote is not in the posting or that "
+        "claims experience. Each kept idea is a suggested project. Re-running a day asks nothing new for a job "
+        "that already has a project. Nothing is built.",
+    )
+    p.add_argument("--date", type=_date, metavar="YYYY-MM-DD", help="the report day (default: today)")
+    p.add_argument("--top", type=int, metavar="N", help="at most N jobs (default: top in config/digest.json; max 5)")
+    p.set_defaults(func=cmd_digest)
 
     p = sub.add_parser("serve", help="the local web app: jobs, who to contact, email drafts, sending, tracking")
     p.add_argument("--port", type=int, default=8765)

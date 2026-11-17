@@ -66,6 +66,11 @@ STAGE_LABELS = {
     INTERVIEWING: "Interviewing", OFFER: "Offer", CLOSED: "Closed",
 }
 
+# Where a proof-of-work project is (projects.status, spec 6.1). The daily digest (digest.py) only ever
+# writes `suggested`; the rest are set later, by you (agreed, read, public) or the build (building, built_private).
+PROJECT_SUGGESTED = "suggested"
+PROJECT_STATUSES = [PROJECT_SUGGESTED, "agreed", "building", "built_private", "read", "public", "dropped"]
+
 
 @dataclass
 class Job:

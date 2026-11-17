@@ -1,0 +1,12 @@
+{
+  "_about": "The daily digest (src/jobhunter/digest.py, `jobhunter digest`, the evening run's --digest): the day's top jobs (shortlisted or visa list, still New, one per company, by fit score) and one small project idea each. Code picks the jobs; the model only writes the idea, from the posting and your Skills section, and code drops an idea whose quote is not in the posting or that claims experience. Each kept idea is a `projects` row, status suggested. Nothing is built until you say go.",
+
+  "_model": "claude-code:opus uses the Claude Code CLI on your Claude login (no API bill, about 20-40 s a job). deepseek-v4-flash also works (DEEPSEEK_API_KEY).",
+  "model": "claude-code:opus",
+  "_top": "At most this many jobs a day (never more than 5).",
+  "top": 5,
+  "_min_score": "Only jobs with a fit score of this or more. 60 kept 3-5 a day on the stored jobs of 2026-11-11 to 11-17; 65 left 1-2 on some days.",
+  "min_score": 60,
+  "description_chars": 6000,
+  "workers": 3
+}

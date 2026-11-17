@@ -68,6 +68,7 @@ from ..store.applications import (
 )
 from ..store.companies import company_contacts, contact_at, forget_lookup
 from ..store.lists import JOB_VIEWS, YEARS, job_list
+from ..store.projects import digest_days, digest_projects
 from ..store.mail import company_contacted, mail_for_job
 from ..text import parse_datetime, utcnow
 
@@ -327,6 +328,21 @@ def create_app(paths: Paths, token: str, allowed_hosts: list[str] | None = None,
     @app.get("/api/today")
     def today(store: JobStore = Depends(db)):
         return tracking.today(store, now(), config)
+
+    @app.get("/api/digest")
+    def digest(store: JobStore = Depends(db)):
+        """Today's top picks: the latest digest's jobs and their ideas (written by the evening run at 21:00,
+        so most of the day this is yesterday's). Reads only."""
+        days = digest_days(store)
+        if not days:
+            return {"day": None, "today": local_day(now()).isoformat(), "picks": []}
+        picks = []
+        for row in digest_projects(store, days[0]):
+            pick = dict(row)
+            pick["idea"] = json.loads(pick.pop("idea_json") or "{}")
+            pick["stage"] = pick["stage"] or NEW
+            picks.append(pick)
+        return {"day": days[0], "today": local_day(now()).isoformat(), "picks": picks}
 
     @app.get("/api/stats")
     def stats(store: JobStore = Depends(db)):

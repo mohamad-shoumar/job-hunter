@@ -175,3 +175,14 @@ def company_postings(store: JobStore, company: str, exclude_id: int, limit: int 
         "AND (description LIKE '%visa%' OR description LIKE '%sponsor%') ORDER BY id DESC LIMIT ?",
         (company, exclude_id, limit),
     ).fetchall()
+
+
+def digest_candidates(store: JobStore, day: str) -> list[sqlite3.Row]:
+    """Jobs filed under report day `day` that are shortlisted or on the visa list and still New, best fit score
+    first (no score last), for the daily digest (digest.py)."""
+    return store.conn.execute(
+        "SELECT j.* FROM jobs j LEFT JOIN applications a ON a.job_id = j.id "
+        "WHERE j.report_date = ? AND j.status IN (?, ?) AND COALESCE(a.stage, ?) = ? "
+        "ORDER BY COALESCE(json_extract(j.fit_grade_json, '$.score'), -1) DESC, j.fit_score DESC, j.id DESC",
+        (day, SHORTLISTED, VISA_LIST, NEW, NEW),
+    ).fetchall()

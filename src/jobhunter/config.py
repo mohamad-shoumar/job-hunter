@@ -41,6 +41,10 @@ class Paths:
         return self.root / "config" / "fit_grade.json"
 
     @property
+    def digest_file(self) -> Path:
+        return self.root / "config" / "digest.json"
+
+    @property
     def profile_file(self) -> Path:
         return self.root / "profile" / "master_profile.md"
 
