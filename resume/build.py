@@ -68,6 +68,7 @@ ul { list-style: disc outside; margin: 3pt 0 0 22pt; }
 li { margin-bottom: 3pt; padding-left: 2pt; }
 .skills { margin-bottom: 8pt; }
 .skill { padding: 1.5pt 0; }
+.nobr { white-space: nowrap; }
 """
 
 
@@ -123,6 +124,37 @@ def esc(text):
     return re.sub(r"\[([^\]]+)\]\(([^)\s]+)\)", lambda m: f'<a href="{link(m.group(2))}">{m.group(1)}</a>', text)
 
 
+# Hard rule: no line of 1-3 leftover words. The last TAIL_WORDS words of each bullet, skills row
+# and paragraph are joined by non-breaking spaces, so they wrap together and a last line holds
+# at least TAIL_WORDS words (or the whole text, when it is shorter). A word with a hyphen or slash
+# in that tail is kept whole too ("multi-agent"), since Chrome may break a line there.
+TAIL_WORDS = 4
+NBSP = "\u00a0"
+
+
+def keep_tail(markup, words=TAIL_WORDS):
+    parts = re.split(r"(<[^>]+>)", markup)
+    spaces = words - 1
+    for i in range(len(parts) - 1, -1, -1):
+        part = parts[i]
+        if part.startswith("<"):
+            continue
+        chars, start = list(part), 0
+        for j in range(len(chars) - 1, -1, -1):
+            if chars[j] == " ":
+                if spaces == 0:
+                    start = j + 1
+                    break
+                chars[j] = NBSP
+                spaces -= 1
+        head, tail = "".join(chars[:start]), "".join(chars[start:])
+        tail = re.sub(r"[^\s\u00a0]*[-/\u2013][^\s\u00a0]*", lambda m: f'<span class="nobr">{m.group(0)}</span>', tail)
+        parts[i] = head + tail
+        if start:
+            break
+    return "".join(parts)
+
+
 def build_html(lines, force_compact=False):
     info, name, body = {}, "", []
     in_job = in_list = in_table = False
@@ -167,7 +199,7 @@ def build_html(lines, force_compact=False):
             if not in_list:
                 body.append("<ul>")
                 in_list = True
-            body.append(f"<li>{esc(line[2:].strip())}</li>")
+            body.append(f"<li>{keep_tail(esc(line[2:].strip()))}</li>")
         elif in_job:
             # Plain line under a ### heading = job title / subtitle.
             body.append(f'<div class="row">{esc(line)}</div>')
@@ -177,10 +209,10 @@ def build_html(lines, force_compact=False):
                 body.append('<div class="skills">')
                 in_table = True
             label, val = line.split(":", 1)
-            body.append(f'<div class="skill"><b>{esc(label.strip())}:</b> {esc(val.strip())}</div>')
+            body.append(f'<div class="skill">{keep_tail(f"<b>{esc(label.strip())}:</b> {esc(val.strip())}")}</div>')
         else:
             close_list()
-            body.append(f"<p>{esc(line)}</p>")
+            body.append(f"<p>{keep_tail(esc(line))}</p>")
     close_block()
     details = my_details()
     name = details.pop("name", name)
