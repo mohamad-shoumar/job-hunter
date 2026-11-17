@@ -52,13 +52,14 @@ CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 CSS = """
 @page { size: Letter; margin: 0.5in 0.6in; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-variant-ligatures: none; font-family: Helvetica, Arial, sans-serif; font-size: 10pt; color: #222; line-height: 1.3; background: #fff; }
-a { color: #5b9bd5; text-decoration: none; }
+body { font-variant-ligatures: none; font-family: Helvetica, Arial, sans-serif; font-size: 10.5pt; color: #222; line-height: 1.3; background: #fff; }
+a { color: #1f4e79; text-decoration: none; }
 header { margin-bottom: 10pt; }
-h1 { font-weight: normal; font-size: 25pt; color: #5b9bd5; line-height: 1.1; }
-.title { font-size: 12pt; color: #5b9bd5; }
-.contact { font-size: 10pt; margin-top: 4pt; }
-h2 { font-weight: normal; font-size: 19pt; color: #5b9bd5; margin: 4pt 0 6pt; }
+h1 { font-weight: normal; font-size: 25pt; color: #1f4e79; line-height: 1.1; }
+.title { font-size: 12pt; color: #1f4e79; }
+.contact { font-size: 10.5pt; margin-top: 4pt; }
+.contact div + div { margin-top: 1pt; }
+h2 { font-weight: normal; font-size: 19pt; color: #1f4e79; margin: 4pt 0 6pt; }
 .job { margin-bottom: 8pt; }
 p { margin-bottom: 8pt; }
 .row { font-weight: bold; display: flex; justify-content: space-between; }
@@ -185,28 +186,28 @@ def build_html(lines, force_compact=False):
     name = details.pop("name", name)
     info.update(details)
 
-    contact = []
+    # Two contact lines: email, phone and place, then the links. Each link prints its
+    # own address without https:// or www (linkedin.com/in/you), linked to the same URL.
+    contact, links = [], []
     if "email" in info:
         contact.append(html.escape(info["email"]))  # plain text, not a link
     if "phone" in info:
         contact.append(html.escape(info["phone"]))
-    # Profile links print as a short label; the URL lives in the link.
-    for key, label in (("linkedin", "LinkedIn"), ("github", "GitHub")):
-        if key in info:
-            contact.append(f'<a href="{html.escape(link(info[key]))}">{label}</a>')
-    if "portfolio" in info:
-        url = link(info["portfolio"])
-        shown = re.sub(r"^https?://(www\.)?", "", url).rstrip("/")
-        contact.append(f'<a href="{html.escape(url)}">{html.escape(shown)}</a>')
     if "location" in info:
         contact.append(html.escape(info["location"]))
+    for key in ("linkedin", "github", "portfolio"):
+        if key in info:
+            url = link(info[key])
+            shown = re.sub(r"^https?://(www\.)?", "", url).rstrip("/")
+            links.append(f'<a href="{html.escape(url)}">{html.escape(shown)}</a>')
+    contact_lines = "".join(f"<div>{' | '.join(part)}</div>" for part in (contact, links) if part)
 
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>{html.escape(name)} Resume</title><style>{CSS}{COMPACT_CSS if force_compact or info.get("compact", "").lower() == "yes" else ""}</style></head>
 <body>
 <header>
   <div><h1>{html.escape(name)}</h1><div class="title">{html.escape(info.get("title", ""))}</div></div>
-  <div class="contact">{" | ".join(contact)}</div>
+  <div class="contact">{contact_lines}</div>
 </header>
 {chr(10).join(body)}
 </body></html>
