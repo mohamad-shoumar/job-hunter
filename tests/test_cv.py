@@ -360,14 +360,38 @@ def test_a_title_that_is_not_one_role_keeps_the_target_role_headline(resume, fil
 def test_a_cv_that_spills_loses_optional_bullets_never_core_ones(resume, filters):
     store = JobStore(":memory:")
     job_id = store_job(store, filters, title="Engineering Manager")  # a lead job: two optional bullets print
-    build = FakeBuild(2, 2, 1)  # two pages, still two in compact, then one
+    # two pages, still two in compact, still two without the extra skill, then one
+    build = FakeBuild(2, 2, 2, 1)
     meta = tailor_for_job(store, job_id, writer(GOOD), PROFILE_FILE, config_for(resume), NOW, builder=build)
     assert meta["tags"] == {"lead": 'the title says "manager"'} and meta["titles"] == {"R1": "Team Lead"}
-    assert meta["pages"] == 1 and len(build.sources) == 3
+    assert meta["pages"] == 1 and len(build.sources) == 4
     final = build.sources[-1]
     assert f"- {R1[6]}\n// - {R1[7]}" in final  # the last optional bullet went, the other stayed
     assert all(f"- {R1[n]}" in final for n in (3, 5)) and "Present\nTeam Lead\n" in final
-    assert any(n.startswith("Cut to fit one page") for n in meta["notes"])
+    assert any(n.startswith("Cut to fit one page (an optional bullet") for n in meta["notes"])
+
+
+def test_a_cv_that_spills_loses_its_last_skills_first(resume, filters):
+    # The model picked no Frameworks, so the whole profile row (6) prints; resume.md's own row has 5.
+    store = JobStore(":memory:")
+    job_id = store_job(store, filters, title="Engineering Manager")
+    build = FakeBuild(2, 2, 1)
+    meta = tailor_for_job(store, job_id, writer(GOOD), PROFILE_FILE, config_for(resume), NOW, builder=build)
+    assert meta["pages"] == 1 and len(build.sources) == 3
+    assert "Frameworks: Django, FastAPI, Node.js, React, Next.js, React Native\n" in build.sources[1]
+    assert "Frameworks: Django, FastAPI, Node.js, React, Next.js\n" in build.sources[2]
+    assert f"- {R1[7]}" in build.sources[2]  # both optional bullets still print
+    assert "Cut to fit one page: React Native from Frameworks (the last skills in the row)" in meta["notes"]
+
+
+def test_skills_never_shrink_below_three_a_row(resume, filters):
+    store = JobStore(":memory:")
+    job_id = store_job(store, filters, title="Engineering Manager")
+    build = FakeBuild(*[2] * 30)  # never fits
+    meta = tailor_for_job(store, job_id, writer(GOOD), PROFILE_FILE, config_for(resume), NOW, builder=build)
+    final = build.sources[-1]
+    assert "Frameworks: Django, FastAPI, Node.js\n" in final and f"// - {R1[6]}" in final
+    assert meta["pages"] == 2 and meta["notes"][-1].startswith("It is 2 pages even in compact mode")
 
 
 def test_a_cv_made_by_hand_is_never_overwritten(resume, filters):

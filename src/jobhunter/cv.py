@@ -20,8 +20,9 @@ you (see .claude/CLAUDE.md):
     config/outreach.json; each match quotes what it matched). The model orders
     and rewords them; one it leaves out is printed anyway in the profile's words.
     A role's "Printed title:" line picks its title the same way. A CV still two
-    pages long in the compact layout loses optional bullets, oldest role first,
-    until it fits;
+    pages long in the compact layout loses the last skills of its longest rows
+    (until each is no longer than resume.md's own row), then optional bullets, oldest role
+    first, then more skills (down to MIN_SKILLS a row) until it fits;
   - a skills row only holds skills from the profile row with the same label;
   - the headline is the posting's own title, cleaned by code (cv_headline:
     "Senior Software Engineer, Payments Platform" -> "Senior Software
@@ -511,6 +512,22 @@ def cut_optional(plan: Plan) -> str | None:
     return None
 
 
+MIN_SKILLS = 3  # a skills row never shrinks below this to fit one page
+
+
+def cut_skill(plan: Plan, limits: dict[str, int]) -> tuple[str, str] | None:
+    """Drop the last skill (the model lists the job's best first) of the longest row still longer than its
+    limit (in characters, as printed) and holding more than MIN_SKILLS. None: no row left to cut."""
+    def text(label):
+        return ", ".join(plan.skills[label])
+    rows = [label for label, items in plan.skills.items()
+            if len(items) > MIN_SKILLS and len(text(label)) > limits.get(label, 0)]
+    if not rows:
+        return None
+    label = max(rows, key=lambda r: len(text(r)))
+    return label, plan.skills[label].pop()
+
+
 # --- the model -----------------------------------------------------------------------------
 
 SYSTEM = f"""\
@@ -794,11 +811,22 @@ def tailor_for_job(store: JobStore, job_id: int, writer: CvWriter, profile_path:
         pdf, pages = builder(folder, source)
         if pages <= 1:
             break
-    # Still too long: optional bullets go (never core ones) until it fits.
-    while pages > 1 and (cut := cut_optional(plan)):
-        plan.notes.append(f'Cut to fit one page (an optional bullet, kept as a comment): "{cut[:60]}…"')
-        source.write_text(render(lines, matched, rows, plan, note, True))
-        pdf, pages = builder(folder, source)
+    # Still too long (one page is a hard rule): first the skills the model put last, until each
+    # row is no longer than resume.md's own; then optional bullets (never core ones); then skills again,
+    # down to MIN_SKILLS a row. The skills rows grew past resume.md's, and that alone made
+    # every tailored CV spill onto a second page (2026-11-17).
+    master = {label: len(lines[i].split(":", 1)[1].strip()) for i, label in rows.items()}
+    dropped: dict[str, list[str]] = {}
+    for step in (lambda: cut_skill(plan, master), lambda: cut_optional(plan), lambda: cut_skill(plan, {})):
+        while pages > 1 and (cut := step()):
+            if isinstance(cut, tuple):
+                dropped.setdefault(cut[0], []).insert(0, cut[1])
+            else:
+                plan.notes.append(f'Cut to fit one page (an optional bullet, kept as a comment): "{cut[:60]}…"')
+            source.write_text(render(lines, matched, rows, plan, note, True))
+            pdf, pages = builder(folder, source)
+    for label, items in dropped.items():
+        plan.notes.append(f"Cut to fit one page: {', '.join(items)} from {label} (the last skills in the row)")
     if pages > 1:
         plan.notes.append(f"It is {pages} pages even in compact mode: cut a bullet in {source}")
     file = cv_rel(config, pdf)  # Backend_Acme_Sep2026/<First>_<Last>.pdf: what cv_file and the app name it by
