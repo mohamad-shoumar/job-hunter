@@ -74,7 +74,7 @@ li { margin-bottom: 3pt; padding-left: 2pt; }
 # Add "compact: yes" to a file's header lines to squeeze it onto one page.
 COMPACT_CSS = """
 @page { margin: 0.4in 0.55in; }
-body { font-size: 9.5pt; line-height: 1.2; }
+body { font-size: 10.5pt; line-height: 1.15; }
 header { margin-bottom: 6pt; }
 h2 { font-size: 14pt; margin: 2pt 0 3pt; }
 h1 { font-size: 22pt; }
