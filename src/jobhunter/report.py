@@ -15,6 +15,7 @@ from pathlib import Path
 
 from .discovery import site_line
 from .fitgrade import grade_of, sort_grade
+from .rubric import CULTURE_LABELS
 from .models import (
     DUPLICATE_ROLE, ELIGIBLE, LIKELY, REJECTED, REVIEW_CLEARED, SHORTLISTED, VISA_LIST,
 )
@@ -117,8 +118,10 @@ def _job_block(n: int, row: sqlite3.Row, sightings: list[sqlite3.Row], prepared:
     lines += [f"  - {r}" for r in reasons[1:]]
     grade = grade_of(row)
     if grade:
-        star = {"good": " ★ no live coding", "bad": " ★ live coding"}.get(grade.get("star") or "", "")
-        lines.append(f"- **Fit score:** {grade['score']}/100{star} — {grade['reason']}")
+        lines.append(f"- **Fit score:** {grade['score']}/100 — {grade['reason']}")
+        if grade.get("culture"):
+            culture = grade["culture"]
+            lines.append(f"- **AI culture:** {CULTURE_LABELS.get(culture['tag'], culture['tag'])} — {culture['why']}")
         lines.append("  - " + " · ".join(f"{name} {points}" for name, (points, _) in grade["parts"].items()))
     lines.append(f"- **Role:** {'; '.join(relevance)}" + (f" · skills named: {', '.join(skills[:10])}" if skills else ""))
     lines.append(f"- **Details:** {' · '.join(details)}")

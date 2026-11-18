@@ -1,5 +1,5 @@
 {
-  "_about": "Fit score (src/jobhunter/fitgrade.py, rubric.py): each shown job gets 0-100 points by your rubric (skills match 40, visa and location 30, salary and company 30, with the interview style 20 of those). Sorting only: it never changes a job's status, never hides or rejects one. The model reads the posting for seniority, required skills, domain, benefits, equity and interviews, each quoted; code checks the quotes and adds up every part. The salary floors are FIT_SALARY_FLOORS in .env, never here. `enabled` controls the daily run; `jobhunter grade` works either way.",
+  "_about": "Fit score (src/jobhunter/fitgrade.py, rubric.py): each shown job gets 0-100 points by your rubric (skills match 40, visa and location 30, salary and company 30, with the AI engineering culture 20 of those: AI-Native 20, Traditional 0, Unknown 10). Sorting only: it never changes a job's status, never hides or rejects one. The model reads the posting for seniority, required skills, domain, benefits, equity and AI culture, each quoted; code checks the quotes and adds up every part. The salary floors are FIT_SALARY_FLOORS in .env, never here. `enabled` controls the daily run; `jobhunter grade` works either way.",
 
   "enabled": true,
   "_model": "claude-code:opus uses the Claude Code CLI on your Claude login (no API bill, about 20-40 s a job, counts against your plan). deepseek-v4-flash also works (DEEPSEEK_API_KEY, about $0.002 a job).",
@@ -10,7 +10,7 @@
   "lookback_days": 7,
   "description_chars": 6000,
   "workers": 4,
-  "_interview": "When a posting does not say how they interview, the company is looked up once: the public hiring-without-whiteboards list, then the web (Claude Code with web search), its quote checked on the page code fetches, and kept for interview_recheck_days. At most max_interview_lookups_per_run companies a run, best score first (about 20-30 s each; on 2026-11-15, 2 of 6 companies tried had an answer code could check). 0 turns it off.",
+  "_interview": "When a posting does not show the company's AI engineering culture (AI-assisted coding, product ownership, rapid shipping vs deep language expertise, unassisted coding, algorithm-heavy interviews), the company is looked up once on the web (Claude Code with web search: its engineering blog, careers and how-we-hire pages), its quote checked on the page code fetches, and kept for interview_recheck_days. At most max_interview_lookups_per_run companies a run, best score first.",
   "interview_model": "claude-code:sonnet",
   "max_interview_lookups_per_run": 10,
   "interview_recheck_days": 90

@@ -577,7 +577,7 @@ def _contact_json(contact: sqlite3.Row | None, targets: list[str] | None = None)
 
 
 def _grade(row: sqlite3.Row) -> dict | None:
-    """The fit score for the page: its total, parts, star and reason (not the model's raw answer)."""
+    """The fit score for the page: its total, parts, AI culture tag and reason (not the model's raw answer)."""
     grade = grade_of(row)
     return {k: v for k, v in grade.items() if k != "answer"} if grade else None
 

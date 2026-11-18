@@ -5,14 +5,14 @@ rejects a job. Code adds the points up; the model never does.
 
   Skills match            40  seniority 15, technical skills 12, years 8, domain 5
   Visa and location       30  the best row that has evidence (see visa_points)
-  Salary and company      30  base salary 7, benefits 1, equity 2, interview style 20
+  Salary and company      30  base salary 7, benefits 1, equity 2, AI engineering culture 20
 
 Code scores what the database already knows: years (`required_yoe`), the visa and
 location row (the posting's own visa sentences, the sponsor registers in the
 eligibility reasons, the AI check), the salary against the country's floor (in .env,
 never a tracked file), and which required skills the profile names. The model
 (fitgrade.py) only reads the posting for the seniority level, the required skills,
-the domain, benefits, equity and the interview process, each with a quote code finds
+the domain, benefits, equity and the AI engineering culture, each with a quote code finds
 in the posting; a quote it cannot find scores nothing.
 """
 
@@ -229,46 +229,53 @@ def salary_points(row: sqlite3.Row, visa: VisaRules | None, relocation: Relocati
     return (SALARY_MAX if ok else 0), f"{row['salary_raw']}: {'meets' if ok else 'below'} your floor for {where}"
 
 
-# --- interview style: 20 ------------------------------------------------------
+# --- AI engineering culture: 20 ----------------------------------------------
+# The user's call, 2026-11-18, replacing the live-coding interview star: AI-native 20, traditional 0,
+# unknown 10. AI-native = AI-assisted coding, product ownership, rapid shipping; traditional = deep
+# language expertise, unassisted coding, algorithm-heavy interviews (live coding, LeetCode, HackerRank).
 
-INTERVIEW_MAX = 20
-INTERVIEW_UNKNOWN = 10
-GOOD, BAD = "good", "bad"  # the star next to the score: green, red
+CULTURE_MAX = 20
+CULTURE_UNKNOWN_POINTS = 10
+AI_NATIVE, TRADITIONAL, UNKNOWN = "ai_native", "traditional", "unknown"
+CULTURE_TAGS = (AI_NATIVE, TRADITIONAL, UNKNOWN)
+CULTURE_LABELS = {AI_NATIVE: "AI-Native", TRADITIONAL: "Traditional", UNKNOWN: "Unknown"}
 
 
 @dataclass
-class Interview:
-    live_coding: str = "unknown"  # yes | no | unknown
-    rounds: int | None = None
+class Culture:
+    tag: str = UNKNOWN
+    why: str = ""  # one sentence
     quote: str = ""
     source: str = ""  # "posting", or the page the company lookup quoted
 
     @classmethod
-    def from_dict(cls, data: dict | None) -> Interview:
+    def from_dict(cls, data: dict | None) -> Culture:
+        """A stored answer. One from before 2026-11-18 ({"live_coding": ...}) reads live coding as
+        traditional (an algorithm-heavy, unassisted interview) and anything else as unknown."""
         data = data or {}
-        rounds = data.get("rounds")
-        return cls(str(data.get("live_coding") or "unknown"), rounds if isinstance(rounds, int) and rounds > 0 else None,
-                   str(data.get("quote") or ""), str(data.get("source") or ""))
+        if "tag" not in data and "live_coding" in data:
+            if data.get("live_coding") == "yes":
+                return cls(TRADITIONAL, "Live coding or a coding test in the interviews.", str(data.get("quote") or ""),
+                           str(data.get("source") or ""))
+            return cls()
+        tag = data.get("tag") if data.get("tag") in CULTURE_TAGS else UNKNOWN
+        return cls(tag, " ".join(str(data.get("why") or "").split())[:300], str(data.get("quote") or ""),
+                   str(data.get("source") or ""))
 
 
-def interview_points(found: Interview) -> tuple[int, str | None, str]:
-    """(points, star, why). Live coding or a coding test named: 0 and a red star. None: 20 and a green
-    star, less for many rounds (4: 18, 5 or more: 15). Not known: 10, no star."""
-    where = f' ({found.source}): "{_short(found.quote, 120)}"' if found.quote else ""
-    if found.live_coding == "yes":
-        return 0, BAD, f"live coding or a coding test{where}"
-    if found.live_coding == "no":
-        rounds = found.rounds
-        points = INTERVIEW_MAX if rounds is None or rounds <= 3 else 18 if rounds == 4 else 15
-        said = f", {rounds} rounds" if rounds else ""
-        return points, GOOD, f"no live coding{said}{where}"
-    return INTERVIEW_UNKNOWN, None, "interview process not known yet"
+def culture_points(found: Culture) -> tuple[int, str, str]:
+    """(points, tag, why). AI-native 20, traditional 0; no quoted evidence is unknown, 10."""
+    if found.tag == UNKNOWN or not found.quote:
+        return CULTURE_UNKNOWN_POINTS, UNKNOWN, "not enough evidence either way"
+    where = f' ({found.source}): "{_short(found.quote, 120)}"'
+    points = CULTURE_MAX if found.tag == AI_NATIVE else 0
+    return points, found.tag, f"{CULTURE_LABELS[found.tag]}: {found.why or 'see the quote'}{where}"
 
 
 # --- the total ----------------------------------------------------------------
 
 BENEFITS_MAX, EQUITY_MAX = 1, 2
-RUBRIC_VERSION = 1
+RUBRIC_VERSION = 2
 
 
 def total(parts: dict[str, list]) -> int:

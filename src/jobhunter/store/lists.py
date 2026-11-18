@@ -116,7 +116,8 @@ def new_jobs(store: JobStore, status: str, since: datetime) -> list[sqlite3.Row]
         """
         SELECT j.id, j.title, j.company, j.status, j.fit_score, j.report_date,
                json_extract(j.fit_grade_json, '$.score') AS fit_grade,
-               json_extract(j.fit_grade_json, '$.star') AS fit_star FROM jobs j
+               json_extract(j.fit_grade_json, '$.culture.tag') AS fit_culture,
+               json_extract(j.fit_grade_json, '$.culture.why') AS fit_culture_why FROM jobs j
         LEFT JOIN applications a ON a.job_id = j.id
         WHERE (a.job_id IS NULL OR a.stage = ?) AND j.status = ? AND j.first_seen >= ?
         ORDER BY COALESCE(json_extract(j.fit_grade_json, '$.score'), 50) DESC, j.fit_score DESC, j.id DESC

@@ -63,22 +63,23 @@ function stageChip(stage, reason, skipReason) {
   const why = reason === "skipped" && skipReason ? `: ${(state.status?.skip_reasons || {})[skipReason] || skipReason}` : "";
   return `<span class="chip ${STAGE_CHIP[stage] || ""}">${esc(stageLabel(stage, reason))}${esc(why)}</span>`;
 }
-// The fit score (sorting only): 0-100 by your rubric, each part's points on hover, and a star for the
-// interviews: green when there is no live coding, red when the posting or the company names it.
-const STAR = { good: ["star-good", "No live coding or coding test"], bad: ["star-bad", "Live coding or a coding test"] };
-function starMark(star) {
-  const [cls, title] = STAR[star] || [];
-  return cls ? `<span class="${cls}" title="${title}">★</span>` : "";
+// The fit score (sorting only): 0-100 by your rubric, each part's points on hover, and the AI
+// engineering culture tag next to it (AI-native 20 points, traditional 0, unknown 10), its one-sentence
+// reason on hover.
+const CULTURE = { ai_native: ["good", "AI-Native"], traditional: ["bad", "Traditional"], unknown: ["", "Unknown"] };
+function cultureTag(tag, why) {
+  const [tone, label] = CULTURE[tag] || [];
+  return label ? ` <span class="chip ${tone}" title="${esc(why || "")}">${label}</span>` : "";
 }
 function gradeChip(g) {
   if (!g) return "";
   const tone = g.score >= 70 ? "good" : g.score < 45 ? "warn" : "";
   const parts = Object.entries(g.parts || {}).map(([k, [p]]) => `${k} ${p}`).join(" · ");
   return `<span class="chip ${tone}" title="${esc(g.reason)}
-${esc(parts)}">${g.score}</span>${starMark(g.star)}`;
+${esc(parts)}">${g.score}</span>${cultureTag(g.culture?.tag, g.culture?.why)}`;
 }
-// Today's lists get only the number and the star from the server.
-const scoreChip = (score, star) => score == null ? "" : `<span class="chip">${score}</span>${starMark(star)}`;
+// Today's lists get only the number and the tag from the server.
+const scoreChip = (score, tag, why) => score == null ? "" : `<span class="chip">${score}</span>${cultureTag(tag, why)}`;
 const companyKey = (r) => (r.company || "").trim().toLowerCase() || `#${r.id}`;
 // The two Jobs tab views that show one box per company: the jobs still waiting for a decision.
 const GROUPED_VIEWS = new Set(["shortlisted", "visa_list"]);
@@ -395,7 +396,7 @@ function whySection(d) {
       <ul class="small">${j.eligibility_reasons.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>
       ${ai ? `<div class="small"><b>AI check:</b> ${esc(ai.verdict)}${ai.verified ? "" : " (quote not verified)"} · ${esc(ai.reason)}
         ${ai.quote ? `<div class="quote">“${esc(ai.quote)}” ${ai.source_url ? `<a href="${esc(ai.source_url)}" target="_blank" rel="noopener">source</a>` : ""}</div>` : ""}</div>` : ""}
-      ${j.fit_grade ? `<div style="margin-top:6px"><b>Fit score ${j.fit_grade.score}/100</b> ${starMark(j.fit_grade.star)} <span class="small muted">${esc(j.fit_grade.reason)} (${esc(j.fit_grade.model)})</span></div>
+      ${j.fit_grade ? `<div style="margin-top:6px"><b>Fit score ${j.fit_grade.score}/100</b> ${cultureTag(j.fit_grade.culture?.tag, j.fit_grade.culture?.why)} <span class="small muted">${esc(j.fit_grade.reason)} (${esc(j.fit_grade.model)})</span></div>
         <div class="kv small">${Object.entries(j.fit_grade.parts || {}).map(([k, [p, why]]) => `<div>${esc(k)} ${p}</div><div>${esc(why)}</div>`).join("")}</div>` : ""}
       <div style="margin-top:6px"><b>Role</b> <span class="small muted">${esc(j.relevance_reasons.join("; "))}</span></div>
       <div class="small muted">Skills named: ${esc(j.skills.join(", ") || "none")}</div>
@@ -594,7 +595,7 @@ function digestCard(d) {
     const i = p.idea || {};
     const stack = (i.stack || []).map((s) => esc(s.name) + (s.yours ? "" : ' <span class="muted">(new to you)</span>')).join(", ");
     return `<li><a data-open="${p.job_id}"><b>${esc(p.title)}</b></a> <span class="muted">· ${esc(p.company)}</span>
-      ${scoreChip(p.fit_grade, p.fit_star)}${p.stage !== "new" ? ` <span class="chip">${esc(state.status?.stage_labels?.[p.stage] || p.stage)}</span>` : ""}
+      ${scoreChip(p.fit_grade, p.fit_culture, p.fit_culture_why)}${p.stage !== "new" ? ` <span class="chip">${esc(state.status?.stage_labels?.[p.stage] || p.stage)}</span>` : ""}
       <div style="margin-top:4px"><b>${esc(p.project_title)}</b> <span class="muted small">· ${esc(String(i.hours ?? "?"))} h</span></div>
       <div class="small">${esc(i.problem || "")}</div>
       ${i.quote ? `<div class="quote">“${esc(i.quote)}”</div>` : ""}
@@ -615,9 +616,9 @@ async function renderToday() {
       ${digestCard(d)}
       ${card("Replies to answer", t.replies.map((r) => item(r, `<div class="quote">${esc(r.reply_from || "")}: ${esc(r.reply_snippet || "")}</div>`)), "No new replies. Click Check inbox to look.")}
       ${card("Follow-ups due", t.follow_ups_due.map((r) => item(r, `<div class="small muted">to ${esc(r.email || "?")} · follow-up ${r.follow_ups + 1} · due ${esc(day(r.next_follow_up_at))}</div>`)), "Nothing due.")}
-      ${card("New shortlisted to triage", onePerCompany(t.new_jobs, (r) => r.fit_grade).map((r) => item(r, ` ${scoreChip(r.fit_grade, r.fit_star)}
+      ${card("New shortlisted to triage", onePerCompany(t.new_jobs, (r) => r.fit_grade).map((r) => item(r, ` ${scoreChip(r.fit_grade, r.fit_culture, r.fit_culture_why)}
         <span class="row" style="margin-top:4px"><button class="btn small" data-quick="saved" data-id="${r.id}">Save</button><button class="btn small danger" data-quick="skipped" data-id="${r.id}">Skip</button>${moreButton(r)}</span>`)), "All caught up.")}
-      ${card("New on the visa list (EU/UK)", onePerCompany(t.new_visa_jobs || [], (r) => r.fit_grade).map((r) => item(r, ` ${scoreChip(r.fit_grade, r.fit_star)}
+      ${card("New on the visa list (EU/UK)", onePerCompany(t.new_visa_jobs || [], (r) => r.fit_grade).map((r) => item(r, ` ${scoreChip(r.fit_grade, r.fit_culture, r.fit_culture_why)}
         <span class="row" style="margin-top:4px"><button class="btn small" data-quick="saved" data-id="${r.id}">Save</button><button class="btn small danger" data-quick="skipped" data-id="${r.id}">Skip</button>${moreButton(r)}</span>`)), "None this week.")}
       ${t.unsure_sends.length ? card("Sends to double-check", t.unsure_sends.map((r) => item(r, `<div class="small muted">Gmail didn't confirm ${esc(r.subject)}: Check inbox resolves it.</div>`)), "") : ""}
       ${card("Ghosted this week", t.ghosted.map((r) => item(r, `<div class="small muted">closed ${esc(day(r.at))}</div>`)), "None.")}

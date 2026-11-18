@@ -8,10 +8,10 @@ How a job is scored (the user's call 2026-11-15, decision 26, replacing the 1-5 
 learned from Applied and skipped jobs):
   - the model (Claude Code by default) reads the posting and the profile's facts and answers
     only what needs reading: the seniority level, the required skills, the domain, benefits,
-    equity and what the posting says about its interviews, each with a quote;
+    equity and the AI engineering culture (AI-native, traditional, unknown), each with a quote;
   - code checks each quote against the posting (find_quote), scores every part from
     rubric.py and adds them up. Years, visa and location, and salary are code alone.
-  - when the posting says nothing about its interviews, interviews.py looks the company up
+  - when the posting does not show its engineering culture, interviews.py looks the company up
     once (cached per company) and `rescore` updates its jobs.
 A job keeps its score; `jobhunter grade --regrade` scores the open ones again.
 """
@@ -34,7 +34,7 @@ from .identity import company_key
 from .llm import JsonModel, Usage, error_line, find_quote, json_model
 from .models import SHORTLISTED, VISA_LIST
 from .profile import load_profile, sections
-from .rubric import Interview
+from .rubric import Culture
 from .store import JobStore
 from .store.companies import interview_styles
 from .store.lists import company_postings, jobs_to_grade
@@ -61,10 +61,12 @@ Do not stretch: a different language or tool is not the same skill.
 - benefits_quote: words from the posting naming meaningful benefits (health insurance, pension, \
 learning budget, paid leave beyond the legal minimum), copied exactly; "" when there are none.
 - equity_quote: words from the posting offering equity, stock options or RSUs, copied exactly; "" when none.
-- interview: what the posting says about its hiring process. live_coding "yes" when it names live \
-coding, pair programming, a whiteboard, or a coding test such as HackerRank, Codility or LeetCode as an \
-interview step (pair programming as part of the daily work is not an interview); "no" when it describes the process and none of those are in it, or says there is none; "unknown" when it does not \
-say. rounds: the number of interview stages it describes, or null. quote: the words it rests on, copied exactly.
+- ai_culture: the company's AI engineering culture as the posting shows it (its engineering \
+culture, AI tooling, interview process). tag "ai_native" when it shows AI-assisted coding (engineers \
+using AI coding tools such as Cursor, Copilot or Claude Code), product ownership and rapid shipping; \
+"traditional" when it stresses deep language expertise, coding without AI help, or algorithm-heavy \
+interviews (live coding, LeetCode, HackerRank, a whiteboard); "unknown" when the posting does not show \
+enough either way. why: one sentence saying why. quote: the words it rests on, copied exactly ("" for unknown).
 - reason: one short sentence in plain words naming what matters most about this job for this person.
 
 Copy every quote word for word from the posting: a quote code cannot find there scores nothing."""
@@ -83,17 +85,17 @@ SCHEMA = {
         "domain_why": {"type": "string"},
         "benefits_quote": {"type": "string"},
         "equity_quote": {"type": "string"},
-        "interview": {
+        "ai_culture": {
             "type": "object",
-            "properties": {"live_coding": {"type": "string", "enum": ["yes", "no", "unknown"]},
-                           "rounds": {"type": ["integer", "null"]}, "quote": {"type": "string"}},
-            "required": ["live_coding", "rounds", "quote"],
+            "properties": {"tag": {"type": "string", "enum": list(rubric.CULTURE_TAGS)},
+                           "why": {"type": "string"}, "quote": {"type": "string"}},
+            "required": ["tag", "why", "quote"],
             "additionalProperties": False,
         },
         "reason": {"type": "string"},
     },
     "required": ["seniority", "required_skills", "domain", "domain_why", "benefits_quote", "equity_quote",
-                 "interview", "reason"],
+                 "ai_culture", "reason"],
     "additionalProperties": False,
 }
 EXAMPLE = json.dumps({
@@ -103,7 +105,7 @@ EXAMPLE = json.dumps({
     "domain": "transferable",
     "domain_why": "Payments, close to the logistics billing work in the profile.",
     "benefits_quote": "private health insurance and a learning budget", "equity_quote": "",
-    "interview": {"live_coding": "unknown", "rounds": None, "quote": ""},
+    "ai_culture": {"tag": "unknown", "why": "The posting says nothing about tools or how the team works.", "quote": ""},
     "reason": "A mid-level Python backend role asking 3+ years.",
 })
 
@@ -119,7 +121,7 @@ class FitGradeConfig:
     lookback_days: int = 7
     description_chars: int = 6000
     workers: int = 4
-    # The company interview lookup (interviews.py): its model, and how many companies a run.
+    # The company AI-culture lookup (interviews.py): its model, and how many companies a run.
     interview_model: str = "claude-code:sonnet"
     max_interview_lookups_per_run: int = 10
     interview_recheck_days: int = 90
@@ -185,9 +187,9 @@ def other_offer(store: JobStore, row: sqlite3.Row) -> str | None:
     return f"{months[newest]} ({len(months)} months: {', '.join(sorted(months))})"
 
 
-def score(row: sqlite3.Row, answer: dict, context: Context, company_interview: Interview | None = None,
+def score(row: sqlite3.Row, answer: dict, context: Context, company_culture: Culture | None = None,
           offer_elsewhere: str | None = None) -> dict:
-    """The rubric's parts for one job: {name: [points, why]}, the total, and the interview star.
+    """The rubric's parts for one job: {name: [points, why]}, the total, and the AI culture tag.
 
     Pure: the model's `answer` was given already, so `rescore` can run it again with no model."""
     text = f"{row['title']}\n{row['description'] or ''}"
@@ -204,14 +206,15 @@ def score(row: sqlite3.Row, answer: dict, context: Context, company_interview: I
     benefits = _quoted(answer.get("benefits_quote"), text)
     equity = _quoted(answer.get("equity_quote"), text)
 
-    said = Interview.from_dict(answer.get("interview"))
+    # The posting's own words first (an answer from before 2026-11-18 has "interview" instead).
+    said = Culture.from_dict(answer.get("ai_culture") or answer.get("interview"))
     said.quote = _quoted(said.quote, text)
-    if said.live_coding != "unknown" and said.quote:
+    if said.tag != rubric.UNKNOWN and said.quote:
         said.source = POSTING
-        interview = said
+        culture = said
     else:
-        interview = company_interview or Interview()
-    interview_pts, star, interview_why = rubric.interview_points(interview)
+        culture = company_culture or Culture()
+    culture_pts, tag, culture_why = rubric.culture_points(culture)
 
     parts = {
         "seniority": [rubric.SENIORITY[level], level.replace("_", " ")],
@@ -222,9 +225,14 @@ def score(row: sqlite3.Row, answer: dict, context: Context, company_interview: I
         "salary": list(rubric.salary_points(row, visa_rules, relocation, context.floors)),
         "benefits": [rubric.BENEFITS_MAX if benefits else 0, f'"{rubric._short(benefits, 120)}"' if benefits else "none named"],
         "equity": [rubric.EQUITY_MAX if equity else 0, f'"{rubric._short(equity, 120)}"' if equity else "none named"],
-        "interview": [interview_pts, interview_why],
+        "culture": [culture_pts, culture_why],
     }
-    return {"score": rubric.total(parts), "parts": parts, "star": star, "rubric": rubric.RUBRIC_VERSION}
+    if tag != rubric.UNKNOWN:
+        sentence = culture.why or "See the quote."
+    else:
+        sentence = said.why if said.tag == rubric.UNKNOWN and said.why else "Not enough evidence either way."
+    return {"score": rubric.total(parts), "parts": parts, "culture": {"tag": tag, "why": sentence[:300]},
+            "rubric": rubric.RUBRIC_VERSION}
 
 
 class FitGrader:
@@ -246,11 +254,11 @@ class FitGrader:
             raise ValueError(f"the model gave no usable answer: {json.dumps(answer)[:200]}")
         return answer, usage
 
-    def grade(self, store_reads: tuple[Interview | None, str | None], row: sqlite3.Row, context: Context,
+    def grade(self, store_reads: tuple[Culture | None, str | None], row: sqlite3.Row, context: Context,
               now: datetime) -> dict:
         answer, usage = self.ask(row, context)
-        company_interview, offer_elsewhere = store_reads
-        result = score(row, answer, context, company_interview, offer_elsewhere)
+        company_culture, offer_elsewhere = store_reads
+        result = score(row, answer, context, company_culture, offer_elsewhere)
         return {**result, "reason": " ".join(str(answer["reason"]).split())[:300], "answer": answer,
                 "model": self.config.model, "at": iso(now), "cost_usd": usage.cost(self.config.model)}
 
@@ -287,10 +295,10 @@ def to_grade(store: JobStore, now: datetime, days: int, regrade: bool = False) -
     return jobs_to_grade(store, SHOWN, since, regrade)
 
 
-def store_reads(store: JobStore, row: sqlite3.Row) -> tuple[Interview | None, str | None]:
-    """What a score reads from the store besides the job: the company's interview lookup, another posting's offer."""
+def store_reads(store: JobStore, row: sqlite3.Row) -> tuple[Culture | None, str | None]:
+    """What a score reads from the store besides the job: the company's culture lookup, another posting's offer."""
     found = interview_styles(store, [company_key(row["company"])]).get(company_key(row["company"]))
-    return (Interview.from_dict(json.loads(found["answer_json"])) if found and found["answer_json"] else None,
+    return (Culture.from_dict(json.loads(found["answer_json"])) if found and found["answer_json"] else None,
             other_offer(store, row))
 
 
@@ -336,7 +344,8 @@ def rescore(store: JobStore, rows, profile_path: Path, filters: Filters | None =
         grade = grade_of(row)
         if not context or not grade or "answer" not in grade:
             continue
-        new = {**grade, **score(row, grade["answer"], context, *store_reads(store, row))}
+        new = {k: v for k, v in grade.items() if k != "star"}  # the live-coding star, before 2026-11-18
+        new.update(score(row, grade["answer"], context, *store_reads(store, row)))
         if new != grade:
             store.save_fit_grade(row["id"], new)
             if row["report_date"]:

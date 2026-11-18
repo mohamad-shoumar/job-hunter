@@ -12,6 +12,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 from . import interviews, pipeline
+from .rubric import CULTURE_LABELS
 from .ai_check import build_checker, check_jobs
 from .posted_date import build_finder, find_dates
 from .classify import classify, recheck_age
@@ -368,18 +369,20 @@ def cmd_grade(args) -> int:
         def show(row, grade):
             print(f"#{row['id']:<5} {grade['score']:>3}/100  {row['company']} — {row['title']}")
             print(f"       {grade['reason']}")
+            if grade.get("culture"):
+                print(f"       AI culture: {CULTURE_LABELS[grade['culture']['tag']]} — {grade['culture']['why']}")
 
         result = grade_jobs(store, grader, rows, paths.profile_file, now, filters, on_result=show)
         if not args.no_interviews:
             finder, note = interviews.build_finder(grader.config)
             if finder:
-                print(f"\nlooking up how companies interview with {finder.label}")
+                print(f"\nlooking up companies' AI culture with {finder.label}")
                 found = interviews.look_up_interviews(store, finder, grader.config, paths.profile_file, now, filters)
                 print(f"  {found.looked_up} companies looked up, {found.found} found")
                 result.errors += found.errors
                 result.changed_days |= found.changed_days
             elif note:
-                print(f"  interview lookup off: {note}")
+                print(f"  AI culture lookup off: {note}")
         rebuilt = [write_report(store, paths.reports_dir, day, store.last_run_stats(), now, filters.max_posting_age_days)
                    for day in sorted(result.changed_days)]
     finally:
@@ -980,14 +983,14 @@ def main(argv: list[str] | None = None) -> int:
         "grade",
         help="Fit score 0-100 for shown jobs, by your rubric (sorting only)",
         description="The model reads each posting for seniority, required skills, domain, benefits, equity and "
-        "interviews (each quoted); code scores those, years, visa and location, and salary, and adds them up "
-        "(rubric.py). Then companies whose postings do not say how they interview are looked up. It only "
+        "the AI engineering culture (each quoted); code scores those, years, visa and location, and salary, and "
+        "adds them up (rubric.py). Then companies whose postings do not show their AI culture are looked up. It only "
         "sorts: it never changes a job's status. Without ids: the open (New or Saved) shortlisted and "
         "visa-list jobs from the last lookback_days that have no score yet.",
     )
     p.add_argument("job_ids", type=int, nargs="*", help="grade these jobs (again, if already graded)")
     p.add_argument("--regrade", action="store_true", help="score open jobs again")
-    p.add_argument("--no-interviews", action="store_true", help="skip the company interview lookup")
+    p.add_argument("--no-interviews", action="store_true", help="skip the company AI culture lookup")
     p.add_argument("--rescore", action="store_true",
                    help="no model: score the open scored jobs again from their stored answers (after changing "
                    "FIT_SALARY_FLOORS or the rubric)")

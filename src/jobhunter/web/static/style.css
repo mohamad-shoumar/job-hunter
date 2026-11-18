@@ -103,8 +103,6 @@ input[type=text], input[type=email], input[type=search] { width: 100%; }
 .chip.good { background: var(--good-bg); color: var(--good); }
 .chip.warn { background: var(--warn-bg); color: var(--warn); }
 .chip.bad { background: var(--bad-bg); color: var(--bad); }
-.star-good { color: var(--good); margin-left: 2px; }
-.star-bad { color: var(--bad); margin-left: 2px; }
 .chip.info { background: var(--info-bg); color: var(--info); }
 
 /* jobs list */

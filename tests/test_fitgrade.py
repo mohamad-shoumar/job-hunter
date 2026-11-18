@@ -34,7 +34,7 @@ DESCRIPTION = ("We build APIs with Python, FastAPI and PostgreSQL on AWS. We off
 def answer(**changes) -> dict:
     base = {"seniority": "mid", "required_skills": ["Python", "PostgreSQL", "Rust", "AWS"], "domain": "transferable",
             "domain_why": "APIs, like their backend work.", "benefits_quote": "private health insurance and a learning budget",
-            "equity_quote": "", "interview": {"live_coding": "unknown", "rounds": None, "quote": ""},
+            "equity_quote": "", "ai_culture": {"tag": "unknown", "why": "Nothing on tools.", "quote": ""},
             "reason": "A mid-level Python backend role."}
     return {**base, **changes}
 
@@ -96,11 +96,16 @@ def test_skills_are_the_share_of_required_skills_the_profile_names():
     assert rubric.skills_points(covered, set(), "API design, system design")[1] == "1 of 2 required skills (missing: Go)"
 
 
-def test_interview_style_stars():
-    assert rubric.interview_points(rubric.Interview("yes", None, "HackerRank test", "posting"))[:2] == (0, rubric.BAD)
-    assert rubric.interview_points(rubric.Interview("no", 3))[:2] == (20, rubric.GOOD)
-    assert rubric.interview_points(rubric.Interview("no", 5))[:2] == (15, rubric.GOOD)
-    assert rubric.interview_points(rubric.Interview())[:2] == (10, None)
+def test_ai_culture_points():
+    native = rubric.Culture(rubric.AI_NATIVE, "They code with AI agents.", "we ship with Cursor", "posting")
+    assert rubric.culture_points(native)[:2] == (20, rubric.AI_NATIVE)
+    assert rubric.culture_points(rubric.Culture(rubric.TRADITIONAL, "LeetCode rounds.", "a LeetCode round"))[:2] == (
+        0, rubric.TRADITIONAL)
+    assert rubric.culture_points(rubric.Culture())[:2] == (10, rubric.UNKNOWN)
+    assert rubric.culture_points(rubric.Culture(rubric.AI_NATIVE, "No quote."))[:2] == (10, rubric.UNKNOWN)
+    # A stored answer from before 2026-11-18: live coding reads as traditional, the rest as unknown.
+    assert rubric.Culture.from_dict({"live_coding": "yes", "quote": "HackerRank test"}).tag == rubric.TRADITIONAL
+    assert rubric.Culture.from_dict({"live_coding": "no", "rounds": 3, "quote": "a take-home"}).tag == rubric.UNKNOWN
 
 
 def test_salary_floors_come_from_env_and_compare_by_country(store, filters):
@@ -161,10 +166,11 @@ def test_scores_are_saved_and_never_change_a_status(store, filters):
     grade = grade_of(store.get(ids[0]))
     parts = {k: v[0] for k, v in grade["parts"].items()}
     # mid 15, 3 of 4 skills 9, no years stated 8, transferable 3, worldwide 20, no pay 0, benefits 1,
-    # no equity 0, interviews not known 10.
+    # no equity 0, AI culture unknown 10.
     assert parts == {"seniority": 15, "skills": 9, "years": 8, "domain": 3, "visa": 20, "salary": 0, "benefits": 1,
-                     "equity": 0, "interview": 10}
-    assert grade["score"] == sum(parts.values()) == 66 and grade["star"] is None
+                     "equity": 0, "culture": 10}
+    assert grade["score"] == sum(parts.values()) == 66
+    assert grade["culture"] == {"tag": "unknown", "why": "Nothing on tools."}
     assert grade["reason"] == "A mid-level Python backend role." and grade["answer"]["seniority"] == "mid"
     message = model.messages[0]
     assert "## Their profile (facts)" in message and "## The posting\nTitle: Backend Engineer" in message
@@ -174,17 +180,24 @@ def test_a_quote_not_in_the_posting_scores_nothing(store, filters):
     (job_id,) = open_jobs(store, filters, 1)
     row = store.get(job_id)
     made_up = answer(benefits_quote="unlimited paid vacation for everyone", equity_quote="generous stock options package",
-                     interview={"live_coding": "no", "rounds": 2, "quote": "we never do live coding"})
-    parts = score(row, made_up, context(filters))["parts"]
-    assert parts["benefits"][0] == parts["equity"][0] == 0 and parts["interview"][0] == 10
+                     ai_culture={"tag": "ai_native", "why": "Made up.", "quote": "we all code with Claude Code"})
+    result = score(row, made_up, context(filters))
+    parts = result["parts"]
+    assert parts["benefits"][0] == parts["equity"][0] == 0 and parts["culture"][0] == 10
+    assert result["culture"] == {"tag": "unknown", "why": "Not enough evidence either way."}
 
 
-def test_the_posting_s_own_interview_words_set_the_star(store, filters):
+def test_the_posting_s_own_words_set_the_culture_tag(store, filters):
     (job_id,) = open_jobs(store, filters, 1)
-    said = answer(interview={"live_coding": "no", "rounds": 3, "quote": "a call, a take-home task and a system design chat"})
+    said = answer(ai_culture={"tag": "ai_native", "why": "They ship small and fast.",
+                              "quote": "a call, a take-home task and a system design chat"})
     result = score(store.get(job_id), said, context(filters))
-    assert result["star"] == "good" and result["parts"]["interview"][0] == 20
-    assert "(posting)" in result["parts"]["interview"][1]
+    assert result["culture"] == {"tag": "ai_native", "why": "They ship small and fast."}
+    assert result["parts"]["culture"][0] == 20 and "(posting)" in result["parts"]["culture"][1]
+    # A score saved before 2026-11-18 ("interview" in the answer, a "star") is read the new way.
+    old = answer(interview={"live_coding": "yes", "rounds": None, "quote": "a call, a take-home task"})
+    del old["ai_culture"]
+    assert score(store.get(job_id), old, context(filters))["parts"]["culture"][0] == 0
 
 
 def test_an_unusable_answer_is_an_error_and_saves_nothing(store, filters):
@@ -221,15 +234,18 @@ def test_the_model_sees_profile_facts_but_no_contact_details():
 
 def test_reports_list_the_best_score_first(store, filters, tmp_path):
     low, high, unscored = open_jobs(store, filters, 3)
-    store.save_fit_grade(low, {"score": 30, "parts": {"years": [0, "x"]}, "star": "bad", "reason": "Asks for 7+ years."})
-    store.save_fit_grade(high, {"score": 82, "parts": {"years": [8, "x"]}, "star": "good", "reason": "Python backend."})
+    store.save_fit_grade(low, {"score": 30, "parts": {"years": [0, "x"]}, "reason": "Asks for 7+ years.",
+                               "culture": {"tag": "traditional", "why": "LeetCode rounds."}})
+    store.save_fit_grade(high, {"score": 82, "parts": {"years": [8, "x"]}, "reason": "Python backend.",
+                                "culture": {"tag": "ai_native", "why": "They code with AI agents."}})
     store.commit()
     text = write_report(store, tmp_path, pipeline.local_day(NOW).isoformat(), None, NOW, 14).read_text()
     shortlisted = text.split("## Shortlisted")[1].split("## Needs review")[0]
     # A job with no score yet sits in the middle (50), not below the 30 one.
     order = [shortlisted.index(f"Backend Engineer {i}") for i in (1, 2, 0)]
     assert order == sorted(order)
-    assert "- **Fit score:** 82/100 ★ no live coding — Python backend." in shortlisted
+    assert "- **Fit score:** 82/100 — Python backend.\n" in shortlisted
+    assert "- **AI culture:** AI-Native — They code with AI agents." in shortlisted
     assert "- **Fit:**" not in shortlisted
 
 
@@ -269,46 +285,45 @@ HIRING_PAGE = "https://co0.example/how-we-hire"
 def test_a_company_lookup_counts_only_when_code_finds_its_quote(store, filters):
     ids = open_jobs(store, filters, 2)
     grade_jobs(store, grader(), [store.get(i) for i in ids], PROFILE, NOW, filters)
-    http = FakeHttp({HIRING_PAGE: "<p>Our process: an intro call and a take-home. We never do live coding.</p>"})
-    good = interviews.InterviewFinder(FakeLookup({"live_coding": "no", "rounds": 2, "quote": "We never do live coding.",
-                                                  "source_url": HIRING_PAGE, "reason": "Their page says so."}), http, "m")
+    http = FakeHttp({HIRING_PAGE: "<p>How we build: every engineer here ships with Claude Code and Cursor.</p>"})
+    good = interviews.InterviewFinder(FakeLookup({"tag": "ai_native", "why": "Their page says they code with AI.",
+                                                  "quote": "every engineer here ships with Claude Code and Cursor.",
+                                                  "source_url": HIRING_PAGE}), http, "m")
     config = FitGradeConfig(max_interview_lookups_per_run=1)
     run = interviews.look_up_interviews(store, good, config, PROFILE, NOW, filters)
     assert run.looked_up == 1 and run.found == 1
-    looked = [i for i in ids if grade_of(store.get(i))["star"] == "good"]
+    looked = [i for i in ids if grade_of(store.get(i))["culture"]["tag"] == "ai_native"]
     assert len(looked) == 1
     after = grade_of(store.get(looked[0]))
-    assert after["parts"]["interview"][0] == 20 and after["score"] == 76
+    assert after["parts"]["culture"][0] == 20 and after["score"] == 76
+    assert after["culture"]["why"] == "Their page says they code with AI."
     # Cached: the next run looks up the other company only.
-    other = interviews.InterviewFinder(FakeLookup({"live_coding": "yes", "rounds": None, "quote": "a live coding round on HackerRank",
-                                                   "source_url": HIRING_PAGE, "reason": "Made up."}), http, "m")
+    other = interviews.InterviewFinder(FakeLookup({"tag": "traditional", "why": "Made up.",
+                                                   "quote": "a live coding round on HackerRank",
+                                                   "source_url": HIRING_PAGE}), http, "m")
     run = interviews.look_up_interviews(store, other, config, PROFILE, NOW, filters)
     assert run.looked_up == 1 and run.found == 0  # its quote is not on the page
     assert len(interview_styles(store, ["co0", "co1"])) == 2
-    assert [grade_of(store.get(i))["star"] for i in ids].count(None) == 1
+    assert [grade_of(store.get(i))["culture"]["tag"] for i in ids].count("unknown") == 1
 
 
-def test_the_whiteboard_list_is_read_by_code_and_blocked_sites_are_never_fetched(store, filters):
-    readme = ("## A - C\n- [Acme](https://acme.example) | Berlin | Two-stage process: a call, then a take-home project.\n"
-              "- [Contentful](https://c.example) | Berlin | Multiple interviews & live coding challenge.\n"
-              "- [Calm](https://calm.example) | Remote | No whiteboard, no live coding; a paid project.\n")
-    assert interviews.read_note("Two-stage process: a call, then a take-home project.") == {
-        "live_coding": "no", "rounds": 2, "quote": "Two-stage process: a call, then a take-home project."}
-    finder = interviews.InterviewFinder(None, FakeHttp({interviews.HWW_URL: readme}), "m")
-    assert finder.find("Contentful").answer["live_coding"] == "yes"
-    assert finder.find("Calm GmbH").answer["live_coding"] == "no"
-    assert finder.find("Nobody").answer is None
-    web = interviews.InterviewFinder(FakeLookup({"live_coding": "no", "rounds": 3, "quote": "no live coding at all here",
-                                                 "source_url": "https://www.glassdoor.com/Interview/x", "reason": "r"}),
-                                     FakeHttp({interviews.HWW_URL: readme}), "m")
+def test_blocked_sites_are_never_fetched_and_old_lookups_are_done_again(store, filters):
+    web = interviews.InterviewFinder(FakeLookup({"tag": "ai_native", "why": "r", "quote": "we use Copilot",
+                                                 "source_url": "https://www.glassdoor.com/Interview/x"}), FakeHttp({}), "m")
     found = web.find("Nobody")
     assert found.answer is None and found.reason.startswith("Not used: that site blocks scripts")
-    # A quote that does not say it by itself (the page's title did) is not used.
-    page = "https://acme.example/pair-programming"
-    vague = interviews.InterviewFinder(FakeLookup({"live_coding": "yes", "rounds": None, "quote": "a 60-minute session with two engineers",
-                                                   "source_url": page, "reason": "r"}),
-                                       FakeHttp({interviews.HWW_URL: readme, page: "<p>We run a 60-minute session with two engineers.</p>"}), "m")
-    assert vague.find("Nobody").reason.startswith("Not used: its quote does not say so by itself")
+    assert interviews.InterviewFinder(None, FakeHttp({}), "m").find("Nobody").answer is None
+    # A row checked before 2026-11-18 asked about live coding only, so it is not fresh.
+    from jobhunter.store.companies import save_interview_style
+
+    later = interviews.CULTURE_FROM + pipeline.timedelta(days=1)
+    (job_id,) = open_jobs(store, filters, 1)
+    store.set_report_date([job_id], pipeline.local_day(later).isoformat())
+    grade_jobs(store, grader(), [store.get(job_id)], PROFILE, later, filters)
+    save_interview_style(store, "co0", "Co0", None, "m", "", "nothing", interviews.CULTURE_FROM - pipeline.timedelta(days=1))
+    assert "co0" in interviews.companies_to_look_up(store, FitGradeConfig(), later)
+    save_interview_style(store, "co0", "Co0", None, "m", "", "nothing", later)
+    assert "co0" not in interviews.companies_to_look_up(store, FitGradeConfig(), later)
 
 
 def test_a_track_record_needs_visa_offers_in_two_months(store, filters):

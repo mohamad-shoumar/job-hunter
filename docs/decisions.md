@@ -176,6 +176,8 @@ The model never writes a Summary: the Summary paragraph is mine and is copied wo
 
 **Date:** 2026-10-20
 
+**Replaced by [decision 28](#28-cover-letters-are-the-apply-job-skills-last-step) on 2026-11-18.**
+
 **Context:** Earlier versions wrote a full letter (header, opening, body, closing) for every new shortlisted job in the daily run.
 
 **Decision:** A letter is two paragraphs, with no header, date, greeting or sign-off, and is written only when I click Write cover letter (or run `jobhunter cover <id>`). Paragraph 1 is why this company: Claude Code writes it from the posting and up to 3 pages code fetches from the company's site. Code checks every name and number in it against those pages and my profile, and drops a sentence that pitches my own past work. Paragraph 2 is my own text, printed as is.
@@ -365,7 +367,7 @@ The model never writes a Summary: the Summary paragraph is mine and is copied wo
 | Visa and location: visa + relocation 30; visa or relocation help 27; a track record (on a sponsor register, or their other postings offered a visa in two or more different months) 23; remote and open to Lebanon 20; nothing confirmed 15 | 30 |
 | Base salary: the top of the range reaches my floor for that country 7, else 0 | 7 |
 | Benefits named 1, equity named 2 | 3 |
-| Interview style: no live coding 20 (4 rounds 18, 5+ 15) with a green star; live coding or a coding test (HackerRank, ...) 0 with a red star; not known 10 | 20 |
+| Interview style: no live coding 20 (4 rounds 18, 5+ 15) with a green star; live coding or a coding test (HackerRank, ...) 0 with a red star; not known 10 (replaced by the AI culture tag, [decision 29](#29-ai-engineering-culture-replaces-the-interview-star), 2026-11-18) | 20 |
 
 Code adds up every part. Claude Code (`claude-code:opus`, on my Claude login) reads the posting only for what needs reading: the level, the required skills, the domain, benefits, equity and what it says about interviews, each with a quote that code must find in the posting, or that part scores nothing. Years, visa and location, and salary are scored by code alone, from the data the rules already keep. The salary floors are `FIT_SALARY_FLOORS` in `.env`, never in a tracked file. When a posting does not say how they interview, the company is looked up once (`interviews.py`): first on the public hiring-without-whiteboards list, read by code, then on the web, where the answer only counts when code finds its quote on the page it fetches itself; Glassdoor, Reddit, Blind, levels.fyi and Kununu block or forbid scripts, so they are never used. It is kept per company for 90 days. Germany has no sponsor register, and "Blue Card" is in none of the 35,800 stored postings, so the best track record a script can check is our own stored postings ([research](research/2026-11-15-hiring-track-record-and-interview-style.md)). The skill-keyword count stays only to break ties, off the screen.
 
@@ -387,3 +389,26 @@ Code adds up every part. Claude Code (`claude-code:opus`, on my Claude login) re
 
 **Trade-off:** The PDFs no longer say which job they are for on their own: the folder does. Older PDFs straight in `output/` keep their names and still work; rebuilding one writes the new layout. Cover letters keep their old names.
 
+## 28. Cover letters are the apply-job skill's last step
+
+**Date:** 2026-11-18
+
+**Context:** The cover letter code (`cover.py`) fetched the company's site, checked every sentence and sent answers back to the model, plus a long guidelines file. It was a lot of prompting for two short paragraphs.
+
+**Decision:** The code is gone: no Write cover letter button, no `jobhunter cover`, no `auto_cover`. When the apply-job skill fills a form for a job whose fit score is above 60, its last step reads the job description and the tailored CV and writes two paragraphs: why I'd like to join them, then my standard CoinQuant paragraph word for word. It saves a `.txt` next to the CVs and puts the letter in the form.
+
+**Why:** Simpler, and the skill already has the posting and the CV in front of it.
+
+**Trade-off:** No code checks paragraph 1 any more; the skill's "facts only from the CV" rule is what keeps it honest. Old letters stay in the database, unused.
+
+## 29. AI engineering culture replaces the interview star
+
+**Date:** 2026-11-18
+
+**Context:** The fit score's 20 interview points were about live coding only, and the company lookup found an answer for 3 of 50 companies.
+
+**Decision:** Each scored job is tagged **AI-Native** (AI-assisted coding, product ownership, rapid shipping: 20 points), **Traditional** (deep language expertise, unassisted coding, algorithm-heavy interviews: 0) or **Unknown** (not enough evidence: 10), with a one-sentence reason. The posting is read first; when it shows nothing, the company is looked up on the web (its engineering blog, careers and how-we-hire pages), and a tag counts only when code finds its quote on the page. The tag shows next to the score on every role in the app and in the report.
+
+**Why:** I want to work where AI-assisted engineering is normal, and that matters more to me than the interview format alone.
+
+**Trade-off:** Scores saved before the change read live coding as Traditional and everything else as Unknown, so a job that had a green star loses 10 points until it is scored again (`jobhunter grade --regrade`, at most 60 jobs a run).

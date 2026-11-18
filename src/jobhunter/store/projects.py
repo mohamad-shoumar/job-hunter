@@ -53,7 +53,8 @@ def digest_projects(store: JobStore, day: str, limit: int = 5) -> list[sqlite3.R
         SELECT p.id AS project_id, p.title AS project_title, p.idea_json, p.stack, p.status AS project_status,
                j.id AS job_id, j.title, j.company, j.status, j.location_raw,
                json_extract(j.fit_grade_json, '$.score') AS fit_grade,
-               json_extract(j.fit_grade_json, '$.star') AS fit_star, a.stage
+               json_extract(j.fit_grade_json, '$.culture.tag') AS fit_culture,
+               json_extract(j.fit_grade_json, '$.culture.why') AS fit_culture_why, a.stage
         FROM projects p JOIN jobs j ON j.id = p.job_id LEFT JOIN applications a ON a.job_id = j.id
         WHERE json_extract(p.idea_json, '$.digest_date') = ?
         ORDER BY json_extract(p.idea_json, '$.score') DESC, p.id
