@@ -118,11 +118,6 @@ def save_tailored_cv(store: JobStore, job_id: int, meta: dict, now: datetime, at
     )
 
 
-def save_cover_letter(store: JobStore, job_id: int, meta: dict, now: datetime) -> None:
-    store.conn.execute("UPDATE applications SET cover_letter_json = ?, updated_at = ? WHERE job_id = ?",
-                       (json.dumps(meta), iso(now), job_id))
-
-
 # --- events ---------------------------------------------------------------------
 
 

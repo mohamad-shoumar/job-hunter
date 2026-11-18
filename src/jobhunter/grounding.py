@@ -1,5 +1,5 @@
 """The fact check's building blocks, shared by the email (pitch.check_draft), the CV
-(cv.check_bullet) and the cover letter (cover.check_sentence).
+(cv.check_bullet).
 
 The rule: a generated line may only use numbers, names, skills and seniority words found
 in the profile facts it cites (profile/master_profile.md, the only source of facts about

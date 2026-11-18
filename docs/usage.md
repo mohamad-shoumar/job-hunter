@@ -31,14 +31,14 @@ open reports/$(date +%F).md
 .venv/bin/jobhunter serve      # the web app, http://127.0.0.1:8765
 ```
 
-Without a profile, the run still finds and judges jobs; it just makes no CVs, cover letters or emails.
+Without a profile, the run still finds and judges jobs; it just makes no CVs or emails.
 
 **Which key does what.** With the settings in `config/`:
 
 | key or tool | used for | without it |
 | --- | --- | --- |
 | `DEEPSEEK_API_KEY` | AI check step 1, tailored CVs, and the email's one AI line when `pitch_mode` is `"ai"` | those steps are skipped |
-| the `claude` CLI (Claude Code), signed in | AI check step 2 (web search), posting-date lookups, the fit score and its interview lookups, cover letters | the AI check uses DeepSeek only; dates come from job pages only; no fit score; no cover letters |
+| the `claude` CLI (Claude Code), signed in | AI check step 2 (web search), posting-date lookups, the fit score and its interview lookups | the AI check uses DeepSeek only; dates come from job pages only; no fit score; no cover letters |
 | `ANTHROPIC_API_KEY` | only a `claude-*` model in a config file, and the contact lookup's "search the web" backup | the "Search the web with Claude" button is off |
 | `HUNTER_API_KEY` | finding who to email | you add contacts by hand (or use the backup above) |
 | `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD` | sending, and reading replies and bounces | no sending |
@@ -58,15 +58,14 @@ that holds `config/`) and `-v` (debug logging).
 | `jobhunter run --from 2026-09-20 --to 2026-09-27` | one report per day for that range (see [Date ranges](#date-ranges)) |
 | `jobhunter run --days 7` | the same for the last 7 days, today included |
 | `jobhunter run --sources himalayas,lever` | only these sources (`--skip serpapi` leaves some out) |
-| `jobhunter run --no-ai` | no model calls: no posting-date lookups, AI check, fit score, CVs, cover letters or AI-written email lines |
-| `jobhunter run --no-outreach` | no contact lookups, drafts, CVs, cover letters or inbox check |
+| `jobhunter run --no-ai` | no model calls: no posting-date lookups, AI check, fit score, CVs or AI-written email lines |
+| `jobhunter run --no-outreach` | no contact lookups, drafts, CVs or inbox check |
 | `jobhunter run --no-report` | store and classify only |
 | `jobhunter serve` | the web app: jobs, who to email, drafts, sending, tracking (`--port`, `--no-open`) |
 | `jobhunter linkedin <id>` | the job's one LinkedIn person and the note to send them (`--url`, `--note`; nothing given: shows what is stored) |
 | `jobhunter contacts` | find who to email for shortlisted jobs without a contact, best fit first (`--limit N`, `--no-claude`, or job ids) |
 | `jobhunter tailor <id>` | a CV tailored to that job, in `resume/output/` (`--replace-edits` to redo one you edited) |
 | `jobhunter rebuild-cv <id>` | after you edit a job's CV text in `resume/versions/`, rebuild its PDF (no AI) and list lines that say more than your profile |
-| `jobhunter cover <id>` | a two-paragraph cover letter for that job, next to its CV |
 | `jobhunter inbox` | check Gmail for replies and bounces (the daily run does this too) |
 | `jobhunter check` | AI-check shortlisted jobs the rules left `unclear`, newest first (`--limit N`, `--recheck`, or job ids) |
 | `jobhunter dates` | find when undated shortlisted jobs were posted (`--limit N`, `--recheck`, or job ids) |
@@ -436,37 +435,14 @@ skills item with a word your profile does not have. It only points; it never cha
 tailored CV, **Tailor again** asks before replacing your edits, and the daily run leaves it alone. From the
 terminal: edit the file in any editor, then `jobhunter rebuild-cv <id>`. A wrong line that comes from
 `profile/master_profile.md` itself is better fixed there (then `python3 build.py sync` in `resume/`), so no
-future CV or cover letter repeats it.
+future CV repeats it.
 
 ### Cover letters
 
-`src/jobhunter/cover.py`. Only when you ask: the Cover letter box under the CV has **Write cover letter**,
-**Copy** and **Download** (a .txt file to upload), and `jobhunter cover <id>` does the same. The daily run
-writes none (`auto_cover` is false). A letter is two paragraphs, with no header, date, greeting or sign-off
-(the form already has your name and the job):
-
-1. **Why this company.** `cover_model` (`claude-code`: the Claude Code CLI on your Claude login, about 25
-   seconds) writes it from the posting and up to 3 pages code fetches from the company's site: its home page,
-   /about and /blog. The domain is the one the contact lookup found, else one in the job's links, else a
-   guess (`acme.com`, kept only when the page names the company). Job boards and agencies get the posting
-   only. Code checks every sentence (`check_sentence`, built on `grounding.py`): each name, number and word
-   for what kind of company it is ("consultancy", "startup") must be in the posting, those pages or your
-   profile. A sentence about you names only your profile's tools and years, and never describes your past work
-   ("I built", "my experience", your employer): paragraph 2 does that. The model also quotes the words its
-   reason rests on, and code looks for them.
-2. **Yours.** `cover_paragraph` in `config/outreach.json`, word for word, never checked.
-
-How paragraph 1 reads is in `config/cover_letter_guidelines.md` (`cover_guidelines`): 2 or 3 sentences, at
-most 65 words, one specific reason, like a developer talking to a hiring manager, plus lists of phrases that
-read as AI ("passionate about", "cutting-edge"). Its `writer:start`/`writer:end` part is the model's
-instructions, so edit that file to change how it reads. A sentence that breaks a fact rule is sent back once,
-then left out, and the box lists what was left out and why. Length, a dash, or a quote code cannot find is
-sent back once, then only noted. Plain-word claims ("they ship weekly") pass the checks, so read paragraph 1
-before you use it.
-
-The letter is `resume/output/<Last name>_CoverLetter_<Company>_<MonYYYY>.md`, plain text to paste into a
-form or upload. A file you made by hand is never overwritten (`_2`). The box shows the file as it is now, so
-your edits stay, and each job in the daily report links its tailored CV and cover letter.
+The app and the daily run write none (the code was removed on 2026-11-18). The apply-job skill writes
+one as its last step, for a job whose fit score is above 60: paragraph 1 is why you'd like to join, from
+the job description and the tailored CV; paragraph 2 is your standard CoinQuant paragraph, word for
+word. It saves `resume/output/<Last name>_CoverLetter_<Company>_<MonYYYY>.txt` and puts it in the form.
 
 ### The resume folder
 
@@ -575,7 +551,7 @@ quoted; "immediate joiner" is noted. Pay in AED, QAR or SAR with no period is re
 `src/jobhunter/visa.py`, `src/jobhunter/sponsors.py`, `visa_list` in `config/filters.json`. A target role in
 the Netherlands, Germany, Finland, the UK, Ireland, Spain or Italy (on-site, hybrid, or remote only for people
 living there) goes to a separate **visa list**, never the shortlist. It is its own section in the report and
-its own view in the web app (Jobs, then "Visa list"). The daily run makes no CV, cover letter or contact
+its own view in the web app (Jobs, then "Visa list"). The daily run makes no CV or contact
 lookup for it. The Pipeline's To apply column shows the ones posted today or yesterday, with a "visa" chip,
 next to the shortlisted jobs; the buttons in the app work as for any job.
 
@@ -638,8 +614,7 @@ run. On 2026-11-15 a dry run found 43 (366 target-role listings of 1,463 in the 
 - `config/ai_check.json`: the posting-date lookup and the AI check (steps 4 and 5).
 - `config/fit_grade.json`: the fit score (step 6).
 - `config/outreach.json`: who to target by size, the job-board skip list, lookup and send limits, follow-up
-  days, the email text, the models, the resume folder, and the CV and cover letter settings.
-- `config/cover_letter_guidelines.md`: how cover letters read.
+  days, the email text, the models, the resume folder, and the CV settings.
 - `.env`: about you (`MY_NAME`, `MY_EMAIL`, `MY_PHONE`, `MY_LINKEDIN`, `MY_GITHUB`, `MY_PORTFOLIO`,
   `MY_LOCATION`, printed on CVs, cover letters and emails; each wins over the same Basics line in the
   profile), `RELOCATION_MIN_MONTHLY_USD`, and the keys in [Setup](#setup). Not in git; keep it that way.

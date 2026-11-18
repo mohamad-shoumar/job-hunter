@@ -113,8 +113,6 @@ def cmd_run(args) -> int:
             print(f"Drafts: {len(o['drafts'])}")
         if o.get("cvs"):
             print(f"CVs tailored: {', '.join(o['cvs'])}")
-        if o.get("covers"):
-            print(f"Cover letters: {', '.join(o['covers'])}")
         if o["inbox"]:
             i = o["inbox"]
             print(f"Inbox: {i['replies']} replies, {i['probable']} probable, {i['bounces']} bounces, "
@@ -675,33 +673,6 @@ def cmd_tailor(args) -> int:
     return 0
 
 
-def cmd_cover(args) -> int:
-    """A cover letter for each job: <cv_dir>/<Name>_CoverLetter_<Company>_<MonYYYY>.md (why this company, then yours)."""
-    from .config import OutreachConfig
-    from .cover import build_cover_writer, cover_for_job
-
-    paths, _, _ = _load(args)
-    config = OutreachConfig.load(paths.outreach_file)
-    writer, note = build_cover_writer(config)
-    if writer is None:
-        raise SystemExit(note)
-    store = JobStore(paths.db_file)
-    try:
-        for job_id in args.job_ids:
-            meta = cover_for_job(store, job_id, writer, paths.profile_file, config, utcnow())
-            print(f"#{job_id}: {meta['path']} ({meta['words']} words, {meta['model']}, about ${meta['cost_usd']:.3f})")
-            for line in meta["notes"]:
-                print(f"  - {line}")
-            for line in meta["removed"]:
-                print(f"  ! removed by the checks: {line}")
-            for line in meta["warnings"]:
-                print(f"  ? {line}")
-            print(f"  read: {', '.join(meta['pages']) or 'the posting only'}")
-    finally:
-        store.close()
-    return 0
-
-
 def cmd_rebuild_cv(args) -> int:
     """After you edit a job's CV text by hand: rebuild its PDF (no model) and list lines to look at."""
     from .config import OutreachConfig
@@ -959,17 +930,6 @@ def main(argv: list[str] | None = None) -> int:
     )
     p.add_argument("job_ids", type=int, nargs="+")
     p.set_defaults(func=cmd_rebuild_cv)
-
-    p = sub.add_parser(
-        "cover",
-        help="write a two-paragraph cover letter for jobs, next to the tailored CVs",
-        description="Paragraph 1 is why you want to join the company: the model writes it from the posting and "
-        "pages code fetches from the company's site, and code checks every name and number against them and "
-        "your profile. Paragraph 2 is cover_paragraph (config/outreach.json), word for word. Writes "
-        "<Name>_CoverLetter_<Company>_<MonYYYY>.md in cv_dir.",
-    )
-    p.add_argument("job_ids", type=int, nargs="+")
-    p.set_defaults(func=cmd_cover)
 
     p = sub.add_parser(
         "linkedin",

@@ -115,9 +115,8 @@ call, 2026-11-18).
 - Upload the tailored CV PDF wherever a resume is asked for. If `find`/`read_page` can't see the
   file box (SmartRecruiters and other sites hide it inside a web component, "shadow DOM"), use a
   stand-in box (below). Don't fetch the PDF from the app's `/api/cv/` from the page: Chrome holds
-  that request for a local-network permission and the tab freezes. If a cover letter is asked for and one
-  exists (`resume/output/<Last>_CoverLetter_<Company>_*.md`), paste or upload it. If none exists,
-  press **Write cover letter** in the app first. If it's optional and that fails, skip it.
+  that request for a local-network permission and the tab freezes. Leave a cover letter box empty
+  for now: step 5 writes the letter and comes back to fill it.
 - **Hidden file box, stand-in method** (tested on SmartRecruiters, Oct 2026):
   1. `javascript_tool`: add a plain box the tools can see:
      `let p=document.createElement('input'); p.type='file'; p.id='jh-proxy'; p.setAttribute('aria-label','jh proxy file input'); p.style.cssText='position:fixed;top:0;left:0;z-index:99999'; document.body.appendChild(p)`
@@ -307,11 +306,31 @@ Search only on LinkedIn, where the user is already signed in; never use an email
   tab's "LinkedIn: accepted, waiting on you" view. `--sent-at/--accepted-at/--replied-at` exist only
   to backfill when the user tells you a date.
 
+### 5. Cover letter (last step, fit score above 60)
+Only for a job whose fit score is **above 60** (the user's call, 2026-11-18). Under that, write none,
+unless the form makes a cover letter required: then write one the same way and note it.
+1. Read the job description and this job's tailored CV (`resume/versions/<name>.md`).
+2. Write **paragraph 1**: two or three sentences on why the user would like to join this company,
+   from what the job description says the company does. Nothing about the user that isn't in the
+   CV.
+3. **Paragraph 2** is always this, word for word:
+   "At CoinQuant, I've helped build and ship production systems in a fast-paced startup
+   environment. I take initiative, think beyond technical requirements to business outcomes, and
+   leverage multi-agent workflows and automated testing to accelerate development without
+   compromising reliability. I'd bring that same combination of ownership and AI-driven
+   productivity to your team."
+4. Just the two paragraphs: no header, date, greeting or sign-off. Save them as
+   `resume/output/<Last>_CoverLetter_<Company>_<MonYYYY>.txt` (never overwrite a file that is
+   already there: add `_2`).
+5. Go back to the job's form tab: paste the letter into a cover letter text box, or upload the
+   `.txt` where a file is asked for. No box on the form: just keep the file and put the letter in
+   the report.
+
 ## At the end
 
 Report one line per job: company, role, fit score, where you applied (the URL of the tab left open), CV
 used (mirrored or not; if mirrored, the posting's must-haves the profile doesn't have, so the user
-can add any that are true), salary entered and anything you guessed. Under it, its one LinkedIn contact: name, title, profile
+can add any that are true), salary entered, the cover letter's file (if step 5 wrote one) and anything you guessed. Under it, its one LinkedIn contact: name, title, profile
 URL, step/group and why (AUB grad, Arab or Muslim name, the company size for a CEO, the link to the user if any), email if public, and
 the note ready to paste with its character count. Say which jobs you filled the LinkedIn box on (the
 `jobhunter linkedin` runs), since "Why this person" is not stored on the card.

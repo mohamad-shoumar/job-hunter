@@ -237,17 +237,8 @@ class OutreachConfig:
     max_cvs_per_run: int = 5
     # Replaces cv.TAG_RULES for the tags it names: {"lead": {"title": [...], "posting": [...]}}.
     cv_tags: dict = field(default_factory=dict)
-    # Cover letters (cover.py): written next to the CVs in cv_dir, only when you ask (the button or
-    # `jobhunter cover`). Empty cover_model means cv_model.
-    cover_model: str = ""
-    # How paragraph 1 (why this company) reads: its writer part is the model's instructions, its word lists are checked.
-    cover_guidelines: str = "config/cover_letter_guidelines.md"
-    # Paragraph 2, your own words, printed as is.
-    cover_paragraph: str = ""
-    auto_cover: bool = False
-    max_covers_per_run: int = 5
     # The daily run also catches up on shortlisted jobs filed this many days back that still have no
-    # tailored CV or cover letter (one that failed, e.g. on a network error at wake-up).
+    # tailored CV (one that failed, e.g. on a network error at wake-up).
     catch_up_days: int = 7
     # The inbox check (both daily runs) closes a job as rejected when a rejection email names its
     # company (rejections.py), looking back at most this many days.
@@ -261,7 +252,7 @@ class OutreachConfig:
         config = cls(**{k: v for k, v in data.items() if k in known})
         # config/outreach.json sits in <project>/config, so a relative folder is inside the project.
         root = path.resolve().parent.parent
-        for name in ("cv_dir", "resume_dir", "cover_guidelines"):
+        for name in ("cv_dir", "resume_dir"):
             folder = Path(getattr(config, name)).expanduser()
             setattr(config, name, str(folder if folder.is_absolute() else root / folder))
         return config

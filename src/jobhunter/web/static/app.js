@@ -300,7 +300,7 @@ function jobRow(j) {
         <div class="job-title">${esc(j.title)}</div>
         <div class="muted">${esc(j.company)} · <span class="small">${esc(j.reason)}</span></div>
         <div class="job-meta" style="margin-top:4px">${statusChip(j.status, j.eligibility)} ${stageChip(j.stage, j.closed_reason, j.skip_reason)} ${linkedinChip(j)} ${linkedinWaitingChip(j)}
-          ${j.has_cv ? `<span class="chip">CV tailored</span>` : ""}${j.has_cover ? ` <span class="chip">cover letter</span>` : ""}</div>
+          ${j.has_cv ? `<span class="chip">CV tailored</span>` : ""}</div>
       </div>
       <div class="job-side">
         ${gradeChip(j.fit_grade)}
@@ -374,7 +374,6 @@ function renderDrawer() {
       ${stage !== "closed" ? `<button class="btn danger" data-action="stage" data-stage="closed" data-reason="skipped">Skip</button>` : ""}
     </div>
     ${cvSection(d)}
-    ${coverSection(d)}
     ${linkedinSection(d)}
     ${trackingSection(d)}
     ${whySection(d)}
@@ -476,31 +475,6 @@ function cvEditor() {
       </div>`;
 }
 
-function coverSection(d) {
-  const c = d.cover, s = state.status || {};
-  const note = s.cover_note;
-  const info = c ? `
-      <div class="small muted" style="margin-top:6px">Written ${esc(ago(c.written_at))} by ${esc(c.model)}${c.cost_usd ? `, $${c.cost_usd.toFixed(3)}` : ""}
-        · paragraph 1: ${c.words} words · <span class="mono">${esc(c.file)}</span></div>
-      ${c.notes.length ? `<ul class="small">${c.notes.map((n) => `<li>${esc(n)}</li>`).join("")}</ul>` : ""}
-      ${c.removed.length ? `<div class="warnings">Left out by the checks:<ul>${c.removed.map((r) => `<li>${esc(r)}</li>`).join("")}</ul></div>` : ""}
-      ${c.warnings.length ? `<div class="warnings">Check these by eye:<ul>${c.warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></div>` : ""}
-      <div class="small muted" style="margin-top:6px">Read: ${c.pages?.length ? c.pages.map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(u.replace(/^https:\/\//, ""))}</a>`).join(", ") : "the posting only"}</div>
-      <textarea id="cover-text" rows="14" readonly style="margin-top:8px">${esc(c.text || "")}</textarea>` : "";
-  return `
-    <div class="section">
-      <h3>Cover letter</h3>
-      ${c ? "" : `<div class="muted">None yet. Paragraph 1 is why this company (from the posting and its website); paragraph 2 is your own text.</div>`}
-      ${info}
-      <div class="row small" style="margin-top:8px">
-        <button class="btn" data-action="cover" ${note ? `disabled title="${esc(note)}"` : `title="${esc(s.cover_model || "")} writes paragraph 1 from the posting and the company's site; code checks every sentence"`}>${c ? "Write again" : "Write cover letter"}</button>
-        ${c ? `<button class="btn" data-action="copy-cover">Copy</button>
-        <button class="btn" data-action="download-cover" title="Save the letter as a .txt file to your Downloads">Download ↓</button>` : ""}
-      </div>
-      ${note ? `<div class="small muted" style="margin-top:6px">${esc(note)}</div>` : ""}
-    </div>`;
-}
-
 // The one LinkedIn person for this job and the note to send them (the user's call, 2026-11-05: outreach is
 // LinkedIn now, so there is no "who to contact" box, no subject line and no Send button). Both boxes are
 // saved when you click away, like the tracking notes. Nothing is ever sent from here: you press Connect
@@ -590,11 +564,6 @@ async function drawerAction(action, el) {
     const t = detail.tailored || {};
     return setDetail(detail, `CV ready: ${t.file}${t.notes?.length ? " (see what code changed)" : ""}`);
   }
-  if (action === "cover") {
-    if (d.cover && !confirm("Write a new cover letter? It replaces this one, including edits you made to the file.")) return;
-    const detail = await busy(el, "Reading the company's site and writing… (up to a minute)", () => api(`/api/jobs/${id}/cover`, { method: "POST" }));
-    return setDetail(detail, `Cover letter ready: ${detail.cover?.file}${detail.cover?.removed.length ? " (the check left some sentences out)" : ""}`);
-  }
   if (action === "edit-cv") {
     const r = await busy(el, "Opening…", () => api(`/api/jobs/${id}/cv-text`));
     state.cvEdit = { jobId: id, source: r.source, text: r.text, checks: r.checks, dirty: false };
@@ -612,18 +581,6 @@ async function drawerAction(action, el) {
     if (state.cvEdit?.dirty && !confirm("Discard your unsaved CV edits?")) return;
     state.cvEdit = null;
     return renderDrawer();
-  }
-  if (action === "copy-cover") {
-    await navigator.clipboard.writeText($("#cover-text").value);
-    return toast("Copied");
-  }
-  if (action === "download-cover") {
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(new Blob([$("#cover-text").value], { type: "text/plain" }));
-    link.download = (state.detail?.cover?.file || "CoverLetter.md").replace(/\.md$/, ".txt");
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-    return toast(`Saved ${link.download}`);
   }
 }
 
@@ -733,7 +690,7 @@ async function renderPipeline() {
         <div class="small muted">${esc(j.company)}</div>
         <div class="job-meta small" style="margin-top:4px">
           ${j.status === "visa_list" ? `<span class="chip info">visa</span>` : ""}
-          ${col.key === "to_apply" ? `<span class="chip">posted ${esc(day(postedAt(j)))}</span>${gradeChip(j.fit_grade)}${j.has_cv ? `<span class="chip good">CV</span>` : ""}${j.has_cover ? `<span class="chip good">letter</span>` : ""}` : ""}
+          ${col.key === "to_apply" ? `<span class="chip">posted ${esc(day(postedAt(j)))}</span>${gradeChip(j.fit_grade)}${j.has_cv ? `<span class="chip good">CV</span>` : ""}` : ""}
           ${j.applied_at ? `<span class="chip">applied ${esc(day(j.applied_at))}</span>` : ""}${j.emailed_at ? `<span class="chip info">emailed ${esc(day(j.emailed_at))}</span>` : ""}
           ${!j.applied_at && !j.emailed_at && j.reached_out_at && col.key === "reached_out" ? `<span class="chip">reached out ${esc(day(j.reached_out_at))}</span>` : ""}
           ${j.stage === "reached_out" && j.next_follow_up_at ? `<span class="chip ${new Date(j.next_follow_up_at) <= new Date() ? "warn" : ""}">follow-up ${esc(day(j.next_follow_up_at))}</span>` : ""}

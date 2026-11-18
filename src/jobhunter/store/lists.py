@@ -71,7 +71,7 @@ def job_list(store: JobStore, view: str, q: str = "", yoe: str = "",
         f"""
         SELECT j.*, a.stage, a.closed_reason, a.skip_reason, a.body IS NOT NULL AS has_draft, a.draft_blocked,
                a.next_follow_up_at, a.emailed_at, a.applied_at, a.replied_at,
-               a.cv_tailored_json IS NOT NULL AS has_cv, a.cover_letter_json IS NOT NULL AS has_cover,
+               a.cv_tailored_json IS NOT NULL AS has_cv,
                a.linkedin_url, a.linkedin_sent_at, a.linkedin_accepted_at, a.linkedin_replied_at,
                {OUTREACH_COLUMNS}
         FROM jobs j LEFT JOIN applications a ON a.job_id = j.id

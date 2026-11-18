@@ -5,11 +5,10 @@
   2. an email draft for each of them that has a contact;
   3. a tailored CV for each of them, best fit first (cv.py), which becomes the
      email attachment and what you upload when applying through the posting;
-  4. a cover letter for each of them (cover.py), next to the CV, only with auto_cover (off: you ask per job);
-  5. the inbox check (replies, bounces) and ghosting.
+  4. the inbox check (replies, bounces) and ghosting.
 
-Steps 3 and 4 also catch up on shortlisted jobs from the last catch_up_days
-that still have no CV or letter (one that failed on a network error at
+Step 3 also catches up on shortlisted jobs from the last catch_up_days
+that still have no CV (one that failed on a network error at
 wake-up is tried again the next day), within the same per-run caps. Only
 jobs still at New or Saved, and not one that already has a CV you made for
 that company (the PDF the email would attach).
@@ -26,7 +25,6 @@ from datetime import datetime, timedelta
 
 from .config import OutreachConfig, Paths
 from .contacts import build_finder, clean_company_name, find_contacts, run_budget
-from .cover import build_cover_writer, cover_for_job, cover_of
 from .cv import build_cv_writer, tailor_for_job, tailored_of
 from .fitgrade import sort_grade
 from .llm import error_line
@@ -47,7 +45,7 @@ MAX_DRAFTS_PER_RUN = 15
 def run_outreach(store: JobStore, paths: Paths, new_ids: list[int], now: datetime, ai: bool = True,
                  lookups: bool = True) -> dict:
     config = OutreachConfig.load(paths.outreach_file)
-    summary: dict = {"contacts": None, "drafts": [], "cvs": [], "covers": [], "inbox": None, "notes": [], "errors": []}
+    summary: dict = {"contacts": None, "drafts": [], "cvs": [], "inbox": None, "notes": [], "errors": []}
     new_shortlisted = [row for row in (store.get(i) for i in new_ids) if row and row["status"] == SHORTLISTED]
     ready: list[int] = []
 
@@ -103,11 +101,6 @@ def run_outreach(store: JobStore, paths: Paths, new_ids: list[int], now: datetim
             prepare(summary, "cvs", "cv", waiting, has_cv, config.max_cvs_per_run, lambda: build_cv_writer(config),
                     lambda writer, job_id: tailor_for_job(store, job_id, writer, paths.profile_file, config, now,
                                                           pick=False)["file"], store)
-        if config.auto_cover:
-            prepare(summary, "covers", "cover", waiting, lambda row, app: bool(cover_of(app)), config.max_covers_per_run,
-                    lambda: build_cover_writer(config),
-                    lambda writer, job_id: cover_for_job(store, job_id, writer, paths.profile_file, config, now)["file"],
-                    store)
 
     try:
         account = mail_account()

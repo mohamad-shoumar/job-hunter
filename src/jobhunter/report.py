@@ -81,11 +81,11 @@ def salary_text(row: sqlite3.Row) -> str | None:
 
 
 def _prepared_line(app: sqlite3.Row | None, reports_dir: Path | None) -> str | None:
-    """Links to the job's tailored CV and cover letter (cv.py, cover.py), from the report's folder."""
+    """A link to the job's tailored CV (cv.py), from the report's folder."""
     if app is None:
         return None
     links = []
-    for label, column in (("CV", "cv_tailored_json"), ("cover letter", "cover_letter_json")):
+    for label, column in (("CV", "cv_tailored_json"),):
         path = json.loads(app[column]).get("path") if app[column] else None
         if path:
             target = Path(os.path.relpath(path, reports_dir)) if reports_dir else Path(path)
@@ -289,8 +289,6 @@ def render(day: str, rows: list[sqlite3.Row], sightings: dict[int, list[sqlite3.
                 parts.append(f"{len(outreach['drafts'])} email drafts")
             if outreach.get("cvs"):
                 parts.append(f"{len(outreach['cvs'])} CVs tailored")
-            if outreach.get("covers"):
-                parts.append(f"{len(outreach['covers'])} cover letters")
             if outreach.get("inbox"):
                 i = outreach["inbox"]
                 parts.append(f"inbox: {i['replies'] + i['probable']} replies, {i['bounces']} bounces")

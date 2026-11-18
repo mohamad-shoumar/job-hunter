@@ -8,7 +8,7 @@ Each carries the HTTP status the web app answers with, so one handler (web/app.p
   UpstreamError  502  the model, build.py, Hunter or Gmail failed
 
 The modules keep their own names on top of these (tracking.TrackingError, cv.TailorError,
-cover.CoverError, mailer.SendError, hunter.HunterError), so callers can still catch just theirs.
+mailer.SendError, hunter.HunterError), so callers can still catch just theirs.
 """
 
 from __future__ import annotations
