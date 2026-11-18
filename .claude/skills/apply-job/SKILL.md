@@ -1,6 +1,6 @@
 ---
 name: apply-job
-description: Work through the "To apply" column of the jobhunter app in Chrome - get a checked tailored CV, fill the job's application form on the company site or in LinkedIn Easy Apply, find one LinkedIn contact per job (a fellow AUB grad, else a software engineer with an Arab or Muslim name, else the CEO at a small company, the hiring manager, HR, a team lead) and write a note of at most 300 characters with two achievements - and stop before the final Apply/Submit, never pressing Connect or Message. Use when the user says "apply to my jobs", "go through To apply", or names a job to apply to.
+description: Work through the "To apply" column of the jobhunter app in Chrome - get a checked tailored CV, fill the job's application form on the company site or in LinkedIn Easy Apply, find one LinkedIn contact per job (a fellow AUB grad, else a software engineer with an Arab or Muslim name, else the CEO at a small company, the hiring manager, HR, a team lead) and write a short note from one of five fixed templates - and stop before the final Apply/Submit, never pressing Connect or Message. Use when the user says "apply to my jobs", "go through To apply", or names a job to apply to.
 ---
 
 # Apply to jobs from the "To apply" column
@@ -45,7 +45,35 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
 
 ## For each job
 
-### 1. CV
+### 1. Check you can apply (before any CV work)
+Do this first, so no time goes into a CV for a job that is closed or can't take you (the user's
+call, 2026-11-18).
+- Press **Open posting ↗**.
+- If the posting is behind a sign-in or paywall (We Work Remotely always is), don't sign in and
+  don't pay. Search for the same role on the company's own careers page or its job board (Greenhouse,
+  Lever, Ashby, Workable, BambooHR, LinkedIn) and apply there. Match the title, and the location if
+  one is given.
+- **Skip the job** (and go to the next one) when:
+  - the role can't be found anywhere, or it is closed;
+  - the company can't hire from Lebanon (residence required in another country, US-only, a
+    visa-list job whose posting says it can't sponsor). If the user wants that company never
+    shortlisted again, add it to `blocked_companies` in `config/filters.json` with a short `why`,
+    then run `.venv/bin/jobhunter reclassify`;
+  - a site refuses applicants from Lebanon;
+  - the job is only on job aggregators, with no company page to apply on.
+- **How to skip:** press the red **Skip** button at the top of the job's card in the app. It
+  moves the job to Closed with the reason "skipped", so it leaves To apply. Don't drag the card to
+  the Closed column: that opens a "Why closed?" pop-up that blocks the browser tools. In the Skip
+  pop-up pick the reason that fits and write a short note that quotes the posting ("UAE-Based
+  Candidates only"): both stay with the job, and the final answer reuses the note.
+- **Needs a sign-in or an account** (a careers site that wants you to log in or sign up, Workday,
+  Proxify's talent account): **not a skip.** Claude may not create accounts or type passwords, so
+  leave the job in To apply, leave the tab open on the sign-in page, still do steps 2 and 4 (the CV
+  and the LinkedIn note) so everything is ready, and list it in the report under **Needs your
+  sign-in** with the URL.
+- The page is open and the job is live: go on to the CV.
+
+### 2. CV
 - Open the job's card. In the **CV** section:
   - If it shows a tailored CV ("Tailored ... by ..."), use it.
   - If not, press **Tailor CV to this job** and wait until the tailored info appears (it can take a
@@ -79,28 +107,11 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
 - The PDF is already on disk in `~/job-hunter/resume/output/`, so upload it from there. Press
   **Download ↓** too if the user wants a copy in Downloads.
 
-### 2. Find the real application page
-- Press **Open posting ↗**.
-- If the posting is behind a sign-in or paywall (We Work Remotely always is), don't sign in and
-  don't pay. Search for the same role on the company's own careers page or its job board (Greenhouse,
-  Lever, Ashby, Workable, BambooHR, LinkedIn) and apply there. Match the title, and the location if
-  one is given.
-- If the role can't be found anywhere or is closed, skip it (below) and move to the next job.
-- If the company can't hire from Lebanon (residence required in another country, US-only), skip it
-  and say so in the report. If the user wants that company never shortlisted again, add it to
-  `blocked_companies` in `config/filters.json` with a short `why`, then run
-  `.venv/bin/jobhunter reclassify`.
-- **Skipping a job:** press the red **Skip** button at the top of the job's card in the app. It
-  moves the job to Closed with the reason "skipped", so it leaves To apply. Don't drag the card to
-  the Closed column: that opens a "Why closed?" pop-up that blocks the browser tools. Skip every
-  job you can't apply to: closed or not found, location rules, a site that refuses applicants from
-  Lebanon, only on job aggregators, or a sign-up you can't do (except Proxify, below). A job whose
-  form you filled but the user must finish (a CAPTCHA, a field only they can answer) stays in To
-  apply. In the Skip pop-up pick the reason that fits and write a short note that quotes the
-  posting ("UAE-Based Candidates only"): both stay with the job, and the final answer
-  reuses the note.
-
 ### 3. Fill the form
+- Go back to the application page you found in step 1. A job whose form you filled but the user
+  must finish (a CAPTCHA, a field only they can answer) stays in To apply. If the form itself
+  shows the job can't take you (a "must already have the right to work" question), Skip it as in
+  step 1.
 - Upload the tailored CV PDF wherever a resume is asked for. If `find`/`read_page` can't see the
   file box (SmartRecruiters and other sites hide it inside a web component, "shadow DOM"), use a
   stand-in box (below). Don't fetch the PDF from the app's `/api/cv/` from the page: Chrome holds
@@ -202,9 +213,9 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
   (up to 2 retries per step). If it still fails, leave the tab as it is, note it and go to the next
   job. Never stop the whole run because of one job.
 - **CAPTCHA or account sign-up:** don't solve or create it (Claude may not create accounts or type
-  passwords, even with permission). Fill what you can, leave the tab open and note it for the user.
-  Proxify ("Get paid, not played" postings, often re-posted on job boards) always needs a talent
-  account, so the user does those.
+  passwords, even with permission). Fill what you can, leave the tab open and list it under
+  **Needs your sign-in** (step 1): never Skip a job for this. Proxify ("Get paid, not played"
+  postings, often re-posted on job boards) always needs a talent account, so the user does those.
 - Finish at the final **Apply/Submit** button. Don't press it. Leave the tab open.
 
 ### 4. One LinkedIn contact (find and write, never send)
@@ -251,83 +262,37 @@ Search only on LinkedIn, where the user is already signed in; never use an email
   stops all LinkedIn work for the run.
 - **Email:** only when it is public, on the person's LinkedIn Contact info or the company's own site.
   Never guess one.
-- **The note** (the user's rules, 2026-10-29):
-  - **At most 300 characters** (LinkedIn's limit), counting spaces and punctuation; aim for
-    220-290. Count with code (`len()` in Python or `.length` in JS), never by eye, and put the
-    count in the report. Over 300: shorten the opening or the ask first, never the role or an
-    achievement's facts.
-  - **TWO achievements**, the two that best fit the posting and the person, joined in one sentence
-    so it reads like a person talking, not a list. Keep each one's facts and numbers word for word
-    (15K, 800+, 3 engineers, "AI-native"); only the joining words and the tense may change ("I lead
-    a backend team of 3 engineers and built an AWS event-driven system handling 800+ concurrent
-    jobs."). Never two that say the same thing.
-
-    | Achievement | Best fit |
-    | --- | --- |
-    | **Scale:** Helped scale a platform to 15K users. | Product, startups, scalability |
-    | **AI delivery:** Built AI-native workflows to ship features and fixes daily. | AI-first, fast-paced teams |
-    | **AWS:** Built an AWS event-driven system handling 800+ concurrent jobs. | Backend, cloud, distributed systems |
-    | **Leadership:** Lead a backend team of 3 engineers. | Lead and senior roles |
-
-  - **The template for the person's role** ([Achievements] is the one sentence above): an AUB grad
-    (step A) gets the template for their own role and the line "Fellow AUB alum." after the
-    greeting; an engineer from step B gets the engineer template. These
-    are a starting shape, not a script: reword so it reads naturally for this person and job, but
-    keep the parts (who you are writing to, the role, the two achievements, one easy ask). Name the
-    role only, never the company: no "at [Company]", "at your company" or "on [Company]'s team" (the
-    user's call, 2026-10-31: the person already works there). Use the role title as cleaned for the
-    CV headline (no "Remote", locations or brackets).
-    - CEO / hiring manager: "Hi [Name], I just applied for the [Role] role. [Achievements] I'd love
-      to hear what your team is building next and how I could help."
-    - HR / recruiter: "Hi [Name], I just applied for the [Role] role. [Achievements] Would you be
-      open to a quick chat about it?"
-    - Engineer / team lead: "Hey [Name], I just applied for the [Role] role. [Achievements] I'd love
-      to hear what it's like on your team from someone on the inside." If it fits, name their team
-      or work instead of the general line.
-    - Agency recruiter (only for an agency-posted job, see above): "Hi [Name], I'm a backend
-      developer and team lead looking at [role/location] roles. [Achievements] Happy to connect if
-      you're hiring for something similar."
-    - Example (264 characters): "Hi Alexandra, I just applied for the
-      Senior Backend Engineer role. I've built AI-native workflows to ship features and fixes
-      daily, and an AWS event-driven system handling 800+ concurrent jobs. I'd love to hear what
-      your team is building next and how I could help."
-  - A real shared link may go in when it fits ("Fellow AUB alum."). Details about the person only
-    from their profile; never invent an achievement or a detail about them. Never ask for a
-    referral. Tone: confident, human, direct; no stiff lines like "I'd love to discuss how I could
-    contribute to your team".
+- **The note** (the user's templates, 2026-11-18, replacing the two-achievement notes): pick
+  exactly one of these five by the person's role, put in their first name and the role, and
+  change nothing else. Never name the company.
+  1. **Recruiter / HR / Talent Acquisition / Hiring Manager / Engineering Manager / Team Lead:**
+     "Hi [Name], I just applied for the [Role] role. I helped scale a fintech platform from 0 to
+     20K+ users. Could you take a quick look at my application?"
+  2. **CEO / CTO / Founder:** "Hi [Name], I just applied for the [Role] role. I helped scale a
+     fintech platform from 0 to 20K+ users. What's the #1 quality you're looking for in this hire?"
+  3. **Engineer / potential teammate:** "Hi [Name], I just applied for the [Role] role. I helped
+     scale a fintech platform from 0 to 20K+ users. What's your favorite thing about working there?"
+  4. **Unrelated employee** (works there, but not in hiring, leadership or engineering, e.g. an AUB
+     grad in sales): "Hi [Name], I just applied for the [Role] role. I helped scale a fintech
+     platform from 0 to 20K+ users. Do you know who's handling hiring for this role?"
+  5. **Unclear role** (the title doesn't say what they do): "Hi [Name], I just applied for the
+     [Role] role. I helped scale a fintech platform from 0 to 20K+ users. Do you know if the team is
+     still hiring?"
+  - [Name] is the person's first name only.
+  - [Role] is the core job title: keep the seniority, drop specializations, team names and long
+    descriptions ("Senior Backend Engineer, Payments and Cards" becomes "Senior Backend Engineer";
+    no "Remote", locations or brackets).
+  - The 20K+ line is grounded in the profile's summary ("co-built a fintech platform from 0 to
+    **20,000+** users"). Agency-posted jobs whose recruiter is the one person use template 1.
+  - Count the characters with code (`len()` or `.length`) and put the count in the report; it
+    must be at most 300 (LinkedIn's limit). These templates come to about 150-190.
 - Nobody found in any group: note "no LinkedIn contact" and the searches you tried.
-- **The follow-up** (the user's call, 2026-11-07), written at the same time as the note and sent only
-  after the person accepts. The week-one review found the invite working (25% accepted, of the batch
-  that had had time to land) and nothing happening afterwards: 8 of the 10 who accepted were never
-  written to again, and both replies came from the other person opening the conversation. So the
-  follow-up is a separate message with a different job to do.
-  - **One closed question**, the kind a stranger answers in five seconds: "Is the [Role] role still
-    open?", "Is it still open, or has it moved to interviews?", "Are you the right person to ask, or
-    should I speak to someone else?". Never the invite note's open ask ("I'd love to hear what your
-    team is building next and how I could help"): that is what went unanswered 36 times.
-  - **No second pitch.** They have already read the two achievements in the note. At most one of
-    them may come back, and only when it answers the question being asked.
-  - **Answer the objection behind the silence**: that someone in Beirut will not actually move.
-    - Gulf job (UAE, Qatar): "I'm in Beirut and would relocate to [the UAE / Doha] for it."
-    - Visa-list job (NL, DE, FI, UK, IE, ES, IT): check `data/sponsors/` first
-      (`grep -i "<company>" ~/job-hunter/data/sponsors/{uk,nl,ie}.json`). On the register, say so and
-      ask about the role, not the policy: "I see HEMA B.V. is an IND recognised sponsor - would this
-      role be open to someone relocating from Beirut on a knowledge migrant permit?" Not on it (or no
-      list for that country), ask plainly whether the role comes with sponsorship.
-  - **An easy out** ("If not I'll leave it there", "no problem either way"): it makes replying
-    cheaper than ignoring.
-  - No character limit (it is a message, not an invite), but keep it to 2-3 sentences.
-  - **Timing, for the report, not for code:** the user sends it 4-6 working days after the person
-    accepts, Tuesday to Thursday, 08:30-10:00 **their** local time, **once**. Beirut is UTC+2 in
-    winter, so their 09:00 is 07:00 Beirut in the UAE, 08:00 in Qatar, 10:00 in the Netherlands and
-    11:00 in the UK. Never Saturday, Sunday or Monday morning.
-- **Put the person, the note and the follow-up on the job** (the user's calls, 2026-11-05 and
-  2026-11-07), right after you write them, so they sit on the job's card in the app instead of a
-  Markdown file:
+- **Put the person and the note on the job** (the user's call, 2026-11-05), right after you
+  write them, so they sit on the job's card in the app instead of a Markdown file:
   ```
-  cd ~/job-hunter && .venv/bin/jobhunter linkedin <job id> --url "<profile URL>" --note "<the note>" \
-      --followup "<the follow-up>"
+  cd ~/job-hunter && .venv/bin/jobhunter linkedin <job id> --url "<profile URL>" --note "<the note>"
   ```
+  No follow-up message is written any more (the user's call, 2026-11-18): don't pass `--followup`.
   It prints the note back with its character count: check that count is the one you reported and at
   most 300. The card's **LinkedIn** box then shows "Open profile ↗" and the note (both boxes also take
   a paste by hand, and save when you click away). The box is the message itself: nothing else goes in
@@ -363,5 +328,9 @@ any. Group them like this (the user's request, 2026-10-31):
 - **Not your kind of role (my call, move back any you disagree with):** the posting's main work
   is outside the target roles, or it is far too senior. "**Canonical**: despite the title, it's
   a Jira administrator job."
+
+And, separately, **Needs your sign-in**: every job left in To apply because the site wants a
+login or an account, with the URL of the tab left open and whether the CV and LinkedIn note are
+ready.
 
 The user then goes through the open tabs and presses Apply, and sends the LinkedIn notes themselves.
