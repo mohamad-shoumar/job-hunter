@@ -34,7 +34,8 @@
     {"name": "HelloFresh", "why": "live coding in its interviews; you asked to reject companies that do it (2026-11-16): Glassdoor engineers 2026: \"The live coding interview is a Typescript question\", \"(experience, live coding, architectural, and behavioral)\""},
     {"name": "OpenAI", "why": "live coding in its interviews; you asked to reject companies that do it (2026-11-16): Glassdoor engineers 2025-2026: \"technical screen on coderpad\", \"ai-assisted live coding\", \"1 live coding - SQL+Java\""},
     {"name": "GE HealthCare", "why": "live coding in its interviews; you asked to reject companies that do it (2026-11-16): Glassdoor engineers 2026: \"three rounds of technical coding interviews focused on LeetCode-style problems\""},
-    {"name": "n8n", "why": "live coding in its interviews; you asked to reject companies that do it (2026-11-16): Glassdoor engineers 2024: \"Live coding for 50 mins in JavaScript\"; 2026: \"then a live coding challenge, a meeting with the engineering lead\""}
+    {"name": "n8n", "why": "live coding in its interviews; you asked to reject companies that do it (2026-11-16): Glassdoor engineers 2024: \"Live coding for 50 mins in JavaScript\"; 2026: \"then a live coding challenge, a meeting with the engineering lead\""},
+    {"name": "Google", "why": "you asked to block it (skip note 2026-11-18: \"Add google to blocked companies\")"}
   ],
 
   "_agencies": "Staffing agencies and talent marketplaces: they repost other companies' jobs, sell vetted developers or pay per task. Rejected (code agency) with what matched: a name below, a whole word in the company name, or a phrase in the posting. not_agencies: real companies a name word would catch. Checked against the stored jobs 2026-10-10: 'our clients', 'talent pool' and 'talent network' are left out because real companies (Zscaler, Percona, GitLab) use them.",
