@@ -1,7 +1,7 @@
 #!/bin/sh
 # Entry point for cron/launchd: runs the pipeline from the project folder
 # with the project's virtualenv, appending output to data/run.log.
-# Arguments go to `jobhunter run` (the morning run passes --skip serpapi).
+# Arguments go to `jobhunter run` (the 21:00 run passes --digest).
 set -eu
 cd "$(dirname "$0")/.."
 mkdir -p data

@@ -626,21 +626,18 @@ Keys starting with `_` in the JSON files are comments.
 
 ## Run it daily
 
-A macOS launchd job (`scripts/local.jobhunter.daily.plist`; the top of the file says how to install it with
-your paths filled in) runs `scripts/run_daily.sh` every day at 09:00 local time. If the Mac is asleep at 09:00
+One macOS launchd job (`scripts/local.jobhunter.evening.plist`; the top of the file says how to install it
+with your paths filled in) runs `scripts/run_daily.sh` every day at 21:00 local time. If the Mac is asleep then
 it runs on wake; if the Mac is off, that day is skipped. Output goes to `data/run.log`; launchd's own errors
-go to `~/Library/Logs/jobhunter.log`.
-
-A second one (`scripts/local.jobhunter.evening.plist`, installed the same way) runs at 21:00. Most jobs are
-posted 14:00-17:00 Lebanon time (the US morning), so with the 09:00 run alone they wait until the next
-morning; the evening run puts them in the same day's report. SerpApi runs only in the evening run (the morning
-one has `--skip serpapi`), so its credits last the month and it sees the day's US postings.
-It ends with the daily digest (`--digest`): the day's final list, its top jobs and a project idea each.
+go to `~/Library/Logs/jobhunter.log`. There used to be a 09:00 run too; it was removed on 2026-11-19 (the
+user's call): the evening run already catches the whole European and US working day, and its jobs and CVs are
+ready by the next morning. It includes SerpApi (one run a day keeps its credits within the month) and ends with
+the daily digest (`--digest`): the day's final list, its top jobs and a project idea each.
 
 ```sh
-launchctl kickstart gui/$(id -u)/local.jobhunter.daily    # run now
-launchctl print gui/$(id -u)/local.jobhunter.daily | grep "last exit"
-launchctl bootout gui/$(id -u)/local.jobhunter.daily      # stop the schedule
+launchctl kickstart gui/$(id -u)/local.jobhunter.evening    # run now
+launchctl print gui/$(id -u)/local.jobhunter.evening | grep "last exit"
+launchctl bootout gui/$(id -u)/local.jobhunter.evening      # stop the schedule
 ```
 
 To change the time, edit `Hour`/`Minute` in the plist, install it in `~/Library/LaunchAgents/` again, then

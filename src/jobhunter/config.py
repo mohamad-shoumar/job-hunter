@@ -240,7 +240,7 @@ class OutreachConfig:
     # The daily run also catches up on shortlisted jobs filed this many days back that still have no
     # tailored CV (one that failed, e.g. on a network error at wake-up).
     catch_up_days: int = 7
-    # The inbox check (both daily runs) closes a job as rejected when a rejection email names its
+    # The inbox check (the daily run) closes a job as rejected when a rejection email names its
     # company (rejections.py), looking back at most this many days.
     auto_close_rejections: bool = True
     rejection_lookback_days: int = 45

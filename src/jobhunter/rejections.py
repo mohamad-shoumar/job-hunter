@@ -1,6 +1,6 @@
 """Rejection emails: close the job they are about, quoting the sentence that says no.
 
-Runs inside the inbox check (mailer.check_inbox), so in both daily runs and on `jobhunter inbox`.
+Runs inside the inbox check (mailer.check_inbox), so in the daily run and on `jobhunter inbox`.
 Plain code, no model: every closed job's event quotes the email's sentence and says how the job
 was picked, so a wrong match is easy to see and undo (drag it back in the app).
 

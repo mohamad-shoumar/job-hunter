@@ -79,7 +79,7 @@ class RunOptions:
     built from config/ai_check.json and config/fit_grade.json.
 
     outreach=False skips contacts, drafts and the inbox check (outreach.py). `only` fetches just those sources;
-    `skip` leaves those out (the morning run skips serpapi, whose credits last only for one run a day). A run given
+    `skip` leaves those out (e.g. --skip serpapi, whose credits last only for one run a day). A run given
     no `http` makes its own and waits for the network first; `now` is for tests.
     """
 
@@ -458,7 +458,7 @@ def _chosen(sources: list[Source], only: set[str] | None, skip: set[str] | None,
             raise SystemExit(f"unknown or disabled source(s): {', '.join(sorted(unknown))}")
         sources = [s for s in sources if s.name in only]
     if skip:
-        # A note, not an error: the scheduled morning run must not fail when serpapi is turned off.
+        # A note, not an error: a scheduled run must not fail when serpapi is turned off.
         unknown = skip - {s.name for s in sources}
         if unknown:
             notes.append(f"--skip: no enabled source named {', '.join(sorted(unknown))}")

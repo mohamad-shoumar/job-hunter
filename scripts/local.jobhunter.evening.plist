@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  Second daily run at 21:00 local time, for the jobs posted since the 09:00 run (most
-  are posted 14:00-17:00 Lebanon time, the US morning). This is the run that fetches
-  serpapi (the morning run skips it). If the Mac is asleep then, launchd runs it on wake.
+  The one daily run, at 21:00 local time (the 09:00 run was removed 2026-11-19): it sees
+  the whole European and US working day. It fetches serpapi too. If the Mac is asleep then,
+  launchd runs it on wake.
   It ends with the daily digest (the digest argument below): the day's top jobs and a project idea each,
   in reports/digest_<date>.md. A digest failure never fails the run.
   Install (from the project folder; it fills in your paths):
