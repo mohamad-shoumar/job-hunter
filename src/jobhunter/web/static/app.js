@@ -749,6 +749,52 @@ const POST_TIPS = [
   ["Test PDF carousels and multi-image posts.", "Good for tutorials, lessons and checklists. Metricool found they often beat single-image and video posts."],
 ];
 
+// Lowest pay an employer must offer for the work permit a software engineer would use, per
+// European visa-list country, and what is left each month after tax and social contributions
+// at exactly that pay (single, no children, no church tax, main city, no expat tax regime,
+// annual net / 12). Public figures checked 2026-11-19; they change every year, mostly in January.
+const VISA_PAY = [
+  { country: "Germany", route: "EU Blue Card", gross: "€45,934 (IT jobs) · €50,700 (standard)", net: "€2,522 · €2,735",
+    note: "The lower one covers IT jobs, with or without a degree. 2027 (not official yet): €48,109 · €53,100.",
+    src: "https://www.rtpartner.de/en/immigration/blaue-karte-eu-mindestgehalt-2026/" },
+  { country: "Netherlands", route: "Highly skilled migrant", gross: "€71,304 (30+) · €52,284 (under 30)", net: "€4,141 · €3,356",
+    note: "€5,942 or €4,357 a month × 12; the 8% holiday allowance does not count. Blue Card: same €5,942. The 30% ruling (from €48,013) lowers the tax.",
+    src: "https://ind.nl/en/required-amounts-income-requirements" },
+  { country: "Finland", route: "EU Blue Card / Specialist", gross: "€47,244", net: "€2,961",
+    note: "€3,937 a month × 12. Key-employee flat 25% tax from €5,800 a month.",
+    src: "https://migri.fi/en/eu-blue-card" },
+  { country: "Denmark", route: "Pay Limit Scheme (no Blue Card)", gross: "DKK 552,000", net: "DKK 30,038",
+    note: "Pension paid by the employer counts toward it, which lowers take-home. Expat 27% tax from DKK 65,400 a month.",
+    src: "https://www.nyidanmark.dk/en-GB/You-want-to-apply/Work/Pay-limit-scheme" },
+  { country: "Sweden", route: "EU Blue Card", gross: "SEK 643,500", net: "SEK 41,447",
+    note: "SEK 53,625 a month × 12. The plain work permit needs only SEK 413,640 (net SEK 27,856).",
+    src: "https://www.migrationsverket.se/English/Private-individuals/Working-in-Sweden/Employed/Special-rules-for-certain-occupations-and-citizens-of-certain-countries/EU-Blue-Card.html" },
+  { country: "UK", route: "Skilled Worker", gross: "£54,700", net: "£3,524",
+    note: "The going rate for software developers (SOC 2134) beats the £41,700 general floor. Under 26 or a new graduate: 70%, at least £33,400. New figures from spring 2027.",
+    src: "https://www.gov.uk/government/publications/skilled-worker-visa-going-rates-for-eligible-occupations/skilled-worker-visa-going-rates-for-eligible-occupation-codes" },
+  { country: "Ireland", route: "Critical Skills Permit (no Blue Card)", gross: "€40,904", net: "≈ €2,852",
+    note: "With a relevant degree, since 1 March 2026. Without one: €68,911.",
+    src: "https://enterprise.gov.ie/en/news-and-events/department-news/2025/december/20251202.html" },
+  { country: "France", route: "Talent passport, EU Blue Card", gross: "€59,373", net: "€3,398",
+    note: "The €39,582 route needs a master's from a French university. Impatriate regime: 30% of pay tax-free for 5 years.",
+    src: "https://www.service-public.gouv.fr/particuliers/vosdroits/F16922" },
+  { country: "Belgium (Brussels)", route: "Single permit, highly qualified", gross: "€44,441", net: "≈ €2,877",
+    note: "€3,703 a month (Blue Card €4,748); from 1 Jan 2027 €4,015 (€5,148). Net counts the usual 13th month and holiday pay. Flanders €48,912, Wallonia €53,220. Expat regime from €70,000.",
+    src: "https://economy-employment.brussels/single-permit-minimum-remuneration" },
+  { country: "Poland", route: "EU Blue Card", gross: "PLN 160,264", net: "PLN 9,179",
+    note: "PLN 13,355 a month × 12 (150% of the 2025 average wage); the 2027 figure comes out in February.",
+    src: "https://grantthornton.pl/publikacja/nowy-prog-wynagrodzenia-dla-niebieskiej-karty-ue-blue-card-w-2026-roku/" },
+  { country: "Spain", route: "EU Blue Card / highly qualified", gross: "€41,356", net: "€2,558",
+    note: "1.4 × the average wage, since mid-2026. Beckham law: flat 24% tax for 6 years, no pay minimum.",
+    src: "https://www.boe.es/diario_boe/txt.php?id=BOE-A-2026-2142" },
+  { country: "Italy", route: "EU Blue Card", gross: "€36,279", net: "≈ €1,920–2,080",
+    note: "Two 2026 calculators disagree; both may be a little low. Impatriate regime: only half of pay taxed for 5 years.",
+    src: "https://www.regione.fvg.it/rafvg/cms/RAFVG/formazione-lavoro/servizi-datori-lavoro/FOGLIA6/FOGLIA14/" },
+  { country: "Portugal", route: "EU Blue Card / highly qualified", gross: "€30,198", net: "≈ €1,898",
+    note: "€2,157 a month, × 14 payments (usual in Portugal); still based on the 2023 average wage. IFICI: flat 20% tax for 10 years.",
+    src: "https://aima.gov.pt/pt/trabalhar/autorizacao-de-residencia-para-atividade-altamente-qualificada-art-90-o" },
+];
+
 function renderCheatSheet() {
   const today = new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "Asia/Beirut" }).format(new Date());
   $("#main").innerHTML = `
@@ -761,6 +807,12 @@ function renderCheatSheet() {
           Buffer (4.8M posts): Wednesday 4 PM was the best slot overall, late afternoons beat mornings. Sprout Social: Tuesday to Thursday, working hours.</div></div>
       <div class="card"><h2>What to try</h2>
         <ul>${POST_TIPS.map(([head, why]) => `<li><b>${esc(head)}</b><div class="small muted">${esc(why)}</div></li>`).join("")}</ul></div>
+      <div class="card wide"><h2>Visa minimum salary and take-home pay (2026)</h2>
+        <div class="table-scroll"><table><tr><th>Country</th><th>Permit</th><th>Minimum gross / year</th><th>Net / month</th><th>Note</th></tr>${VISA_PAY.map((v) => `
+          <tr><td><b>${esc(v.country)}</b></td><td>${esc(v.route)}</td><td><b>${esc(v.gross)}</b></td><td><b>${esc(v.net)}</b></td>
+            <td class="small">${esc(v.note)} <a href="${esc(v.src)}" target="_blank" rel="noopener">source</a></td></tr>`).join("")}</table></div>
+        <div class="small muted" style="margin-top:8px">Net is take-home at exactly the minimum: single, no children, no church tax, main city,
+          standard tax (no expat regime), yearly net ÷ 12. ≈ means close to the minimum, not exactly at it. Checked 2026-11-19; most figures change every January.</div></div>
     </div>`;
 }
 
