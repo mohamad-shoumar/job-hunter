@@ -12,3 +12,10 @@ Give Claude these three things and let it answer:
 3. **The question**, with its word or character limit if the form shows one.
 
 Then: "Answer this question for this job, from this CV."
+
+Then, before using the answer, run it through the `humanizer:humanizer` skill in embedded mode
+(it returns only the final text), so it doesn't read like AI wrote it (the user's call,
+2026-11-20). Humanizer may reorder, cut and reword, but the profile rule still wins: it must not
+add a fact, skill, number or detail that isn't in the CV, even where it asks for "a specific
+detail". Keep the form's word or character limit. If the humanizer plugin isn't installed, skip
+this step and note it.
