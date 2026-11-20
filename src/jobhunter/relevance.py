@@ -19,6 +19,12 @@ Engineer" is a target and "Forward-Deployed Banker" is not.
 
 AI and forward-deployed roles (junior_only) are wanted only at junior level: a
 "senior"/"lead" title or a lower years ask rejects them, quoted.
+
+Senior roles (`senior` in filters.json, the user's call 2026-11-20): every target role is
+rejected, code `too_senior`, when its title says "senior" or its text asks for a senior
+person ("We're looking for a Senior Backend Engineer", "Position level: Senior",
+"senior-level expertise"), quoted. A text that only mentions senior people ("work with
+senior engineers", "junior and senior developers welcome") is not an ask.
 """
 
 from __future__ import annotations
@@ -26,7 +32,7 @@ from __future__ import annotations
 import re
 
 from .config import Filters, JuniorOnly
-from .extract import find_required_yoe
+from .extract import find_required_yoe, quote_around, sentences
 from .models import IRRELEVANT, MATCH, MAYBE, Assessment, Job
 from .text import has_phrase, normalize_words
 
@@ -42,6 +48,20 @@ _ROLE_NOUN = re.compile(r"\b(?:engineer|developer|programmer|swe)\b")
 # Wider than _ROLE_NOUN (which splits a title into roles): "Forward Deployed ML Engineering
 # Expert" is an engineering role, "Forward-Deployed Banker" is not.
 _ENGINEERING_ROLE = re.compile(r"\b(?:engineer|engineering|developer|programmer|swe)\b")
+# The posting asking for a senior person, not naming senior colleagues: "looking for a Senior ...",
+# "As a Senior Engineer, you will", "Position level: Senior", "senior-level expertise".
+_ADJ = r"(?:(?:experienced|talented|skilled|highly[- ]skilled|motivated|passionate|strong|exceptional|hands-on)\s+)?"
+_SENIOR_ASK = re.compile(
+    r"\b(?:looking\s+for|seeking|hiring|searching\s+for|in\s+search\s+of|recruiting)\s+"
+    r"(?:an?\s+|our\s+(?:next\s+|new\s+|first\s+)?)?" + _ADJ + r"senior\b"
+    r"|\bas\s+(?:an?|our)\s+" + _ADJ + r"senior\b"
+    r"|\b(?:position|role|job|career|experience|seniority)\s+level\s*[:\-–]\s*senior\b"
+    r"|\bseniority\s*:\s*senior\b"
+    r"|\bsenior[- ]level\s+(?:expertise|experience|skills)\b"
+    r"|\bthis\s+(?:is\s+a\s+)?senior\s+(?:role|position)\b",
+    re.I)
+# A sentence that also names a lower level is open to both: "a senior or mid-level engineer".
+_LOWER_LEVEL = re.compile(r"\b(?:junior|mid|medior|intermediate|graduate|entry[- ]level|early[- ]career)\b", re.I)
 
 
 def _first(title: str, keywords: list[str]) -> str | None:
@@ -129,6 +149,15 @@ def junior_only_role(title: str, rules: JuniorOnly) -> str | None:
     return ai_role.group(0) if ai_role else None
 
 
+def senior_ask(text: str) -> str | None:
+    """The sentence in which a posting asks for a senior person, if it does."""
+    for segment in sentences(text):
+        m = _SENIOR_ASK.search(segment)
+        if m and not _LOWER_LEVEL.search(segment):
+            return quote_around(segment, m.start(), m.end())
+    return None
+
+
 def fit_score(job: Job, filters: Filters) -> int:
     return sum(filters.fit_weights.get(skill, 0) for skill in job.skills)
 
@@ -157,6 +186,13 @@ def assess_relevance(job: Job, filters: Filters) -> tuple[Assessment, int]:
                               "junior_only"), score
     if yoe is not None and filters.reject_if_required_yoe_at_least and yoe >= filters.reject_if_required_yoe_at_least:
         return Assessment(IRRELEVANT, [f"Asks for {yoe}+ years of experience{said}"], "too_senior"), score
+    if filters.senior_title_words:
+        word = _first(title, filters.senior_title_words)
+        if word:
+            return Assessment(IRRELEVANT, [f'Senior role: the title says "{word}"'], "too_senior"), score
+        asked = senior_ask(job.description)
+        if asked:
+            return Assessment(IRRELEVANT, [f'Senior role: "{asked}"'], "too_senior"), score
     if yoe is not None and filters.stretch_yoe_at_least and yoe >= filters.stretch_yoe_at_least:
         reasons.append(f"Asks for {yoe}+ years (a stretch){said}")
 

@@ -135,6 +135,11 @@ _NOT_REQUIRED_BEFORE = re.compile(
 _SEGMENTS = re.compile(r"\n|(?<=[.!?;])\s+|\s*[•·▪●◦]\s*|\s+[-–]\s+(?=[A-Z])")
 
 
+def sentences(text: str) -> list[str]:
+    """A posting's sentences and bullets, split the way the years rule reads them."""
+    return [s for s in _SEGMENTS.split(text or "") if s]
+
+
 def _optional(segment: str, start: int, end: int) -> bool:
     """'Nice to have: 8+ years' or '2+ years of Rust preferred', close to the years. A comma ends
     the clause ('5+ years in Python, ideally in startups'), and an aside in brackets is about

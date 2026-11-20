@@ -412,3 +412,16 @@ Code adds up every part. Claude Code (`claude-code:opus`, on my Claude login) re
 **Why:** I want to work where AI-assisted engineering is normal, and that matters more to me than the interview format alone.
 
 **Trade-off:** Scores saved before the change read live coding as Traditional and everything else as Unknown, so a job that had a green star loses 10 points until it is scored again (`jobhunter grade --regrade`, at most 60 jobs a run).
+
+
+## 30. No senior roles, and no 5+ years
+
+**Date:** 2026-11-20
+
+**Context:** About 300 applications brought 1 interview. Of the 30 jobs shortlisted on 2026-11-19, 15 said "senior" or asked for 5+ years.
+
+**Decision:** Every target role, on the shortlist and the visa list, is rejected (code `too_senior`, the line quoted) when its title says "senior", its text asks for a senior person ("We're looking for a Senior Backend Engineer", "As a Senior Software Engineer, you will", "Position level: Senior", "senior-level expertise"), or it asks for 5+ years (was 6+).
+
+**Why:** Applying to senior roles is not working; the time goes to roles at my level instead.
+
+**Trade-off:** "Senior" anywhere in the text would have dropped good jobs ("you'll work with senior engineers", "junior and senior developers welcome"), so only an ask counts, and a sentence that also names junior or mid level is open to both. A posting that asks for a senior person in words the patterns do not know still gets through.

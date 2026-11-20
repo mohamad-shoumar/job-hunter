@@ -140,3 +140,62 @@ def test_ai_and_forward_deployed_roles_are_junior_only(title, description, reaso
 def test_junior_only_leaves_the_rest(title, description, filters):
     assessment, _ = assess_relevance(enrich(make_job(title=title, description=description)), filters)
     assert assessment.verdict != IRRELEVANT
+
+
+@pytest.mark.parametrize(
+    "title, description, reason",
+    [
+        ("Senior Backend Engineer", "Python.", 'Senior role: the title says "senior"'),
+        ("Sr. Python Developer", "Python.", 'Senior role: the title says "senior"'),
+        ("Product Engineer", "We’re looking for a Senior Product Engineer to help shape Slite.",
+         'Senior role: "We’re looking for a Senior Product Engineer to help shape Slite."'),
+        ("Python Backend Engineer", "Experience: Minimum 3 Years\nPosition Level: Senior Level",
+         'Senior role: "Position Level: Senior Level"'),
+        ("Software Engineer", "As a Senior Software Engineer, you will design and build features.",
+         'Senior role: "As a Senior Software Engineer, you will design and build features."'),
+        ("Backend Engineer", "We are seeking a highly skilled Senior Full-Stack Developer to join us.",
+         'Senior role: "We are seeking a highly skilled Senior Full-Stack Developer to join us."'),
+    ],
+)
+def test_senior_roles_are_rejected(title, description, reason, filters):
+    filters.senior_title_words = ["senior"]
+    assessment, _ = assess_relevance(enrich(make_job(title=title, description=description)), filters)
+    assert (assessment.code, assessment.reasons) == ("too_senior", [reason])
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "Collaborate with senior engineers and partner teams to clarify problems.",
+        "We're looking for Junior and Senior Developers to join our fully remote team.",
+        "We are looking for both senior and junior brilliant minds.",
+        "We're looking for a senior or mid-level engineer.",
+        "Act as the senior escalation point when an issue is beyond the Customer team.",
+        "Senior level roles typically involve a 3rd stage with our leadership team.",
+        "A clear growth path towards a Senior Full Stack Developer role.",
+        "3+ years of professional software development (5+ for the senior track).",
+    ],
+)
+def test_naming_senior_people_is_not_a_senior_ask(description, filters):
+    filters.senior_title_words = ["senior"]
+    job = enrich(make_job(title="Backend Engineer", description=description + " Python."))
+    assert assess_relevance(job, filters)[0].verdict == MATCH
+
+
+def test_senior_rule_is_off_without_the_setting(filters):
+    job = enrich(make_job(title="Senior Backend Engineer", description="We're looking for a Senior Engineer. Python."))
+    assert assess_relevance(job, filters)[0].verdict == MATCH
+
+
+def test_five_years_rejected_at_a_limit_of_five(filters):
+    filters.reject_if_required_yoe_at_least = 5
+    job = enrich(make_job(description="You have 5+ years of professional software experience."))
+    assert assess_relevance(job, filters)[0].code == "too_senior"
+
+
+def test_real_filters_reject_senior_and_five_years():
+    from pathlib import Path
+
+    from jobhunter.config import Filters
+    real = Filters.load(Path(__file__).parent.parent / "config" / "filters.json")
+    assert real.senior_title_words == ["senior"] and real.reject_if_required_yoe_at_least == 5

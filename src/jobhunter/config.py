@@ -157,6 +157,8 @@ class Filters:
     gulf_remote: GulfRemote | None = None
     # AI and forward-deployed roles: rejected unless junior (relevance.py).
     junior_only: JuniorOnly | None = None
+    # Title words that make any target role too senior (relevance.py); empty: the rule is off.
+    senior_title_words: list[str] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, data: dict) -> Filters:
@@ -186,6 +188,8 @@ class Filters:
                 relocation.local_only if relocation else None,
                 relocation.title_local_only if relocation else None),
             junior_only=JuniorOnly.from_dict(data.get("junior_only")),
+            senior_title_words=[w for w in (normalize_words(x) for x in (data.get("senior") or {}).get("title_words", []))
+                                if w],
         )
 
     @classmethod

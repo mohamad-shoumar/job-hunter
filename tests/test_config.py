@@ -25,7 +25,7 @@ def test_the_shipped_filters_load():
     filters = Filters.load(SHIPPED.filters_file)
     assert filters.title_include and filters.fit_weights
     # A misspelled key would be ignored without a word, leaving that rule off.
-    known = {f.name for f in fields(Filters)} | {"visa_list"}  # visa_list fills Filters.visa
+    known = {f.name for f in fields(Filters)} | {"visa_list", "senior"}  # visa_list fills Filters.visa, senior senior_title_words
     assert _settings(SHIPPED.filters_file) <= known
 
 
