@@ -1,4 +1,6 @@
-"""Can this company hire someone who lives in Lebanon? Deterministic first pass.
+"""Can this company hire someone who lives in your home country? Deterministic first pass.
+
+The home is Lebanon unless one is passed (geo.Home); the reasons name it ("Region includes Lebanon").
 
 Verdicts:
   eligible  the posting says so (Lebanon listed, or open worldwide)
@@ -27,15 +29,18 @@ import re
 from .extract import extract_contractor_mentions, extract_eor_mentions
 from .geo import (
     LEBANON,
+    LEBANON_HOME,
     POSITIVE_KINDS,
     REGION_OK,
     RESTRICTED,
     WORLDWIDE,
+    Home,
     PlaceMatch,
     classify_place,
+    names_home,
     scan_title,
     timezone_signal,
-    utc_offsets_allow_lebanon,
+    utc_offsets_allow,
 )
 from .gulf import GulfRemote
 from .models import ELIGIBLE, HYBRID, LIKELY, NOT_ELIGIBLE, ONSITE, REMOTE, UNCLEAR, Assessment, Job
@@ -111,7 +116,6 @@ _ROLE_WORLDWIDE = re.compile(
     r"|\bthis\s+is\s+a\s+(?:fully\s+|100%\s+)?(?:globally|worldwide)[ -]remote\s+(?:role|position|job)\b",
     re.I,
 )
-_LEBANON_PROSE = re.compile(r"\b(?:lebanon|beirut)\b", re.I)
 # "The salary range listed for this role applies to US-based candidates only": about pay, not who may apply.
 _PAY_RANGE = re.compile(r"\b(?:salary|pay|compensation)\s+(?:ranges?|bands?)\b", re.I)
 
@@ -137,14 +141,15 @@ def _snippet(text: str, start: int, end: int, width: int = 160) -> str:
 class DescriptionSignals:
     """Everything the description says about where candidates may live."""
 
-    def __init__(self, description: str):
+    def __init__(self, description: str, home: Home | None = None):
+        home = home or LEBANON_HOME
         text = description or ""
         self.restrictions: list[str] = []
         # "must be based in Europe or the Middle East": a rule naming a place that fits.
         self.place_positives: list[str] = []
         for pattern in _RESIDENCY_PATTERNS + _PLACE_QUALIFIER_PATTERNS:
             for m in pattern.finditer(text):
-                kind = classify_place(m.group("place")).kind
+                kind = classify_place(m.group("place"), home=home).kind
                 if kind == RESTRICTED:
                     self.restrictions.append(_snippet(text, m.start(), m.end()))
                 elif kind in POSITIVE_KINDS or kind == LEBANON:
@@ -156,11 +161,11 @@ class DescriptionSignals:
         # "we hire around the world": often company boilerplate, not about this role.
         prose = (_snippet(text, m.start(), m.end()) for m in _WORLDWIDE_PROSE.finditer(text))
         self.worldwide_prose = next((s for s in prose if not _TIME_LIMITED.search(s)), None)
-        m = _LEBANON_PROSE.search(text)
-        self.lebanon = _snippet(text, m.start(), m.end()) if m else None
+        m = names_home(text, home)
+        self.home_named = _snippet(text, m.start(), m.end()) if m else None
         self.eor = extract_eor_mentions(text)
         self.contractor = extract_contractor_mentions(text)
-        self.timezone = timezone_signal(text)
+        self.timezone = timezone_signal(text, home)
         self.restrictions = list(dict.fromkeys(r for r in self.restrictions if not _PAY_RANGE.search(r)))
         self.place_positives = list(dict.fromkeys(self.place_positives))
 
@@ -172,8 +177,8 @@ class DescriptionSignals:
         not: it appears on every posting, including the ones limited to one
         country.
         """
-        if self.lebanon:
-            return self.lebanon
+        if self.home_named:
+            return self.home_named
         if self.place_positives:
             return self.place_positives[0]
         if self.eor:
@@ -194,21 +199,24 @@ def _quote(matches: list[PlaceMatch]) -> str:
 
 
 def assess_eligibility(job: Job, relocation: Relocation | None = None, visa: VisaRules | None = None,
-                       gulf: GulfRemote | None = None) -> Assessment:
+                       gulf: GulfRemote | None = None, home: Home | None = None) -> Assessment:
     """`relocation`: the countries you would move to (relocation.py). Jobs there may be on-site.
 
     `visa`: the countries you would move to on a work visa (visa.py): judged on sponsorship evidence.
 
     `gulf`: Gulf countries you would work for but not move to (gulf.py): only their remote jobs count.
+
+    `home`: where you live (geo.Home); Lebanon when not given.
     """
+    home = home or LEBANON_HOME
     field_texts = job.allowed_locations or ([job.location_raw] if job.location_raw else [])
-    field_matches = [classify_place(t, field=True) for t in field_texts]
-    title_matches = scan_title(job.title)
+    field_matches = [classify_place(t, field=True, home=home) for t in field_texts]
+    title_matches = scan_title(job.title, home)
     everything = field_matches + title_matches
 
-    lebanon = [m for m in everything if m.kind == LEBANON]
-    if lebanon:
-        return Assessment(ELIGIBLE, [f"Lebanon is listed: {_quote(lebanon)}"], "lebanon_listed")
+    listed = [m for m in everything if m.kind == LEBANON]
+    if listed:
+        return Assessment(ELIGIBLE, [f"{home.name} is listed: {_quote(listed)}"], f"{home.word}_listed")
 
     # In a country you would move to, on-site is fine; so is "Remote (UAE)", which means living there.
     # A region that includes Lebanon ("EMEA, Dubai") is still the remote path below.
@@ -224,7 +232,7 @@ def assess_eligibility(job: Job, relocation: Relocation | None = None, visa: Vis
         where = job.location_raw or ", ".join(job.allowed_locations) or "no location given"
         return Assessment(NOT_ELIGIBLE, [f'Not remote ({job.remote_status}): "{where}"'], "not_remote")
 
-    remote = _assess_remote(job, field_texts, field_matches, title_matches, gulf)
+    remote = _assess_remote(job, field_texts, field_matches, title_matches, gulf, home)
     # "Middle East", but: location "UAE": limited to people living in the UAE, so the relocation rules decide.
     if place and remote.code == "location_conflict":
         return assess_relocation(job, place, relocation)
@@ -236,7 +244,7 @@ def assess_eligibility(job: Job, relocation: Relocation | None = None, visa: Vis
 
 
 def _assess_gulf_remote(job: Job, restricted: list[PlaceMatch], desc: DescriptionSignals,
-                        gulf: GulfRemote, notes: list[str], doubt: str | None = None) -> Assessment:
+                        gulf: GulfRemote, notes: list[str], home: Home, doubt: str | None = None) -> Assessment:
     """A remote job listed in Kuwait or Bahrain: countries you would work for, not move to (gulf.py)."""
     title = gulf.title_local_only.search(job.title or "") if gulf.title_local_only else None
     if title:
@@ -255,19 +263,19 @@ def _assess_gulf_remote(job: Job, restricted: list[PlaceMatch], desc: Descriptio
         return Assessment(NOT_ELIGIBLE, [f"Restricted to {_quote(restricted)}, and {rules[0]}"], code)
     doubted += [f"But: {rule[0].upper()}{rule[1:]}" for rule in rules]
     return Assessment(UNCLEAR, [f"Remote, listed in {_quote(restricted)}: a country you would work for from "
-                                f"Lebanon, not move to ({gulf.countries}). Can they hire someone living in "
-                                "Lebanon?"] + doubted + notes, "gulf_remote")
+                                f"{home.name}, not move to ({gulf.countries}). Can they hire someone living in "
+                                f"{home.name}?"] + doubted + notes, "gulf_remote")
 
 
 def _assess_remote(job: Job, field_texts: list[str], field_matches: list[PlaceMatch],
-                   title_matches: list[PlaceMatch], gulf: GulfRemote | None = None) -> Assessment:
-    """A remote job (or one that does not say): can someone living in Lebanon be hired?"""
+                   title_matches: list[PlaceMatch], gulf: GulfRemote | None, home: Home) -> Assessment:
+    """A remote job (or one that does not say): can someone living in the home be hired?"""
     tz_conflict = None
-    if job.allowed_utc_offsets and not utc_offsets_allow_lebanon(job.allowed_utc_offsets):
+    if job.allowed_utc_offsets and not utc_offsets_allow(job.allowed_utc_offsets, home):
         offsets = ", ".join(f"UTC{o:+g}" for o in sorted(set(job.allowed_utc_offsets)))
         tz_conflict = f"candidates must be in these time zones: {offsets}"
 
-    desc = DescriptionSignals(job.description)
+    desc = DescriptionSignals(job.description, home)
     notes = []
     if desc.contractor:
         notes.append("Mentions contractor hiring: " + ", ".join(desc.contractor))
@@ -296,7 +304,7 @@ def _assess_remote(job: Job, field_texts: list[str], field_matches: list[PlaceMa
             narrowed = ([] if title_positive else title_restricted) + ([] if field_positive else field_restricted)
             if (gulf and job.remote_status == REMOTE and narrowed and not desc.restrictions and not tz_conflict
                     and gulf.only_place([m.evidence for m in narrowed])):
-                return _assess_gulf_remote(job, narrowed, desc, gulf, notes)
+                return _assess_gulf_remote(job, narrowed, desc, gulf, notes, home)
             return Assessment(
                 NOT_ELIGIBLE,
                 [f"Location says {_quote(positive)}, but: " + " | ".join(conflicts)] + notes,
@@ -305,21 +313,22 @@ def _assess_remote(job: Job, field_texts: list[str], field_matches: list[PlaceMa
         if WORLDWIDE in kinds:
             return Assessment(ELIGIBLE, [f"Open worldwide: {_quote(positive)}"] + notes, "worldwide")
         if REGION_OK in kinds:
-            return Assessment(LIKELY, [f"Region includes Lebanon: {_quote(positive)}"] + notes, "region_ok")
-        return Assessment(LIKELY, [f"Time zone window includes Lebanon: {_quote(positive)}"] + notes, "timezone_ok")
+            return Assessment(LIKELY, [f"Region includes {home.name}: {_quote(positive)}"] + notes, "region_ok")
+        return Assessment(LIKELY, [f"Time zone window includes {home.name}: {_quote(positive)}"] + notes,
+                          "timezone_ok")
 
     restricted = field_restricted + title_restricted
     if restricted:
         # "Remote - Europe (UTC-1 to UTC+3)": the place may be loose wording
         # for a time zone window that does include Lebanon.
-        tz_in_field = next((timezone_signal(t) for t in field_texts if timezone_signal(t)), None)
+        tz_in_field = next((timezone_signal(t, home) for t in field_texts if timezone_signal(t, home)), None)
         doubt = desc.specific_positive or (f"time zone window {tz_in_field}" if tz_in_field else None)
         # Remote in a Gulf country you would work for but not move to: the AI check asks whether
         # they can hire from Lebanon. Only remote, so on-site there stays rejected (not_remote).
         # A job with a doubt is judged here too, so it keeps the code that stops the AI check
         # from rejecting it on the location alone (classify.py); the doubt goes with it.
         if gulf and job.remote_status == REMOTE and gulf.only_place([m.evidence for m in restricted]):
-            return _assess_gulf_remote(job, restricted, desc, gulf, notes, doubt)
+            return _assess_gulf_remote(job, restricted, desc, gulf, notes, home, doubt)
         if doubt:
             return Assessment(UNCLEAR, [f"Restricted to {_quote(restricted)}, but: {doubt}"] + notes, "conflict")
         return Assessment(NOT_ELIGIBLE, [f"Restricted to {_quote(restricted)}"] + notes, "location_restricted")
@@ -336,15 +345,16 @@ def _assess_remote(job: Job, field_texts: list[str], field_matches: list[PlaceMa
                 "conflict",
             )
         return Assessment(NOT_ELIGIBLE, [f'Description limits location: "{desc.restrictions[0]}"'], "residency_required")
-    if desc.lebanon:
-        return Assessment(LIKELY, [f'Description mentions Lebanon: "{desc.lebanon}"'] + notes, "description_lebanon")
+    if desc.home_named:
+        return Assessment(LIKELY, [f'Description mentions {home.name}: "{desc.home_named}"'] + notes,
+                          f"description_{home.word}")
     positive = desc.place_positives[0] if desc.place_positives else desc.worldwide_prose
     if positive:
         return Assessment(LIKELY, [f'Description: "{positive}"'] + notes, "description_positive")
     if desc.eor:
         return Assessment(LIKELY, notes, "eor")
     if desc.timezone:
-        return Assessment(LIKELY, [f'Time zone window includes Lebanon: "{desc.timezone}"'] + notes, "timezone_ok")
+        return Assessment(LIKELY, [f'Time zone window includes {home.name}: "{desc.timezone}"'] + notes, "timezone_ok")
     location = job.location_raw or "none given"
     return Assessment(
         UNCLEAR,

@@ -9,7 +9,9 @@ from dataclasses import dataclass, field, fields
 from pathlib import Path
 
 from .agency import AgencyRules
+from .geo import LEBANON_HOME, Home
 from .gulf import GulfRemote
+from .homes import home_from
 from .identity import company_key
 from .relocation import Relocation
 from .text import normalize_words
@@ -159,6 +161,8 @@ class Filters:
     junior_only: JuniorOnly | None = None
     # Title words that make any target role too senior (relevance.py); empty: the rule is off.
     senior_title_words: list[str] = field(default_factory=list)
+    # Where you live (geo.Home, homes.py): every location rule is judged against it. Lebanon by default.
+    home: Home = LEBANON_HOME
 
     @classmethod
     def from_dict(cls, data: dict) -> Filters:
@@ -190,6 +194,7 @@ class Filters:
             junior_only=JuniorOnly.from_dict(data.get("junior_only")),
             senior_title_words=[w for w in (normalize_words(x) for x in (data.get("senior") or {}).get("title_words", []))
                                 if w],
+            home=home_from(data.get("home")),
         )
 
     @classmethod

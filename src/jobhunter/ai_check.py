@@ -173,7 +173,7 @@ def rule_reason(job: Job, filters: Filters | None = None) -> str:
     ...: can they hire someone living in Lebanon?", not "Restricted to ...", which would answer
     the question for the model (gulf.py).
     """
-    rules = (assess_eligibility(job, filters.relocation, filters.visa, filters.gulf_remote)
+    rules = (assess_eligibility(job, filters.relocation, filters.visa, filters.gulf_remote, filters.home)
              if filters else assess_eligibility(job))
     return (rules.reasons or [""])[0]
 
