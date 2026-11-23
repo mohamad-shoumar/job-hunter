@@ -644,3 +644,58 @@ def test_build_py_names_every_pdf_after_you_only(tmp_path, monkeypatch):
     assert build.cv_pdf(tmp_path / "resume.md") == tmp_path / "output" / "General" / "Jane_Q_Doe.pdf"
     monkeypatch.delenv("MY_NAME")
     assert build.cv_pdf(tmp_path / "resume.md").name == "Someone_Else.pdf"  # no MY_NAME: the file's "# Name"
+
+
+# --- a base CV of its own for FDE / Solutions roles (role_cvs) ---------------------------------
+
+FDE_BASE = """// hand-made FDE CV
+# Jane Doe
+title: Forward Deployed Engineer
+
+## Summary
+A pitch of my own.
+
+## Professional Experience
+
+### Acme, Dubai | Sep 2025 - Present
+Team Lead
+- A bullet written by hand.
+"""
+
+
+def fde_config(resume):
+    (resume / "versions").mkdir(exist_ok=True)
+    (resume / "versions" / "Master_FDE.md").write_text(FDE_BASE)
+    return config_for(resume, role_cvs=[{"titles": ["forward deployed", "solutions engineer"],
+                                         "cv": "versions/Master_FDE.md"}])
+
+
+@pytest.mark.parametrize("title, headline", [
+    ("Senior Solutions Engineer, EMEA", "Senior Solutions Engineer"),
+    ("Forward Deployed Banker", "Forward Deployed Engineer"),  # not one role: the base CV's own headline
+])
+def test_an_fde_or_solutions_job_gets_the_base_cv_as_it_is(resume, filters, title, headline):
+    store = JobStore(":memory:")
+    job_id = store_job(store, filters, title=title)
+    build = FakeBuild()
+    meta = tailor_for_job(store, job_id, writer(), PROFILE_FILE, fde_config(resume), NOW, builder=build)
+    assert len(build.sources) == 1 and meta["base"] == "versions/Master_FDE.md" and meta["cost_usd"] == 0.0
+    text = build.sources[0]
+    assert f"title: {headline}\n" in text and "- A bullet written by hand.\n" in text and "A pitch of my own." in text
+    assert meta["headline"] == headline and get_application(store, job_id)["cv_file"] == meta["file"]
+    assert (resume / "versions" / "Master_FDE.md").read_text() == FDE_BASE  # the base is never changed
+
+
+def test_other_jobs_are_still_tailored_from_resume_md(resume, filters):
+    store = JobStore(":memory:")
+    job_id = store_job(store, filters)
+    meta = tailor_for_job(store, job_id, writer(GOOD), PROFILE_FILE, fde_config(resume), NOW, builder=FakeBuild())
+    assert "base" not in meta and meta["headline"] == "Senior Backend Engineer"
+
+
+def test_a_missing_base_cv_falls_back_to_tailoring(resume, filters):
+    store = JobStore(":memory:")
+    job_id = store_job(store, filters, title="Forward Deployed Engineer")
+    config = config_for(resume, role_cvs=[{"titles": ["forward deployed"], "cv": "versions/Gone.md"}])
+    meta = tailor_for_job(store, job_id, writer(GOOD), PROFILE_FILE, config, NOW, builder=FakeBuild())
+    assert "base" not in meta

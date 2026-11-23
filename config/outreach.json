@@ -58,6 +58,10 @@
 
   "_cv_tags": "Which optional profile bullets a tailored CV prints. Each bullet in profile/master_profile.md is tagged: [core] always prints, [lead]/[fullstack]/[automation]/[mobile] only when the job matches that tag - a phrase below in its title, or in the posting (whole words, any case - except a phrase with a capital letter, which must match that case: \"React\" but not \"react to incidents\"). The same tag also picks the role's printed title (Team Lead for lead jobs). Empty means the defaults in cv.py TAG_RULES; a tag you list here replaces that tag's default lists. Example: {\"lead\": {\"title\": [\"lead\", \"manager\"], \"posting\": [\"team lead\", \"mentoring\"]}}",
   "cv_tags": {},
+  "_role_cvs": "Jobs whose title has one of these phrases (whole words, any case) get that base CV (in resume_dir), copied as it is instead of tailored: no model; only the headline follows the posting's title, else the base CV's own. The user's call 2026-11-23: Forward Deployed and Solutions Engineer roles use the FDE CV.",
+  "role_cvs": [
+    {"titles": ["forward deployed", "forward-deployed", "solutions engineer", "solution engineer"], "cv": "versions/Master_FDE_v2.md"}
+  ],
 
 
   "_catch_up_days": "The daily run also tailors CVs for shortlisted jobs filed this many days back that still have none (e.g. one that failed on a network error at wake-up), within the same per-run caps. 0 turns this off.",
