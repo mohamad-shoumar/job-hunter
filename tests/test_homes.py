@@ -116,3 +116,10 @@ def test_only_us_time_zones_near_the_home_fit():
     assert classify_place("Remote (PST)", field=True, home=br).kind == RESTRICTED
     assert classify_place("Remote (EST)", field=True, home=br).kind == TIMEZONE_OK
     assert classify_place("REMOTE (AMER or EMEA time zones)", field=True, home=br).kind == REGION_OK
+
+
+def test_a_city_shared_with_another_country_does_not_name_the_home():
+    for code, place in (("EG", "Alexandria, VA"), ("NG", "Lagos, Portugal"), ("IN", "Hyderabad, Sindh, Pakistan")):
+        result = assess_eligibility(make_job(location_raw=place), home=HOMES[code])
+        assert result.code != "home_listed", (code, place)
+    assert assess_eligibility(make_job(location_raw="Alexandria, Egypt"), home=HOMES["EG"]).code == "home_listed"

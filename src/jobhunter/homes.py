@@ -14,6 +14,8 @@ the job reads as restricted, never as open. Notes per country:
   Brazil) is a restriction, as it is for Lebanon.
 - Philippines: APAC, Asia, Southeast Asia.
 - Jordan is left out: "Jordan" is a common first name, so prose would read people as places.
+- A city that shares its name with a place elsewhere never names a home on its own: Alexandria
+  (Virginia), Lagos (Portugal), Hyderabad (Pakistan). "Alexandria, Egypt" still names Egypt.
 
 UTC offsets are winter and summer where the country changes its clocks (Egypt does again
 since 2023; Brazil stopped in 2019).
@@ -27,16 +29,16 @@ _LATAM = ("latam", "latin america", "south america", "americas", "amer")
 
 HOMES: dict[str, Home] = {
     "LB": LEBANON_HOME,
-    "EG": Home("EG", "Egypt", ("egypt", "egyptian", "cairo", "alexandria", "giza"), ("egypt", "cairo", "alexandria"),
+    "EG": Home("EG", "Egypt", ("egypt", "egyptian", "cairo", "giza"), ("egypt", "cairo"),
                (2.0, 3.0), ("emea", "mena", "menat", "middle east", "middle eastern", "near east", "arab world",
                             "arab region", "arab countries", "eastern mediterranean", "africa", "north africa")),
     "PK": Home("PK", "Pakistan", ("pakistan", "pakistani", "karachi", "lahore", "islamabad"),
                ("pakistan", "karachi", "lahore", "islamabad"), (5.0,), ("south asia", "asia", "apac", "asia pacific")),
-    "IN": Home("IN", "India", ("india", "indian", "bangalore", "bengaluru", "hyderabad", "pune", "mumbai", "delhi",
+    "IN": Home("IN", "India", ("india", "indian", "bangalore", "bengaluru", "pune", "mumbai", "delhi",
                                "new delhi", "gurgaon", "gurugram", "noida", "chennai", "kolkata"),
-               ("india", "bangalore", "bengaluru", "hyderabad", "pune", "mumbai", "new delhi", "gurugram", "chennai"),
+               ("india", "bangalore", "bengaluru", "pune", "mumbai", "new delhi", "gurugram", "chennai"),
                (5.5,), ("south asia", "asia", "apac", "asia pacific")),
-    "NG": Home("NG", "Nigeria", ("nigeria", "nigerian", "lagos", "abuja"), ("nigeria", "lagos", "abuja"),
+    "NG": Home("NG", "Nigeria", ("nigeria", "nigerian", "abuja"), ("nigeria", "abuja"),
                (1.0,), ("emea", "africa", "sub saharan africa", "west africa")),
     "KE": Home("KE", "Kenya", ("kenya", "kenyan", "nairobi"), ("kenya", "nairobi"),
                (3.0,), ("emea", "africa", "sub saharan africa", "east africa")),
