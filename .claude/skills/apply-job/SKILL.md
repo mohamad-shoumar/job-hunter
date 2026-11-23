@@ -86,6 +86,13 @@ call, 2026-11-18).
   - There is no Summary section, and no `TODO` or leftover tag such as `[core]`.
   - The "Code changed these" warnings don't point to a broken line.
   If something critical is wrong, fall back to the general CV (`resume/output/General/<First>_<Last>.pdf`), note it for the report and keep going. Don't fix a broken CV by hand.
+- **Forward Deployed and Solutions Engineer jobs use the FDE base CV** (the user's call,
+  2026-11-23; `role_cvs` in `config/outreach.json`): Tailor CV copies
+  `resume/versions/Master_FDE_v2.md` as it is, with only the headline taken from the posting (the
+  card's changes say "Base CV for this role"; `base` in `cv_tailored_json`). Its Summary, its
+  "Team Lead" title and its bullet order are the user's own: never mirror or reorder it, whatever
+  the score. If such a job still shows a CV tailored before 2026-11-23 (no "Base CV" line), press
+  **Tailor CV to this job** again to get the FDE one.
 - **Mirror it only for a fit score of 65 or more** (the user's call, 2026-10-31: mirroring is real
   work, so it goes to the best-fitting jobs; it was "grade 4 or 5" before the 0-100 score of
   2026-11-15). The card shows the score chip; or

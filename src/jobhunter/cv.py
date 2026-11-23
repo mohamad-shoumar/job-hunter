@@ -787,6 +787,8 @@ def tailor_for_job(store: JobStore, job_id: int, writer: CvWriter, profile_path:
         raise TailorError(f"You edited this CV ({old['source']}) on {old['edited_at'][:10]}: tailoring again "
                           "replaces your edits, so confirm it first")
     store.commit()  # no write lock held during the model call
+    if base := role_cv(job["title"], config):
+        return _from_base(store, job_id, job, company, app, old, base, folder, profile, config, now, builder, pick)
 
     tags = job_tags(job["title"], job["description"] or "", {**TAG_RULES, **(config.cv_tags or {})})
     roles, skipped = select(roles, tags)
@@ -829,10 +831,20 @@ def tailor_for_job(store: JobStore, job_id: int, writer: CvWriter, profile_path:
         plan.notes.append(f"Cut to fit one page: {', '.join(items)} from {label} (the last skills in the row)")
     if pages > 1:
         plan.notes.append(f"It is {pages} pages even in compact mode: cut a bullet in {source}")
+    return _finish(store, job_id, job, company, app, old, folder, profile, config, now, pick, pdf, source, pages, {
+        "stem": stem, "headline": plan.headline, "changes": plan.changes, "notes": plan.notes,
+        "tags": tags, "titles": plan.titles,
+        "model": writer.model.model, "cost_usd": usage.cost(writer.model.model) or 0.0, "attempts": attempts,
+    })
+
+
+def _finish(store: JobStore, job_id: int, job, company: str, app, old: dict | None, folder: Path, profile,
+            config: OutreachConfig, now: datetime, pick: bool, pdf: Path, source: Path, pages: int, meta: dict) -> dict:
+    """Record the built CV: the tracker row, the job's tailored meta, the attachment and an event."""
     file = cv_rel(config, pdf)  # Backend_Acme_Sep2026/<First>_<Last>.pdf: what cv_file and the app name it by
     attachable = file is not None
     if not attachable:
-        plan.notes.append(f"build.py wrote {pdf.parent}, not cv_dir ({config.cv_dir}), so it cannot be attached")
+        meta["notes"].append(f"build.py wrote {pdf.parent}, not cv_dir ({config.cv_dir}), so it cannot be attached")
     tracker = folder / "applications.csv"
     if old is None and tracker.is_file():
         with tracker.open("a", newline="") as f:
@@ -841,18 +853,66 @@ def tailor_for_job(store: JobStore, job_id: int, writer: CvWriter, profile_path:
 
     posting = f"{job['title']}\n{job['description'] or ''}"
     meta = {
-        "stem": stem, "file": file or pdf.name, "path": str(pdf), "source": str(source.relative_to(folder)), "pages": pages,
-        "headline": plan.headline, "changes": plan.changes, "notes": plan.notes,
-        "tags": tags, "titles": plan.titles,
-        "gaps": sorted(set(extract_skills(posting)) - profile.skills),
-        "model": writer.model.model, "cost_usd": usage.cost(writer.model.model) or 0.0, "attempts": attempts,
-        "written_at": iso(now),
+        "file": file or pdf.name, "path": str(pdf), "source": str(source.relative_to(folder)), "pages": pages,
+        "gaps": sorted(set(extract_skills(posting)) - profile.skills), **meta, "written_at": iso(now),
     }
     attach = attachable and (pick or not app["cv_file"] or (old is not None and app["cv_file"] == old["file"]))
     save_tailored_cv(store, job_id, meta, now, attach=file if attach else None)
     add_event(store, job_id, "cv", f"CV tailored: {meta['file']}" + (" (again)" if old else ""), now)
     store.commit()
     return meta
+
+
+# --- a base CV of its own for some roles ------------------------------------------------------
+# Forward Deployed and Solutions Engineer jobs (the user's call 2026-11-23) get a CV made by hand
+# (`role_cvs` in outreach.json: versions/Master_FDE_v2.md), copied as it is: no model, its own
+# bullets, summary and skills rows. Only the headline follows the posting's title.
+
+
+def role_cv(title: str, config: OutreachConfig) -> Path | None:
+    """The base CV `role_cvs` names for a job with this title, when that file exists."""
+    folder = Path(config.resume_dir).expanduser()
+    for rule in config.role_cvs or []:
+        if any(_phrase_in(p, title or "") for p in rule.get("titles", [])):
+            path = folder / rule["cv"]
+            return path if path.is_file() else None
+    return None
+
+
+def _base_title(lines: list[str]) -> str:
+    return next((s.split(":", 1)[1].strip() for s in (raw.strip() for raw in lines)
+                 if s.lower().startswith("title:")), "")
+
+
+def _from_base(store: JobStore, job_id: int, job, company: str, app, old: dict | None, base: Path, folder: Path,
+               profile, config: OutreachConfig, now: datetime, builder, pick: bool) -> dict:
+    lines = base.read_text().splitlines()
+    default = _base_title(lines)
+    headline = cv_headline(job["title"]) or default
+    notes = [] if cv_headline(job["title"]) else [
+        f'Headline "{default}", the base CV\'s own: the posting\'s title "{job["title"]}" does not read as one role']
+    stem = old["stem"] if old else _new_stem(folder, job["title"], company, now)
+    source = folder / "versions" / f"{stem}.md"
+    source.parent.mkdir(exist_ok=True)
+    rel = str(base.relative_to(folder))
+    out, in_header = [f"// BASE CV {rel} for {company} - {job['title']} (job #{job_id}, {now:%b %Y}). "
+                      "Tailor again in the app rewrites this file."], True
+    for raw in lines:
+        s = raw.strip()
+        if s.startswith("## "):
+            in_header = False
+        if in_header and s.lower().startswith("title:"):
+            raw = f"title: {headline}"
+        out.append(raw)
+    source.write_text("\n".join(out).rstrip() + "\n")
+    pdf, pages = builder(folder, source)
+    if pages > 1:
+        notes.append(f"It is {pages} pages: cut a bullet in {source}")
+    return _finish(store, job_id, job, company, app, old, folder, profile, config, now, pick, pdf, source, pages, {
+        "stem": stem, "headline": headline, "notes": notes, "tags": {}, "titles": {},
+        "changes": [f"Base CV for this role: {rel}, copied as it is (no model); headline from the posting"],
+        "model": "none (base CV)", "cost_usd": 0.0, "attempts": 0, "base": rel,
+    })
 
 
 # --- your edits ----------------------------------------------------------------------------

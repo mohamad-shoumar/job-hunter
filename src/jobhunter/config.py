@@ -246,6 +246,9 @@ class OutreachConfig:
     max_cvs_per_run: int = 5
     # Replaces cv.TAG_RULES for the tags it names: {"lead": {"title": [...], "posting": [...]}}.
     cv_tags: dict = field(default_factory=dict)
+    # Roles with a base CV of their own, copied instead of tailored (cv.role_cv):
+    # [{"titles": ["forward deployed", ...], "cv": "versions/Master_FDE_v2.md"}], cv relative to resume_dir.
+    role_cvs: list = field(default_factory=list)
     # The daily run also catches up on shortlisted jobs filed this many days back that still have no
     # tailored CV (one that failed, e.g. on a network error at wake-up).
     catch_up_days: int = 7
