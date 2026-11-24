@@ -219,9 +219,9 @@ def test_timing_marks_steps_and_reports_minutes_with_company_names(home, capsys,
     capsys.readouterr()
     assert jobhunter(home, "timing", "report") == 0
     out = capsys.readouterr().out
-    assert "15m working" in out and "4m lost to snags" in out
-    assert "| #1 Acme | 3 | 9 |  | 4 | 12 |" in out
-    assert "- #1 Acme, Form, 4 min: Upload button did nothing → fix: use the stand-in box" in out
+    assert "15.0 min of work for 1 job: 1 form filled. Snags cost 4.0 min." in out
+    assert "| #1 Acme | 12.0 | form filled |" in out
+    assert "- #1 Acme, 4.0 min: Upload button did nothing. Fix: use the stand-in box" in out
     assert (home / "data" / "apply_timing.jsonl").exists()
 
 

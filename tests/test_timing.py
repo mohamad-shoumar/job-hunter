@@ -25,15 +25,31 @@ def test_a_step_lasts_until_the_next_mark_and_snag_time_counts_as_lost(tmp_path)
     timing.mark(log, None, "waiting", at(16))
     out = timing.report(timing.read(log), at(30), labels={7: "#7 Acme"})
 
-    assert out.startswith("**Run 2026-11-24 17:00-17:30 UTC:** 16m working, 14m waiting on you, "
-                          "4m lost to snags; 1 job, 14m a job.")
-    assert "| Job | Setup | Posting | Form | Lost | Total |" in out
-    assert "| #7 Acme |  | 3 | 11 | 4 | 14 |" in out
-    assert "| Run (no job) | 2 |  |  |  | 2 |" in out
-    assert "| **Total** | 2 | 3 | 11 | 4 | 16 |" in out
-    assert "- #7 Acme, Form, 4 min: Location box needs its suggestion clicked → fix: add it to the skill" in out
-    assert "- #7 Acme, Form: Guessed 1 year for LLM apps in production" in out
-    assert "Last runs" not in out  # only one run so far
+    assert out.startswith("**This run** (2026-11-24 17:00-17:30 UTC): 16.0 min of work for 1 job: "
+                          "1 form filled. Snags cost 4.0 min. Waiting on you: 14.0 min (not counted).")
+    assert "| Filling the form | 11.0 | 69% |" in out  # biggest step first
+    assert "| Checking the posting | 3.0 | 19% |" in out
+    assert "| Setup | 2.0 | 12% |" in out
+    assert out.index("Filling the form") < out.index("Checking the posting") < out.index("| Setup")
+    assert "| #7 Acme | 14.0 | form filled |" in out
+    assert "- #7 Acme, 4.0 min: Location box needs its suggestion clicked. Fix: add it to the skill" in out
+    assert "- #7 Acme: Guessed 1 year for LLM apps in production" in out
+    assert "Earlier runs" not in out  # only one run so far
+
+
+def test_each_job_gets_a_result_and_skipped_jobs_share_one_row(tmp_path):
+    log = tmp_path / "apply_timing.jsonl"
+    timing.mark(log, 1, "posting", at(0))  # skipped
+    timing.mark(log, 2, "posting", at(1))  # skipped
+    timing.mark(log, 3, "posting", at(2))
+    timing.mark(log, 3, "tailor", at(3))
+    timing.mark(log, 3, "linkedin", at(5))  # a sign-in page: CV and contact, no form
+    timing.mark(log, None, "report", at(8))
+    out = timing.report(timing.read(log), at(9))
+    assert "for 3 jobs: 1 needs your sign-in, 2 skipped." in out
+    assert "| #3 | 6.0 | needs your sign-in |" in out
+    assert "| 2 skipped jobs | 2.0 (1.0 each) | skipped |" in out
+    assert "| #1 |" not in out
 
 
 def test_a_mark_with_no_open_run_starts_one_and_old_runs_stop_at_their_last_line(tmp_path):
@@ -45,11 +61,11 @@ def test_a_mark_with_no_open_run_starts_one_and_old_runs_stop_at_their_last_line
     assert first != second
     records = timing.read(log)
     old = timing.report(records, later + timedelta(minutes=5), run=first)
-    assert "| #1 | 10 |  | 10 |" in old  # the cv mark was its last line: 0 minutes, not a day
-    assert "CV check" not in old  # a step with no time gets no column
+    assert "10.0 min of work for 1 job" in old  # the cv mark was its last line: 0 minutes, not a day
+    assert "Checking the CV" not in old  # a step with no time gets no row
     new = timing.report(records, later + timedelta(minutes=5))
-    assert "| #2 | 5 |  | 5 |" in new
-    assert "Last runs:" in new and "| 2026-11-24 17:00 | 1 | 10m | 10m | 0m |" in new
+    assert "| 1 skipped job | 5.0 (5.0 each) | skipped |" in new
+    assert "**Earlier runs**" in new and "| 2026-11-24 17:00 | 1 | 10.0 | 10.0 |" in new
 
 
 def test_a_run_replaced_by_a_newer_one_the_same_day_is_not_stretched_to_now(tmp_path):
@@ -61,8 +77,8 @@ def test_a_run_replaced_by_a_newer_one_the_same_day_is_not_stretched_to_now(tmp_
     timing.mark(log, 2, "posting", at(180))
     records = timing.read(log)
     old = timing.report(records, at(190), run=morning)
-    assert "**Run 2026-11-24 17:00-17:05 UTC:** 5m working" in old
-    assert "| 2026-11-24 17:00 | 1 | 5m | 5m | 0m |" in timing.report(records, at(190))
+    assert "(2026-11-24 17:00-17:05 UTC): 5.0 min of work" in old
+    assert "| 2026-11-24 17:00 | 1 | 5.0 | 5.0 |" in timing.report(records, at(190))
 
 
 def test_unknown_steps_and_runs_are_refused(tmp_path):

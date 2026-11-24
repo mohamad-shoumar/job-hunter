@@ -15,16 +15,16 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 
-STEPS = {  # the skill's steps, in the order the table shows them
+STEPS = {  # the skill's steps, in its order, with the plain name the report prints
     "setup": "Setup",
-    "posting": "Posting",  # 1. check you can apply
-    "tailor": "Tailor wait",  # 2. Tailor CV pressed, waiting for it
-    "cv": "CV check",  # 2. checking it, the one-page fix
-    "mirror": "Mirror",  # 2. the mirror-cv skill
-    "form": "Form",  # 3.
-    "linkedin": "LinkedIn",  # 4.
-    "cover": "Cover letter",  # 5.
-    "report": "Report",
+    "posting": "Checking the posting",  # 1. check you can apply
+    "tailor": "Waiting for Tailor CV",  # 2. Tailor CV pressed
+    "cv": "Checking the CV",  # 2. the one-page fix
+    "mirror": "Mirroring the CV",  # 2. the mirror-cv skill
+    "form": "Filling the form",  # 3.
+    "linkedin": "Finding the LinkedIn contact",  # 4.
+    "cover": "Writing the cover letter",  # 5.
+    "report": "Writing the report",
     "waiting": "Waiting on you",  # never counted as working time
 }
 WAITING = "waiting"
@@ -136,17 +136,8 @@ def segments(lines: list[dict], now: datetime, newest: bool = True) -> list[Segm
 
 
 def minutes(td: timedelta) -> str:
-    secs = td.total_seconds()
-    if secs <= 0:
-        return ""
-    if secs < 30:
-        return "<1"
-    return str(round(secs / 60))
-
-
-def duration(td: timedelta) -> str:
-    total = round(td.total_seconds() / 60)
-    return f"{total // 60}h {total % 60:02d}m" if total >= 60 else f"{total}m"
+    """Minutes with one decimal ("2.5"), so a short step reads as a number, not "<1"."""
+    return f"{max(td.total_seconds(), 0) / 60:.1f}"
 
 
 def runs(records: list[dict]) -> list[str]:
@@ -173,10 +164,25 @@ def totals(segs: list[Segment]) -> Totals:
     return Totals(working, waiting, lost, jobs)
 
 
+FILLED, READY, SKIPPED = "form filled", "needs your sign-in", "skipped"
+HEADLINE = {FILLED: "{n} form{s} filled", READY: "{n} need{v} your sign-in", SKIPPED: "{n} skipped"}
+
+
+def result(steps: set[str]) -> str:
+    """What happened to a job, from the steps it got: a form filled, a CV and contact ready for a form
+    only the user can open (a sign-in), or skipped at the posting check."""
+    if "form" in steps:
+        return FILLED
+    if steps <= {"posting"}:
+        return SKIPPED
+    return READY
+
+
 def report(records: list[dict], now: datetime, run: str | None = None,
            labels: dict[int, str] | None = None, history: int = 5) -> str:
-    """The run's job x step table in minutes, where the time went, its snags and notes, and the last
-    few runs side by side. Code does the sums; the skill pastes this into its report."""
+    """A short summary of the run: one headline, where the time went (one row per step), the time each
+    job took (skipped jobs on one row), the snags with their fixes, the notes, and earlier runs. Code
+    does the sums; the skill pastes this into its report."""
     labels = labels or {}
     all_runs = runs(records)
     if not all_runs:
@@ -189,75 +195,77 @@ def report(records: list[dict], now: datetime, run: str | None = None,
     t = totals(segs)
 
     def label(job: int | None) -> str:
-        return "Run (no job)" if job is None else labels.get(job, f"#{job}")
+        return "the run itself" if job is None else labels.get(job, f"#{job}")
 
-    cell: dict[tuple, timedelta] = defaultdict(timedelta)
-    lost: dict[int | None, timedelta] = defaultdict(timedelta)
-    order: list[int | None] = []
+    per_step: dict[str, timedelta] = defaultdict(timedelta)
+    per_job: dict[int, timedelta] = defaultdict(timedelta)
+    steps_of: dict[int, set[str]] = defaultdict(set)
     for s in segs:
         if s.step == WAITING:
             continue
-        if s.job not in order:
-            order.append(s.job)
-        cell[s.job, s.step] += s.length
-        if s.snag:
-            lost[s.job] += s.length
-    order.sort(key=lambda j: j is None)  # the run's own row (setup, report) last
-    cols = [k for k in STEPS if k != WAITING and any(cell.get((j, k)) for j in order)]
+        per_step[s.step] += s.length
+        if s.job is not None:
+            per_job[s.job] += s.length
+            steps_of[s.job].add(s.step)
+    outcome = {j: result(steps_of[j]) for j in per_job}
+    count = {r: sum(1 for v in outcome.values() if v == r) for r in (FILLED, READY, SKIPPED)}
 
     begun = lines[0]["at"]
     ended = segs[-1].end if segs else begun
-    per_job = sum((v for (j, _), v in cell.items() if j is not None), timedelta())
-    head = (f"**Run {begun:%Y-%m-%d %H:%M}-{ended:%H:%M} UTC:** {duration(t.working)} working"
-            f"{f', {duration(t.waiting)} waiting on you' if t.waiting else ''}"
-            f"{f', {duration(t.lost)} lost to snags' if t.lost else ''}; {t.jobs} job{'s' * (t.jobs != 1)}"
-            f"{f', {duration(per_job / t.jobs)} a job' if t.jobs else ''}.")
+    parts = [HEADLINE[r].format(n=count[r], s="s" * (count[r] != 1), v="s" * (count[r] == 1))
+             for r in (FILLED, READY, SKIPPED) if count[r]]
+    head = (f"**This run** ({begun:%Y-%m-%d %H:%M}-{ended:%H:%M} UTC): {minutes(t.working)} min of work for "
+            f"{t.jobs} job{'s' * (t.jobs != 1)}{': ' + ', '.join(parts) if parts else ''}.")
+    if t.lost:
+        head += f" Snags cost {minutes(t.lost)} min."
+    if t.waiting:
+        head += f" Waiting on you: {minutes(t.waiting)} min (not counted)."
     out = [head, ""]
-    if order:
-        out.append("Minutes per step:")
-        out.append("")
-        out.append("| Job | " + " | ".join(STEPS[c] for c in cols) + " | Lost | Total |")
-        out.append("|---" * (len(cols) + 3) + "|")
-        for j in order:
-            row_total = sum((cell[j, c] for c in cols), timedelta())
-            out.append(f"| {label(j)} | " + " | ".join(minutes(cell[j, c]) for c in cols)
-                       + f" | {minutes(lost[j])} | {minutes(row_total)} |")
-        by_step = {c: sum((cell[j, c] for j in order), timedelta()) for c in cols}
-        out.append("| **Total** | " + " | ".join(minutes(by_step[c]) for c in cols)
-                   + f" | {minutes(t.lost)} | {minutes(t.working)} |")
-        out.append("")
-        top = sorted(by_step.items(), key=lambda kv: kv[1], reverse=True)[:3]
-        if t.working:
-            out.append("Where the time went: " + ", ".join(
-                f"{STEPS[c]} {duration(v)} ({round(100 * v / t.working)}%)" for c, v in top if v) + ".")
-            out.append("")
 
-    snags = [s for s in segs if s.snag]
+    if per_step:
+        out += ["**Where the time went**", "", "| Step | Minutes | Share |", "|---|---|---|"]
+        for step, v in sorted(per_step.items(), key=lambda kv: kv[1], reverse=True):
+            if not v:
+                continue  # a step that took no time (the run's last mark) gets no row
+            share = round(100 * v / t.working) if t.working else 0
+            out.append(f"| {STEPS.get(step, step)} | {minutes(v)} | {share}% |")
+        out.append("")
+
+    if per_job:
+        out += ["**Time per job**", "", "| Job | Minutes | Result |", "|---|---|---|"]
+        order = [j for j in dict.fromkeys(s.job for s in segs if s.job is not None)]
+        for j in order:
+            if outcome[j] != SKIPPED:
+                out.append(f"| {label(j)} | {minutes(per_job[j])} | {outcome[j]} |")
+        skipped = [j for j in order if outcome[j] == SKIPPED]
+        if skipped:
+            total = sum((per_job[j] for j in skipped), timedelta())
+            out.append(f"| {len(skipped)} skipped job{'s' * (len(skipped) != 1)} | {minutes(total)} "
+                       f"({minutes(total / len(skipped))} each) | {SKIPPED} |")
+        out.append("")
+
+    snags = sorted((s for s in segs if s.snag), key=lambda s: s.length, reverse=True)
     if snags:
-        out.append("**Snags** (time until the next mark counts as lost):")
-        for s in sorted(snags, key=lambda s: s.length, reverse=True):
-            fix = f" → fix: {s.snag['fix']}" if s.snag.get("fix") else ""
-            out.append(f"- {label(s.job)}, {STEPS.get(s.step, s.step)}, {minutes(s.length) or '0'} min: "
-                       f"{s.snag['text']}{fix}")
+        out.append("**Snags** (what went wrong, the minutes it cost, the fix)")
+        for s in snags:
+            fix = f" Fix: {s.snag['fix']}" if s.snag.get("fix") else ""
+            cost = f", {minutes(s.length)} min" if s.length >= timedelta(seconds=6) else ""
+            out.append(f"- {label(s.job)}{cost}: {s.snag['text']}.{fix}")
         out.append("")
     notes = [r for r in lines if r["kind"] == "note"]
     if notes:
-        out.append("**Notes** (puzzles and guesses):")
-        for r in notes:
-            out.append(f"- {label(r.get('job'))}, {STEPS.get(r.get('step'), r.get('step') or '-')}: {r['text']}")
+        out.append("**Notes** (puzzles and guesses)")
+        out += [f"- {label(r.get('job'))}: {r['text']}" for r in notes]
         out.append("")
 
     past = all_runs[-history:]
     if len(past) > 1:
-        out.append("Last runs:")
-        out.append("")
-        out.append("| Run | Jobs | Working | A job | Lost |")
-        out.append("|---|---|---|---|---|")
+        out += ["**Earlier runs**", "", "| Run | Jobs | Minutes | Minutes a job |", "|---|---|---|---|"]
         for r in past:
             rs = segments([x for x in records if x["run"] == r], now, newest=r == all_runs[-1])
             rt = totals(rs)
             job_time = sum((s.length for s in rs if s.job is not None and s.step != WAITING), timedelta())
-            out.append(f"| {r[:16].replace('T', ' ')} | {rt.jobs} | {duration(rt.working)} | "
-                       f"{duration(job_time / rt.jobs) if rt.jobs else '-'} | {duration(rt.lost)} |")
+            out.append(f"| {r[:16].replace('T', ' ')} | {rt.jobs} | {minutes(rt.working)} | "
+                       f"{minutes(job_time / rt.jobs) if rt.jobs else '-'} |")
         out.append("")
     return "\n".join(out).rstrip() + "\n"

@@ -61,6 +61,8 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
      say, an answer you guessed): `cd ~/job-hunter && .venv/bin/jobhunter timing note <job id> "<what>"`.
    - Always `cd ~/job-hunter` first, as written: from another folder (a worktree) the log lands
      in the wrong place and the report can't name the companies.
+   - Skipping several jobs in one go: still mark each one's `posting` step as you read it, so the
+     report counts every job (a job with only a `posting` mark reads as skipped).
    - A timing call that fails never stops the run: carry on and say so in the report.
    - The run ends with `cd ~/job-hunter && .venv/bin/jobhunter timing report` pasted into the chat
      answer under **Run timing**, then `timing mark - waiting` (At the end has the details).
