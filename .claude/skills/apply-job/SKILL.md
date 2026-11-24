@@ -67,10 +67,23 @@ call, 2026-11-18).
   pop-up pick the reason that fits and write a short note that quotes the posting ("UAE-Based
   Candidates only"): both stay with the job, and the final answer reuses the note.
 - **Needs a sign-in or an account** (a careers site that wants you to log in or sign up, Workday,
-  Proxify's talent account): **not a skip.** Claude may not create accounts or type passwords, so
-  leave the job in To apply, leave the tab open on the sign-in page, still do steps 2 and 4 (the CV
-  and the LinkedIn note) so everything is ready, and list it in the report under **Needs your
-  sign-in** with the URL.
+  Proxify's talent account): **not a skip.** Still do steps 2 and 4 (the CV and the LinkedIn
+  note) so everything is ready. Then:
+  - **How to make the account** (the user's call, 2026-11-24): press **Continue with Google** (or
+    "Sign in with Google") when the site offers it, and pick the user's Google account. With no
+    Google button, fill the site's own sign-up form from `MY_*` in `.env` and the profile (Bain's
+    asks for no password). An existing account behind a login page: Continue with Google the same
+    way.
+  - **Ask first, once per run:** Claude needs the user's yes in chat for each site before it
+    creates an account there, lets Google share the user's details with it, or accepts its terms.
+    So don't stop the run: go on with the next job, and at the end list these sites in the
+    report under **Needs an account** and ask "Create accounts on X and Y?". On a yes, make
+    them as above, then fill the application (step 3) and stop at Submit as usual. A yes already
+    in the user's request for the run that names the site counts.
+  - **Never type a password or a code:** a sign-up form that needs a password (Workday always
+    does), a Google screen asking for the password or a 2-step code, or a code sent by email is
+    the user's. Leave the tab open on it and list the job under **Needs your sign-in** with the
+    URL.
 - The page is open and the job is live: go on to the CV.
 
 ### 2. CV
@@ -218,10 +231,11 @@ call, 2026-11-18).
 - **Stuck?** If a page freezes, an upload fails or a button doesn't respond, reload and try again
   (up to 2 retries per step). If it still fails, leave the tab as it is, note it and go to the next
   job. Never stop the whole run because of one job.
-- **CAPTCHA or account sign-up:** don't solve or create it (Claude may not create accounts or type
-  passwords, even with permission). Fill what you can, leave the tab open and list it under
-  **Needs your sign-in** (step 1): never Skip a job for this. Proxify ("Get paid, not played"
-  postings, often re-posted on job boards) always needs a talent account, so the user does those.
+- **CAPTCHA:** don't solve it. Fill what you can, leave the tab open and list it under **Needs
+  your sign-in** (step 1): never Skip a job for this.
+- **Account sign-up:** the account rules in step 1 (Google first, a yes per site, never a
+  password). Proxify ("Get paid, not played" postings, often re-posted on job boards) always
+  needs a talent account.
 - Finish at the final **Apply/Submit** button. Don't press it. Leave the tab open.
 
 ### 4. One LinkedIn contact (find and write, never send)
@@ -355,8 +369,11 @@ any. Group them like this (the user's request, 2026-10-31):
   is outside the target roles, or it is far too senior. "**Canonical**: despite the title, it's
   a Jira administrator job."
 
-And, separately, **Needs your sign-in**: every job left in To apply because the site wants a
-login or an account, with the URL of the tab left open and whether the CV and LinkedIn note are
-ready.
+And, separately:
+- **Needs an account**: every site where an account is the only thing left, whether it offers
+  Continue with Google, and the question "Create accounts on X and Y?" (step 1).
+- **Needs your sign-in**: every job left in To apply because it needs a password, a code or a
+  CAPTCHA only the user can give, with the URL of the tab left open and whether the CV and
+  LinkedIn note are ready.
 
 The user then goes through the open tabs and presses Apply, and sends the LinkedIn notes themselves.
