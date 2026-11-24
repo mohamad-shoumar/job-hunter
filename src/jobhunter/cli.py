@@ -1,5 +1,5 @@
 """Command line: `jobhunter run | serve | contacts | tailor | rebuild-cv | cover | inbox | check | dates | grade |
-digest | report | reclassify | show | stats | boards | sources | sponsors`. docs/usage.md has the manual."""
+digest | report | reclassify | show | stats | boards | sources | sponsors | timing`. docs/usage.md has the manual."""
 
 from __future__ import annotations
 
@@ -811,6 +811,56 @@ def cmd_linkedin(args) -> int:
     return 0
 
 
+def _job_ref(value: str) -> int | None:
+    if value == "-":
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"a job id, or - for none: {value}") from None
+
+
+def cmd_timing(args) -> int:
+    """How long each apply-job step took and what slowed it (timing.py). It reads no config or
+    registers (`_load`): the skill calls it about eight times a job, so it must start fast."""
+    from . import timing
+
+    root = resolve_root(args.home)
+    path = timing.log_file(root)
+    now = utcnow()
+    try:
+        if args.action == "start":
+            print(f"timing run {timing.start(path, now)}")
+        elif args.action == "mark":
+            timing.mark(path, args.job, args.step, now)
+            print(f"{'#' + str(args.job) if args.job is not None else '-'} {args.step} {now:%H:%M:%S}Z")
+        elif args.action == "snag":
+            timing.snag(path, args.job, args.text, args.fix, now)
+            print(f"snag noted {now:%H:%M:%S}Z: mark the step again once it is sorted")
+        elif args.action == "note":
+            timing.note(path, args.job, args.text, now)
+            print(f"note noted {now:%H:%M:%S}Z")
+        else:
+            records = timing.read(path)
+            ids = {r["job"] for r in records if r.get("job") is not None}
+            labels: dict[int, str] = {}
+            db = Paths(root).db_file
+            if ids and db.exists():
+                store = JobStore(db)
+                try:
+                    for job_id in ids:
+                        row = store.get(job_id)
+                        if row:
+                            labels[job_id] = f"#{job_id} {row['company']}"
+                finally:
+                    store.close()
+            print(timing.report(records, now, run=args.run, labels=labels), end="")
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    return 0
+
+
 def cmd_inbox(args) -> int:
     """Check Gmail for replies and bounces to the emails sent from the app."""
     from .config import OutreachConfig
@@ -1040,6 +1090,24 @@ def main(argv: list[str] | None = None) -> int:
                    help="a Company,Country CSV of employers a visa-sponsorship site lists (sponsor_sites.py)")
     p.add_argument("--site", default="JobDelulu", help="with --import-sites: the site's name")
     p.set_defaults(func=cmd_sponsors)
+
+    p = sub.add_parser("timing", help="how long each apply-job step took and what slowed it (the skill marks "
+                       "each step; `report` adds it up)")
+    tsub = p.add_subparsers(dest="action", required=True)
+    tsub.add_parser("start", help="begin a new run (a mark with no open run begins one too)")
+    t = tsub.add_parser("mark", help="a step begins now; it lasts until the next mark")
+    t.add_argument("job", type=_job_ref, help="the job id, or - for setup, report and waiting")
+    t.add_argument("step", help="setup, posting, tailor, cv, mirror, form, linkedin, cover, report or waiting")
+    t = tsub.add_parser("snag", help="something went wrong: the time until the next mark counts as lost")
+    t.add_argument("job", type=_job_ref)
+    t.add_argument("text", help="what happened")
+    t.add_argument("--fix", help="what would avoid it next time: a skill line, a code change, a profile answer")
+    t = tsub.add_parser("note", help="a puzzle or a guess, no time counted")
+    t.add_argument("job", type=_job_ref)
+    t.add_argument("text")
+    t = tsub.add_parser("report", help="the run's minutes per job and step, its snags and notes, past runs")
+    t.add_argument("--run", help="a run id (default: the latest)")
+    p.set_defaults(func=cmd_timing)
 
     args = parser.parse_args(argv)
     logging.basicConfig(

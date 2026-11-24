@@ -42,10 +42,31 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
 2. Open http://127.0.0.1:8765/#pipeline in a new tab. The **To apply** column lists shortlisted
    jobs the user hasn't applied to yet, plus visa-list jobs (the **visa** chip) posted today or
    yesterday. Do them one at a time, top to bottom (or only the job the user named).
+3. **Time every step** (the user's ask, 2026-11-24: to see where a run's time goes and what to
+   speed up). Start with `cd ~/job-hunter && .venv/bin/jobhunter timing start` and
+   `cd ~/job-hunter && .venv/bin/jobhunter timing mark - setup`, then mark each step as it begins:
+   `cd ~/job-hunter && .venv/bin/jobhunter timing mark <job id> <step>` (`-` for no job). A step lasts until the next
+   mark, so there is no "end" to forget. Send each mark in the same message as the step's first
+   action, so it costs no extra turn. The steps, each also named under its heading below:
+   `setup`, `posting` (1), `tailor` (2: Tailor CV pressed, waiting for it), `cv` (2: checking it,
+   the one-page fix), `mirror` (2: mirror-cv, marked from here since that skill doesn't mark),
+   `form` (3), `linkedin` (4), `cover` (5), `report` (At the end) and `waiting` (just before any
+   question to the user, and when the run stops for them: it never counts as working time).
+   - **Snag**, the moment something goes wrong (a retry, a page that doesn't respond, an upload
+     that fails, an error, a rule you have to work around):
+     `cd ~/job-hunter && .venv/bin/jobhunter timing snag <job id> "<what happened>" --fix "<what would avoid it: a skill line, a code change, a profile answer>"`.
+     Mark the step again once it is sorted: the time in between counts as lost. Write it then,
+     not at the end, so the reason survives a long run.
+   - **Note**, a puzzle or a guess that cost no time (an unclear question, a rule that didn't
+     say, an answer you guessed): `cd ~/job-hunter && .venv/bin/jobhunter timing note <job id> "<what>"`.
+   - Always `cd ~/job-hunter` first, as written: from another folder (a worktree) the log lands
+     in the wrong place and the report can't name the companies.
+   - A timing call that fails never stops the run: carry on and say so in the report.
 
 ## For each job
 
 ### 1. Check you can apply (before any CV work)
+Timing: `cd ~/job-hunter && .venv/bin/jobhunter timing mark <job id> posting`.
 Do this first, so no time goes into a CV for a job that is closed or can't take you (the user's
 call, 2026-11-18).
 - Press **Open posting ↗**.
@@ -87,6 +108,8 @@ call, 2026-11-18).
 - The page is open and the job is live: go on to the CV.
 
 ### 2. CV
+Timing: `cd ~/job-hunter && .venv/bin/jobhunter timing mark <job id> tailor` when you press
+Tailor CV, `cv` while you check and fix it, `mirror` just before you start mirror-cv.
 - Open the job's card. In the **CV** section:
   - If it shows a tailored CV ("Tailored ... by ..."), use it.
   - If not, press **Tailor CV to this job** and wait until the tailored info appears (it can take a
@@ -128,6 +151,7 @@ call, 2026-11-18).
   **Download ↓** too if the user wants a copy in Downloads.
 
 ### 3. Fill the form
+Timing: `cd ~/job-hunter && .venv/bin/jobhunter timing mark <job id> form`.
 - Go back to the application page you found in step 1. A job whose form you filled but the user
   must finish (a CAPTCHA, a field only they can answer) stays in To apply. If the form itself
   shows the job can't take you (a "must already have the right to work" question), Skip it as in
@@ -239,6 +263,7 @@ call, 2026-11-18).
 - Finish at the final **Apply/Submit** button. Don't press it. Leave the tab open.
 
 ### 4. One LinkedIn contact (find and write, never send)
+Timing: `cd ~/job-hunter && .venv/bin/jobhunter timing mark <job id> linkedin`.
 Outreach goes through LinkedIn now, not email (the user's call, 2026-10-29), so the job's card has a
 **LinkedIn** box (the person's profile link and the note) and no contact lookup or email composer at all.
 Search only on LinkedIn, where the user is already signed in; never use an email tool for this step.
@@ -328,6 +353,7 @@ Search only on LinkedIn, where the user is already signed in; never use an email
   to backfill when the user tells you a date.
 
 ### 5. Cover letter (last step, fit score above 60)
+Timing: `cd ~/job-hunter && .venv/bin/jobhunter timing mark <job id> cover`.
 Only for a job whose fit score is **above 60** (the user's call, 2026-11-18). Under that, write none,
 unless the form makes a cover letter required: then write one the same way and note it.
 1. Read the job description and this job's tailored CV (`resume/versions/<name>.md`).
@@ -348,6 +374,13 @@ unless the form makes a cover letter required: then write one the same way and n
    the report.
 
 ## At the end
+
+Timing: `cd ~/job-hunter && .venv/bin/jobhunter timing mark - report` first. Once the rest of the report is written,
+run `cd ~/job-hunter && .venv/bin/jobhunter timing report` and paste its output, as it is, under **Run timing** in
+the chat answer (and in the run's report file, if you write one). Under it add **What I'd change**:
+at most 3 fixes, the one that would save the most time first, each from the snags and notes (a
+skill line, a code change, a profile answer, a form answer to keep) with the minutes it would have
+saved. Then `cd ~/job-hunter && .venv/bin/jobhunter timing mark - waiting`, since the run now waits for the user.
 
 Report one line per job: company, role, fit score, where you applied (the URL of the tab left open), CV
 used (mirrored or not; if mirrored, the posting's must-haves the profile doesn't have, so the user

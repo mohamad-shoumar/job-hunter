@@ -206,3 +206,25 @@ def test_grade_rescore_updates_the_salary_part_with_no_model(home, capsys, monke
     grade = json.loads(stored(home, 1)["fit_grade_json"])
     assert grade["parts"]["salary"][0] == 7 and grade["score"] == sum(p for p, _ in grade["parts"].values())
     assert "1 scored jobs looked at again" in capsys.readouterr().out
+
+
+def test_timing_marks_steps_and_reports_minutes_with_company_names(home, capsys, monkeypatch):
+    clock = iter(NOW + timedelta(minutes=m) for m in (0, 0, 3, 8, 12, 15))
+    monkeypatch.setattr(cli, "utcnow", lambda: next(clock))
+    assert jobhunter(home, "timing", "start") == 0
+    assert jobhunter(home, "timing", "mark", "1", "posting") == 0
+    assert jobhunter(home, "timing", "mark", "1", "form") == 0
+    assert jobhunter(home, "timing", "snag", "1", "Upload button did nothing", "--fix", "use the stand-in box") == 0
+    assert jobhunter(home, "timing", "mark", "-", "report") == 0
+    capsys.readouterr()
+    assert jobhunter(home, "timing", "report") == 0
+    out = capsys.readouterr().out
+    assert "15m working" in out and "4m lost to snags" in out
+    assert "| #1 Acme | 3 | 9 |  | 4 | 12 |" in out
+    assert "- #1 Acme, Form, 4 min: Upload button did nothing → fix: use the stand-in box" in out
+    assert (home / "data" / "apply_timing.jsonl").exists()
+
+
+def test_timing_refuses_an_unknown_step(home, capsys):
+    assert jobhunter(home, "timing", "mark", "1", "apply") == 1
+    assert "unknown step" in capsys.readouterr().err

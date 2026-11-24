@@ -63,6 +63,7 @@ that holds `config/`) and `-v` (debug logging).
 | `jobhunter run --no-report` | store and classify only |
 | `jobhunter serve` | the web app: jobs, who to email, drafts, sending, tracking (`--port`, `--no-open`) |
 | `jobhunter linkedin <id>` | the job's one LinkedIn person and the note to send them (`--url`, `--note`; nothing given: shows what is stored) |
+| `jobhunter timing mark <id> <step>` | the apply-job skill's step timer: `start`, `mark <id or -> <step>`, `snag <id> "what" --fix "..."`, `note <id> "what"`; `report` prints minutes per job and step, the snags and notes, and past runs (`data/apply_timing.jsonl`) |
 | `jobhunter contacts` | find who to email for shortlisted jobs without a contact, best fit first (`--limit N`, `--no-claude`, or job ids) |
 | `jobhunter tailor <id>` | a CV tailored to that job, in `resume/output/` (`--replace-edits` to redo one you edited) |
 | `jobhunter rebuild-cv <id>` | after you edit a job's CV text in `resume/versions/`, rebuild its PDF (no AI) and list lines that say more than your profile |
