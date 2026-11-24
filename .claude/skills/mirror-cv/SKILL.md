@@ -25,7 +25,8 @@ word for the posting's spelling of the same thing. It never adds a fact.
   "PostgreSQL"), never a new technology, number, title or claim. `check_version` judges a swap
   by the profile's own words, so a spelling the profile doesn't use is blocked ("RESTful APIs"
   -> "REST APIs" fails): keep the profile's word and list the posting's as a gap.
-- Certifications always print (the profile says so): never hide one.
+- Certifications in `resume.md` always print (the profile says so): never hide one. The Zapier one
+  prints only on the FDE base CV (the user's call, 2026-11-24): never add it to another CV.
 - No keyword lists, hidden text or extra lines made of posting words. Each term appears where it
   is true, at most about three times on the CV.
 - This file is tracked: never paste profile text, contact details or salary into it.
