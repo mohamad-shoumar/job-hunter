@@ -116,13 +116,14 @@ class Segment:
         return self.end - self.start
 
 
-def segments(lines: list[dict], now: datetime) -> list[Segment]:
-    """Each mark or snag runs until the next one. The last runs until now while the run is open, else
-    it ends at the run's last line (a report on an old run must not count the days since)."""
+def segments(lines: list[dict], now: datetime, newest: bool = True) -> list[Segment]:
+    """Each mark or snag runs until the next one. The last runs until now only in the newest run, while
+    it is open; any other run ends at its own last line (a morning run cut off mid-form must not count
+    the hours until the next run, nor a report on an old run the days since)."""
     lines = sorted(lines, key=lambda r: r["at"])
     if not lines:
         return []
-    last = now if now - lines[-1]["at"] <= STALE else lines[-1]["at"]
+    last = now if newest and now - lines[-1]["at"] <= STALE else lines[-1]["at"]
     out: list[Segment] = []
     for rec in lines:
         if rec["kind"] not in ("mark", "snag"):
@@ -184,7 +185,7 @@ def report(records: list[dict], now: datetime, run: str | None = None,
     if run not in all_runs:
         raise ValueError(f"no run {run!r}: one of {', '.join(all_runs[-history:])}")
     lines = [r for r in records if r["run"] == run]
-    segs = segments(lines, now)
+    segs = segments(lines, now, newest=run == all_runs[-1])
     t = totals(segs)
 
     def label(job: int | None) -> str:
@@ -253,7 +254,7 @@ def report(records: list[dict], now: datetime, run: str | None = None,
         out.append("| Run | Jobs | Working | A job | Lost |")
         out.append("|---|---|---|---|---|")
         for r in past:
-            rs = segments([x for x in records if x["run"] == r], now)
+            rs = segments([x for x in records if x["run"] == r], now, newest=r == all_runs[-1])
             rt = totals(rs)
             job_time = sum((s.length for s in rs if s.job is not None and s.step != WAITING), timedelta())
             out.append(f"| {r[:16].replace('T', ' ')} | {rt.jobs} | {duration(rt.working)} | "

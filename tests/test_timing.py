@@ -52,6 +52,19 @@ def test_a_mark_with_no_open_run_starts_one_and_old_runs_stop_at_their_last_line
     assert "Last runs:" in new and "| 2026-11-24 17:00 | 1 | 10m | 10m | 0m |" in new
 
 
+def test_a_run_replaced_by_a_newer_one_the_same_day_is_not_stretched_to_now(tmp_path):
+    log = tmp_path / "apply_timing.jsonl"
+    morning = timing.start(log, at(0))
+    timing.mark(log, 1, "posting", at(0))
+    timing.mark(log, 1, "form", at(5))  # cut off here: never marked waiting
+    timing.start(log, at(180))
+    timing.mark(log, 2, "posting", at(180))
+    records = timing.read(log)
+    old = timing.report(records, at(190), run=morning)
+    assert "**Run 2026-11-24 17:00-17:05 UTC:** 5m working" in old
+    assert "| 2026-11-24 17:00 | 1 | 5m | 5m | 0m |" in timing.report(records, at(190))
+
+
 def test_unknown_steps_and_runs_are_refused(tmp_path):
     log = tmp_path / "apply_timing.jsonl"
     with pytest.raises(ValueError, match="unknown step 'apply'"):

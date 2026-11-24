@@ -62,6 +62,8 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
    - Always `cd ~/job-hunter` first, as written: from another folder (a worktree) the log lands
      in the wrong place and the report can't name the companies.
    - A timing call that fails never stops the run: carry on and say so in the report.
+   - The run ends with `cd ~/job-hunter && .venv/bin/jobhunter timing report` pasted into the chat
+     answer under **Run timing**, then `timing mark - waiting` (At the end has the details).
 
 ## For each job
 
