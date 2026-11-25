@@ -832,33 +832,92 @@ def cmd_timing(args) -> int:
         if args.action == "start":
             print(f"timing run {timing.start(path, now)}")
         elif args.action == "mark":
-            timing.mark(path, args.job, args.step, now)
-            print(f"{'#' + str(args.job) if args.job is not None else '-'} {args.step} {now:%H:%M:%S}Z")
+            timing.mark(path, args.job, args.step, now, site=args.site)
+            site = timing.site_name(args.site)
+            print(f"{'#' + str(args.job) if args.job is not None else '-'} {args.step}"
+                  f"{' (' + site + ')' if site else ''} {now:%H:%M:%S}Z")
         elif args.action == "snag":
             timing.snag(path, args.job, args.text, args.fix, now)
             print(f"snag noted {now:%H:%M:%S}Z: mark the step again once it is sorted")
         elif args.action == "note":
             timing.note(path, args.job, args.text, now)
             print(f"note noted {now:%H:%M:%S}Z")
+        elif args.action == "mirror":
+            return _timing_mirror(args, root, path, now)
         else:
-            records = timing.read(path)
-            ids = {r["job"] for r in records if r.get("job") is not None}
-            labels: dict[int, str] = {}
-            db = Paths(root).db_file
-            if ids and db.exists():
-                store = JobStore(db)
-                try:
-                    for job_id in ids:
-                        row = store.get(job_id)
-                        if row:
-                            labels[job_id] = f"#{job_id} {row['company']}"
-                finally:
-                    store.close()
-            print(timing.report(records, now, run=args.run, labels=labels), end="")
+            _timing_report(args, root, path, now)
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
         return 1
     return 0
+
+
+def _timing_mirror(args, root: Path, path: Path, now) -> int:
+    """Score the job's CV against the posting's must-haves (skimzone.py) and keep it in the open run."""
+    from . import skimzone, timing
+    from .config import OutreachConfig
+    from .contacts import clean_company_name
+    from .cv import version_of
+    from .store.applications import get_application
+
+    must = skimzone.terms(args.must)
+    if not must:
+        raise ValueError('--must needs the posting\'s must-have terms: "Python; PostgreSQL; AWS Lambda"')
+    store = JobStore(Paths(root).db_file)
+    try:
+        job = store.get(args.job)
+        if job is None:
+            raise ValueError(f"no job #{args.job}")
+        source = version_of(OutreachConfig.load(Paths(root).outreach_file), clean_company_name(job["company"])[0],
+                            get_application(store, args.job))
+    finally:
+        store.close()
+    if source is None:
+        raise ValueError(f"#{args.job} has no tailored CV in versions/ (press Tailor CV first)")
+    sc = skimzone.score(must, source.read_text())
+    run = timing.mirror(path, args.job, args.stage, sc.terms, sc.top, sc.on_cv, now)
+    print(f"#{args.job} {args.stage}: {len(sc.top)} of {len(sc.terms)} must-haves in the top part, "
+          f"{len(sc.on_cv)} on the CV ({source.name})")
+    for term in sc.terms:
+        where = "top part" if term in sc.top else "on the CV" if term in sc.on_cv else "not on the CV"
+        print(f"  {term}: {where}")
+    if run is None:
+        print("  (no apply-job run open: shown, not recorded)")
+    return 0
+
+
+def _timing_report(args, root: Path, path: Path, now) -> None:
+    """The report, with the app's skips (the database) and the run's cost (Claude Code's session log)."""
+    from . import sessionlog, timing
+    from .store.applications import skipped_between
+    from .tracking import SKIP_REASONS
+
+    records = timing.read(path)
+    all_runs = timing.runs(records)
+    shown = list(dict.fromkeys([*all_runs[-5:], *([args.run] if args.run in all_runs else [])]))
+    windows = {r: timing.window(records, r, now) for r in shown}
+    labels: dict[int, str] = {}
+    skips: dict[str, dict[int, tuple[str, str]]] = {}
+    db = Paths(root).db_file
+    if db.exists() and records:
+        store = JobStore(db)
+        try:
+            for r, (start, end) in windows.items():
+                skips[r] = {row["job_id"]: (SKIP_REASONS.get(row["skip_reason"] or "", row["skip_reason"]),
+                                            row["company"]) for row in skipped_between(store, start, end, "skipped")}
+            for job_id in {x["job"] for x in records if x.get("job") is not None}:
+                row = store.get(job_id)
+                if row:
+                    labels[job_id] = f"#{job_id} {row['company']}"
+        finally:
+            store.close()
+    turns = sessionlog.turns_for(windows)
+    costs = timing.load_costs(timing.costs_file(root))
+    fresh = {r: timing.cost(timing.run_segments(records, r, now), turns[r]) for r in turns}
+    if fresh:
+        costs.update(fresh)
+        timing.save_costs(timing.costs_file(root), costs)
+    print(timing.report(records, now, run=args.run, labels=labels, skips=skips, turns=turns, costs=costs), end="")
 
 
 def cmd_inbox(args) -> int:
@@ -1098,6 +1157,7 @@ def main(argv: list[str] | None = None) -> int:
     t = tsub.add_parser("mark", help="a step begins now; it lasts until the next mark")
     t.add_argument("job", type=_job_ref, help="the job id, or - for setup, report and waiting")
     t.add_argument("step", help="setup, posting, tailor, cv, mirror, form, linkedin, cover, report or waiting")
+    t.add_argument("--site", help="on a form mark: the form page's URL (or host), for the minutes per form site")
     t = tsub.add_parser("snag", help="something went wrong: the time until the next mark counts as lost")
     t.add_argument("job", type=_job_ref)
     t.add_argument("text", help="what happened")
@@ -1105,7 +1165,13 @@ def main(argv: list[str] | None = None) -> int:
     t = tsub.add_parser("note", help="a puzzle or a guess, no time counted")
     t.add_argument("job", type=_job_ref)
     t.add_argument("text")
-    t = tsub.add_parser("report", help="the run's minutes per job and step, its snags and notes, past runs")
+    t = tsub.add_parser("mirror", help="score the job's CV for the posting's must-haves (before the mirror "
+                        "edit, and after the rebuild) and keep it in the open run")
+    t.add_argument("job", type=int)
+    t.add_argument("stage", choices=("before", "after"))
+    t.add_argument("--must", required=True, help='the posting\'s must-have terms, in its words: "Python; PostgreSQL"')
+    t = tsub.add_parser("report", help="the run's minutes per job and step, its cost, skips, form sites, "
+                        "mirroring, snags and notes, past runs")
     t.add_argument("--run", help="a run id (default: the latest)")
     p.set_defaults(func=cmd_timing)
 

@@ -65,9 +65,10 @@ class FakeHttp:
 
 
 @pytest.fixture(autouse=True)
-def no_real_keys(monkeypatch):
+def no_real_keys(monkeypatch, tmp_path_factory):
     """Tests never reach Hunter, Claude or Gmail, even when the shell has the keys set, and never run the
     Claude Code CLI, even where it is installed. Your MY_* details are cleared too, so the fixtures' own apply."""
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path_factory.mktemp("claude")))  # never the real session logs
     for name in ("HUNTER_API_KEY", "ANTHROPIC_API_KEY", "DEEPSEEK_API_KEY", "GMAIL_ADDRESS", "GMAIL_APP_PASSWORD",
                  "SERPAPI_API_KEY", "CLAUDE_CODE_BIN", "RELOCATION_MIN_MONTHLY_USD", "FIT_SALARY_FLOORS", *MY_DETAILS.values()):
         monkeypatch.delenv(name, raising=False)

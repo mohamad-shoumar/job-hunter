@@ -219,3 +219,17 @@ def bounce_count(store: JobStore) -> int:
 
 def applied_count(store: JobStore) -> int:
     return store.conn.execute("SELECT COUNT(*) FROM applications WHERE applied_at IS NOT NULL").fetchone()[0]
+
+
+def skipped_between(store: JobStore, start: datetime, end: datetime, reason: str) -> list[sqlite3.Row]:
+    """(job_id, company, skip_reason) for each job closed with `reason` (skipped) whose stage changed
+    between start and end: what an apply-job run skipped in the app (timing.py's report)."""
+    return store.conn.execute(
+        """
+        SELECT DISTINCT e.job_id, j.company, a.skip_reason FROM events e
+        JOIN applications a ON a.job_id = e.job_id JOIN jobs j ON j.id = e.job_id
+        WHERE e.kind = 'stage' AND e.at >= ? AND e.at <= ? AND a.stage = ? AND a.closed_reason = ?
+        ORDER BY e.job_id
+        """,
+        (iso(start), iso(end), CLOSED, reason),
+    ).fetchall()

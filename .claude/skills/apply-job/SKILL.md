@@ -47,7 +47,11 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
    `cd ~/job-hunter && .venv/bin/jobhunter timing mark - setup`, then mark each step as it begins:
    `cd ~/job-hunter && .venv/bin/jobhunter timing mark <job id> <step>` (`-` for no job). A step lasts until the next
    mark, so there is no "end" to forget. Send each mark in the same message as the step's first
-   action, so it costs no extra turn. The steps, each also named under its heading below:
+   **quick** action (opening a page, reading a file), so it costs no extra turn. Never put a mark
+   in the command that carries a long text you wrote (a cover letter, a mirror edit, a form's
+   answers): the time spent writing it comes before the mark, so it lands in the step before (on
+   2026-11-24 every cover letter was booked under the LinkedIn step that way). Mark first, write
+   after. The steps, each also named under its heading below:
    `setup`, `posting` (1), `tailor` (2: Tailor CV pressed, waiting for it), `cv` (2: checking it,
    the one-page fix), `mirror` (2: mirror-cv, marked from here since that skill doesn't mark),
    `form` (3), `linkedin` (4), `cover` (5), `report` (At the end) and `waiting` (just before any
@@ -62,7 +66,9 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
    - Always `cd ~/job-hunter` first, as written: from another folder (a worktree) the log lands
      in the wrong place and the report can't name the companies.
    - Skipping several jobs in one go: still mark each one's `posting` step as you read it, so the
-     report counts every job (a job with only a `posting` mark reads as skipped).
+     report counts every job's minutes (a job with only a `posting` mark reads as skipped). The
+     report counts the skips themselves, and their reasons, from the app's Skip button, so pick
+     the reason that fits.
    - A timing call that fails never stops the run: carry on and say so in the report.
    - The run ends with `cd ~/job-hunter && .venv/bin/jobhunter timing report` pasted into the chat
      answer under **Run timing**, then `timing mark - waiting` (At the end has the details).
@@ -113,7 +119,9 @@ call, 2026-11-18).
 
 ### 2. CV
 Timing: `cd ~/job-hunter && .venv/bin/jobhunter timing mark <job id> tailor` when you press
-Tailor CV, `cv` while you check and fix it, `mirror` just before you start mirror-cv.
+Tailor CV, `cv` while you check and fix it, `mirror` just before you start mirror-cv. mirror-cv
+scores the CV before and after (`jobhunter timing mirror`, its steps 4 and 5): those scores go into
+this run's report.
 - Open the job's card. In the **CV** section:
   - If it shows a tailored CV ("Tailored ... by ..."), use it.
   - If not, press **Tailor CV to this job** and wait until the tailored info appears (it can take a
@@ -155,7 +163,9 @@ Tailor CV, `cv` while you check and fix it, `mirror` just before you start mirro
   **Download ↓** too if the user wants a copy in Downloads.
 
 ### 3. Fill the form
-Timing: `cd ~/job-hunter && .venv/bin/jobhunter timing mark <job id> form`.
+Timing: `cd ~/job-hunter && .venv/bin/jobhunter timing mark <job id> form --site "<the form page's URL>"`
+(the page you fill, not the job's link in the app, which is often a job board's: the report gives
+the minutes per form site, so name it every time; LinkedIn's URL for Easy Apply).
 - Go back to the application page you found in step 1. A job whose form you filled but the user
   must finish (a CAPTCHA, a field only they can answer) stays in To apply. If the form itself
   shows the job can't take you (a "must already have the right to work" question), Skip it as in
@@ -357,7 +367,9 @@ Search only on LinkedIn, where the user is already signed in; never use an email
   to backfill when the user tells you a date.
 
 ### 5. Cover letter (last step, fit score above 60)
-Timing: `cd ~/job-hunter && .venv/bin/jobhunter timing mark <job id> cover`.
+Timing: `cd ~/job-hunter && .venv/bin/jobhunter timing mark <job id> cover`, on its own or with
+step 4's last command (`jobhunter linkedin ...`), **before** you write the letter, never in the
+command that saves it.
 Only for a job whose fit score is **above 60** (the user's call, 2026-11-18). Under that, write none,
 unless the form makes a cover letter required: then write one the same way and note it.
 1. Read the job description and this job's tailored CV (`resume/versions/<name>.md`).

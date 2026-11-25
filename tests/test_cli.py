@@ -225,6 +225,47 @@ def test_timing_marks_steps_and_reports_minutes_with_company_names(home, capsys,
     assert (home / "data" / "apply_timing.jsonl").exists()
 
 
+def test_timing_mirror_scores_the_jobs_cv_and_the_report_counts_the_apps_skips(home, capsys, monkeypatch):
+    from jobhunter.store.applications import save_tailored_cv
+    from jobhunter.tracking import ensure_application, set_stage
+
+    version = home / "resume" / "versions" / "Backend_Acme_Sep2026.md"
+    version.parent.mkdir(parents=True)
+    version.write_text("title: Backend Engineer\n\n## Professional Experience\n\n### Acme | 2025 - Present\n"
+                       "- Built Python APIs.\n\n## Skills\nTools: Docker, Git, Datadog, Grafana, PostgreSQL\n")
+    store = JobStore(home / "data" / "jobs.sqlite")
+    ensure_application(store, 1, NOW)
+    save_tailored_cv(store, 1, {"source": "versions/Backend_Acme_Sep2026.md"}, NOW)
+    set_stage(store, 2, "closed", NOW + timedelta(minutes=3), reason="skipped", skip_reason="wrong_stack")
+    store.commit()
+    store.close()
+    clock = iter(NOW + timedelta(minutes=m) for m in (0, 0, 1, 2, 2, 4, 5, 6))
+    monkeypatch.setattr(cli, "utcnow", lambda: next(clock))
+    assert jobhunter(home, "timing", "mirror", "1", "before", "--must", "Python; PostgreSQL; Rust") == 0
+    assert "no apply-job run open: shown, not recorded" in capsys.readouterr().out
+    assert jobhunter(home, "timing", "mark", "1", "mirror") == 0
+    assert jobhunter(home, "timing", "mirror", "1", "before", "--must", "Python; PostgreSQL; Rust") == 0
+    out = capsys.readouterr().out
+    assert "#1 before: 1 of 3 must-haves in the top part, 2 on the CV" in out
+    assert "  PostgreSQL: on the CV" in out and "  Rust: not on the CV" in out
+    version.write_text(version.read_text().replace("Tools: Docker, Git, Datadog, Grafana, PostgreSQL",
+                                                   "Tools: PostgreSQL, Docker, Git, Datadog, Grafana"))
+    assert jobhunter(home, "timing", "mirror", "1", "after", "--must", "Python; PostgreSQL; Rust") == 0
+    assert jobhunter(home, "timing", "mark", "1", "form", "--site", "https://jobs.lever.co/acme/1") == 0
+    assert "#1 form (Lever)" in capsys.readouterr().out
+    assert jobhunter(home, "timing", "mark", "-", "report") == 0
+    capsys.readouterr()
+    assert jobhunter(home, "timing", "report") == 0
+    out = capsys.readouterr().out
+    assert "for 2 jobs: 1 form filled, 1 skipped (0 timed)." in out
+    assert "| Wrong stack | 1 | Initech |" in out
+    assert "| #1 Acme | 3 | 1 | 2 | Rust |" in out
+    assert "| Lever | 1 | 2.0 |" in out
+    assert "**Cost**" not in out  # no session log in a test
+    assert jobhunter(home, "timing", "mirror", "3", "after", "--must", "Python") == 1
+    assert "no tailored CV" in capsys.readouterr().err
+
+
 def test_timing_refuses_an_unknown_step(home, capsys):
     assert jobhunter(home, "timing", "mark", "1", "apply") == 1
     assert "unknown step" in capsys.readouterr().err

@@ -58,9 +58,12 @@ word for the posting's spelling of the same thing. It never adds a fact.
    - **Not in the profile**: a gap. Report it.
 4. **Edit the version file** (`resume/versions/<name>.md`). First `cp <file> <file>.bak`.
    **The goal:** every must-have you really have is on the CV in the posting's word, and the top
-   ones are in the **skim zone**: the headline, the first 3-4 items of each skills row, and the
-   newest role's first 3 bullets. Write down, before you edit, which must-haves the skim zone
-   already shows; you report before and after.
+   ones are in the **skim zone**: the headline, the first 4 items of each skills row, and the
+   newest role's first 3 bullets. Before you edit, score it in the same command as the `cp`:
+   `.venv/bin/jobhunter timing mirror <id> before --must "<term>; <term>; ..."`, with the
+   must-haves from step 2 in the posting's words, separated by `;`. Code says which are in the skim
+   zone, which elsewhere on the CV and which nowhere (in the posting's exact words, any case: an
+   ATS reads it that way). Inside an apply-job run it also goes into the run's report.
    - **Headline** (`title:`): the app already uses the posting's title. Leave it.
    - **Skills rows**: reorder each row so the posting's terms come first, in the order the
      posting gives them. Push unrelated items to the end of the row.
@@ -106,6 +109,9 @@ word for the posting's spelling of the same thing. It never adds a fact.
      stray line (it counts "version-controlled" as two words). Say so in the report:
      `.venv/bin/python -c "from pathlib import Path; from jobhunter.cv import check_version; print(check_version(Path('resume/versions/<name>.md').read_text(), Path('profile/master_profile.md')))"`
      Each line it lists says more than the profile. Undo that change.
+   - **Score it again** with the same terms: `.venv/bin/jobhunter timing mirror <id> after --must
+     "<the same list>"`. Its before and after numbers are the report's "skim zone, before and
+     after" line; a must-have it lists as "not on the CV" is a gap unless the profile has it.
    - **Recruiter pass.** Read page 1 of the PDF as a recruiter who has 6 seconds and the
      posting's top 3 must-haves in mind. Can each one be found in the skim zone, in the
      posting's word? If one you really have can't, reorder again and rebuild. Stop when it can,
@@ -118,7 +124,8 @@ word for the posting's spelling of the same thing. It never adds a fact.
 
 - A table: posting term (must-have or nice-to-have) -> where it is on the CV now (skills row,
   which bullet), or "gap".
-- The must-haves in the skim zone, before and after ("3 of 7 -> 6 of 7").
+- The must-haves in the skim zone, before and after ("3 of 7 -> 6 of 7"), from `jobhunter timing
+  mirror`.
 - Any bullet hidden only because its tag didn't match this job (`// [fullstack] ...`) that would
   answer a must-have: name it, so the user can decide (you don't un-hide it).
 - The gap list, so the user can add any that are true to the profile.
