@@ -277,6 +277,11 @@ def save_costs(path: Path, costs: dict[str, Cost]) -> None:
     path.write_text(json.dumps({run: asdict(c) for run, c in sorted(costs.items())}, indent=1) + "\n")
 
 
+def cell(text: str) -> str:
+    """A name in a Markdown table cell: a "|" in it would end the cell ("EMBL | EBI")."""
+    return text.replace("|", "/")
+
+
 def tokens(n: float) -> str:
     return f"{n / 1e6:.1f}M" if n >= 1e6 else f"{n / 1e3:.0f}k" if n >= 1e3 else f"{n:.0f}"
 
@@ -382,7 +387,7 @@ def report(records: list[dict], now: datetime, run: str | None = None,
     lines, segs, t, outcome = r.lines, r.segs, r.totals, r.outcome
 
     def label(job: int | None) -> str:
-        return "the run itself" if job is None else labels.get(job, f"#{job}")
+        return "the run itself" if job is None else cell(labels.get(job, f"#{job}"))
 
     def cost_of(name: str, run_segs: list[Segment]) -> Cost | None:
         return cost(run_segs, turns[name]) if name in turns else costs.get(name)
@@ -428,8 +433,8 @@ def report(records: list[dict], now: datetime, run: str | None = None,
                 "| Step | Minutes | Share |" + (" Tool calls |" if with_calls else ""),
                 "|---|---|---|" + ("---|" if with_calls else "")]
         for step, v in sorted(per_step.items(), key=lambda kv: kv[1], reverse=True):
-            if not v:
-                continue  # a step that took no time (the run's last mark) gets no row
+            if v < timedelta(seconds=3):
+                continue  # a step that took (almost) no time, such as the run's last mark, gets no row
             share = round(100 * v / t.working) if t.working else 0
             out.append(f"| {STEPS.get(step, step)} | {minutes(v)} | {share}% |"
                        + (f" {calls[step]} |" if with_calls else ""))
@@ -460,7 +465,7 @@ def report(records: list[dict], now: datetime, run: str | None = None,
                 f"{round(100 * len(app_skips) / n)}%, from the app)", "",
                 "| Reason | Jobs | Companies |", "|---|---|---|"]
         for reason, companies in sorted(by_reason.items(), key=lambda kv: (-len(kv[1]), kv[0])):
-            out.append(f"| {reason} | {len(companies)} | {', '.join(companies)} |")
+            out.append(f"| {reason} | {len(companies)} | {', '.join(cell(c) for c in companies)} |")
         out.append("")
 
     site_of = {s.job: s.site for s in segs if s.step == "form" and s.site}

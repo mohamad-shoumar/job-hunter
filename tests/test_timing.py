@@ -202,3 +202,15 @@ def test_a_runs_window_ends_when_its_work_ends_not_while_it_waits_on_you(tmp_pat
     assert timing.window(timing.read(log), run, at(8)) == (at(0), at(8))  # still working: now
     timing.mark(log, None, "waiting", at(10))
     assert timing.window(timing.read(log), run, at(30)) == (at(0), at(10))  # a skip at 20 is not the run's
+
+
+def test_a_name_with_a_pipe_does_not_break_the_tables(tmp_path):
+    log = tmp_path / "apply_timing.jsonl"
+    timing.mark(log, 1, "form", at(0))
+    timing.mark(log, None, "report", at(5))
+    run = timing.runs(timing.read(log))[0]
+    out = timing.report(timing.read(log), at(5.02), labels={1: "#1 EMBL | EBI"},
+                        skips={run: {2: ("Wrong stack", "Acme | Labs")}})
+    assert "| #1 EMBL / EBI | 5.0 | form filled |" in out
+    assert "| Wrong stack | 1 | Acme / Labs |" in out
+    assert "Writing the report" not in out  # 1 second is not a row
