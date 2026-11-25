@@ -204,10 +204,12 @@ def run_segments(records: list[dict], run: str, now: datetime) -> list[Segment]:
 
 
 def window(records: list[dict], run: str, now: datetime) -> tuple[datetime, datetime]:
-    """When the run began, and when its last step ended (now, for the newest run while it is open)."""
+    """When the run began, and when its work ended: the end of its last working step (now, for the
+    newest run while it works), never the time it then waits on the user. A card skipped by hand
+    after the run, or a later reply in the same session, is not the run's."""
     lines = sorted(run_lines(records, run), key=lambda r: r["at"])
-    segs = run_segments(records, run, now)
-    return lines[0]["at"], (segs[-1].end if segs else lines[-1]["at"])
+    working = [s for s in run_segments(records, run, now) if s.step != WAITING]
+    return lines[0]["at"], (working[-1].end if working else lines[-1]["at"])
 
 
 @dataclass

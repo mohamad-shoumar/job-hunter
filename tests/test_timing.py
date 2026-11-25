@@ -193,3 +193,12 @@ def test_a_mirror_score_goes_into_the_open_run_and_never_opens_one(tmp_path):
     out = timing.report(timing.read(log), at(5), labels={7: "#7 Acme"})
     assert "| #7 Acme | 3 | 1 | 2 | Rust |" in out
     assert "| Mirroring the CV | 3.0 |" in out  # a mirror line is not a mark: the step still runs to the form
+
+
+def test_a_runs_window_ends_when_its_work_ends_not_while_it_waits_on_you(tmp_path):
+    log = tmp_path / "apply_timing.jsonl"
+    run = timing.mark(log, 1, "posting", at(0))
+    timing.mark(log, 1, "form", at(3))
+    assert timing.window(timing.read(log), run, at(8)) == (at(0), at(8))  # still working: now
+    timing.mark(log, None, "waiting", at(10))
+    assert timing.window(timing.read(log), run, at(30)) == (at(0), at(10))  # a skip at 20 is not the run's

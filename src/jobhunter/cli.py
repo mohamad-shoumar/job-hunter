@@ -911,8 +911,9 @@ def _timing_report(args, root: Path, path: Path, now) -> None:
                     labels[job_id] = f"#{job_id} {row['company']}"
         finally:
             store.close()
-    turns = sessionlog.turns_for(windows)
     costs = timing.load_costs(timing.costs_file(root))
+    run = args.run or (all_runs[-1] if all_runs else None)  # the logs are GBs: read only what isn't saved
+    turns = sessionlog.turns_for({r: w for r, w in windows.items() if r == run or r not in costs})
     fresh = {r: timing.cost(timing.run_segments(records, r, now), turns[r]) for r in turns}
     if fresh:
         costs.update(fresh)
