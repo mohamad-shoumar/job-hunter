@@ -25,13 +25,22 @@ rejected, code `too_senior`, when its title says "senior" or its text asks for a
 person ("We're looking for a Senior Backend Engineer", "Position level: Senior",
 "senior-level expertise"), quoted. A text that only mentions senior people ("work with
 senior engineers", "junior and senior developers welcome") is not an ask.
+
+Another language's role (`other_stack` in filters.json, the user's call 2026-11-26, after 195
+wrong-stack skips): the title rule above only sees "Backend Engineer (Java)". A posting that names
+none of your languages anywhere ("Python", "TypeScript", "React"...) and requires one of `others`
+in a sentence ("Strong hands-on experience in Java/J2EE, Spring Boot") is rejected, code
+`other_stack`, quoting that sentence. A sentence that offers a choice or a bonus ("Java or a
+comparable language", "C++ is a plus", "willingness to learn Go") never counts.
 """
 
 from __future__ import annotations
 
 import re
 
-from .config import Filters, JuniorOnly
+from functools import lru_cache
+
+from .config import Filters, JuniorOnly, OtherStack
 from .extract import find_required_yoe, quote_around, sentences
 from .models import IRRELEVANT, MATCH, MAYBE, Assessment, Job
 from .text import has_phrase, normalize_words
@@ -60,6 +69,18 @@ _SENIOR_ASK = re.compile(
     r"|\bsenior[- ]level\s+(?:expertise|experience|skills)\b"
     r"|\bthis\s+(?:is\s+a\s+)?senior\s+(?:role|position)\b",
     re.I)
+# A sentence naming a language as a bonus: only that sentence is left out ("C++ is a plus").
+_BONUS = re.compile(
+    r"\b(?:plus|bonus|nice[- ]to[- ]haves?|preferred|preferably|desirable|advantage|advantageous|ideally"
+    r"|not (?:required|mandatory|essential)|beneficial|optional|familiarity|exposure)\b", re.I)
+# A sentence naming a language as one choice, or one you can learn: the posting is open to other languages
+# ("Java or a comparable language", "primarily Java/JVM, but we're more interested in ... the ability to learn").
+_OPEN_CHOICE = re.compile(
+    r"\b(?:comparable|equivalent|similar|or other|or another|any (?:modern|other|major|mainstream)|such as|e\.g\."
+    r"|for example|like|etc|willing(?:ness)? to (?:learn|work|pick)|eager(?:ness)? to learn|happy to learn"
+    r"|ability to learn|open to learning|learn it|ramp up|generalist)\b", re.I)
+# Names that are also English words: matched only as written ("React to incidents", "Go further together").
+_AS_WRITTEN = {"go", "react", "rust", "ruby", "rails", ".net"}
 # A sentence that also names a lower level is open to both: "a senior or mid-level engineer".
 _LOWER_LEVEL = re.compile(r"\b(?:junior|mid|medior|intermediate|graduate|entry[- ]level|early[- ]career)\b", re.I)
 
@@ -158,6 +179,43 @@ def senior_ask(text: str) -> str | None:
     return None
 
 
+def _term(term: str, langs: str = "") -> re.Pattern:
+    """One language name as a whole word: "Java" is not in "JavaScript", ".NET" is in "ASP.NET". "Go" counts
+    only as a language: "in Go", "with Go as our primary language", "Kotlin / Go"."""
+    left = "" if term[0] in ".#+" else r"(?<![A-Za-z0-9])"
+    body = re.escape(term) + r"(?![A-Za-z0-9+#])" + (r"(?!\s*script)" if term.lower() == "java" else "")
+    if term.lower() == "go":
+        return re.compile(rf"\b(?:in|with|using)\s+Go(?=\s*(?:[,.;:/()]|and\b|or\b|as\b|$))"
+                          rf"|(?<![A-Za-z0-9])Go\s*(?:[,/]|and\b|or\b)\s*(?:{langs})"
+                          rf"|(?:{langs})\s*(?:[,/]|and\b|or\b)\s*Go(?![A-Za-z0-9])")
+    return re.compile(left + body, 0 if term.lower() in _AS_WRITTEN else re.I)
+
+
+@lru_cache(maxsize=4)
+def _stack_patterns(yours: tuple[str, ...], others: tuple[str, ...]):
+    langs = "|".join(re.escape(t) for t in (*yours, *others) if t.lower() != "go")
+    mine = [_term(t) for t in yours]
+    return mine, [(t, _term(t, langs)) for t in others]
+
+
+def other_stack_ask(text: str, rules: OtherStack) -> tuple[str, str] | None:
+    """(the language, the sentence requiring it) when the posting names none of `yours` anywhere, a sentence
+    that is no bonus asks for one of `others`, and no sentence offers that language as a choice."""
+    mine, others = _stack_patterns(tuple(rules.yours), tuple(rules.others))
+    if not others or any(p.search(text or "") for p in mine):
+        return None
+    found = None
+    for segment in sentences(text):
+        hit = next(((name, m) for name, pattern in others for m in [pattern.search(segment)] if m), None)
+        if not hit:
+            continue
+        if _OPEN_CHOICE.search(segment):
+            return None
+        if not found and not _BONUS.search(segment):
+            found = hit[0], quote_around(segment, hit[1].start(), hit[1].end())
+    return found
+
+
 def fit_score(job: Job, filters: Filters) -> int:
     return sum(filters.fit_weights.get(skill, 0) for skill in job.skills)
 
@@ -193,6 +251,11 @@ def assess_relevance(job: Job, filters: Filters) -> tuple[Assessment, int]:
         asked = senior_ask(job.description)
         if asked:
             return Assessment(IRRELEVANT, [f'Senior role: "{asked}"'], "too_senior"), score
+    if filters.other_stack:
+        asked = other_stack_ask(f"{job.title}\n{job.description or ''}", filters.other_stack)
+        if asked:
+            return Assessment(IRRELEVANT, [f'Built on {asked[0]}, and the posting names none of your languages: '
+                                           f'"{asked[1]}"'], "other_stack"), score
     if yoe is not None and filters.stretch_yoe_at_least and yoe >= filters.stretch_yoe_at_least:
         reasons.append(f"Asks for {yoe}+ years (a stretch){said}")
 

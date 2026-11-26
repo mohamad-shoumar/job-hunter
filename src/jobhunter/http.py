@@ -87,6 +87,23 @@ class Http:
         """For files (a spreadsheet)."""
         return self.get(url, params).content
 
+    def final_url(self, url: str, hops: int = 8) -> str:
+        """Where a link's redirects end (links.py), reading only each answer's headers, never a page. The
+        last address counts even when it refuses scripts (403) or cannot be reached: it is still where the
+        link leads. Only the first request's network error is raised."""
+        for hop in range(hops):
+            try:
+                with self._client.stream("GET", url, follow_redirects=False) as response:
+                    location = response.headers.get("location")
+                    if not response.is_redirect or not location:
+                        return url
+                    url = str(response.url.join(location))
+            except httpx.TransportError:
+                if hop == 0:
+                    raise
+                return url
+        return url
+
     def close(self) -> None:
         self._client.close()
 

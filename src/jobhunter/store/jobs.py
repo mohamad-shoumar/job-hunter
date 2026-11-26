@@ -356,6 +356,10 @@ class JobStore:
         self.conn.executemany("UPDATE jobs SET reported_at = ? WHERE id = ?", [(iso(now), i) for i in job_ids])
         self.conn.commit()
 
+    def set_application_url(self, job_id: int, url: str) -> None:
+        """The job's real application page (links.py). The identity keys (ats_key) stay as they were."""
+        self.conn.execute("UPDATE jobs SET application_url = ? WHERE id = ?", (url, job_id))
+
     def set_report_date(self, job_ids, day: str) -> None:
         self.conn.executemany("UPDATE jobs SET report_date = ? WHERE id = ?", [(day, i) for i in job_ids])
 

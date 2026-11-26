@@ -42,9 +42,17 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
 2. Open http://127.0.0.1:8765/#pipeline in a new tab. The **To apply** column lists shortlisted
    jobs the user hasn't applied to yet, plus visa-list jobs (the **visa** chip) posted today or
    yesterday. Do them one at a time, top to bottom (or only the job the user named).
+   - **Tabs** (the user's call, 2026-11-26, after a filled Greenhouse form was lost on 2026-11-25
+     because its tab was reused for a LinkedIn search): open **one LinkedIn tab** at the start and do
+     every LinkedIn search and profile in it (step 4). Each job's form gets a new tab of its own.
+     Never navigate away from a tab that holds a filled form: it is the user's to press Submit in.
 3. **Time every step** (the user's ask, 2026-11-24: to see where a run's time goes and what to
    speed up). Start with `cd ~/job-hunter && .venv/bin/jobhunter timing start` and
-   `cd ~/job-hunter && .venv/bin/jobhunter timing mark - setup`, then mark each step as it begins:
+   `cd ~/job-hunter && .venv/bin/jobhunter timing mark - setup`, then (still setup)
+   `cd ~/job-hunter && .venv/bin/jobhunter links --skip-closed` (links.py, the user's call
+   2026-11-26): it follows each board's Apply redirect (freehire, Arbeitnow) to the employer's own
+   form, stores it as the job's link, so **Open posting ↗** opens the form, and moves the postings
+   freehire or LinkedIn show as closed to Closed as skipped, quoting why. Then mark each step as it begins:
    `cd ~/job-hunter && .venv/bin/jobhunter timing mark <job id> <step>` (`-` for no job). A step lasts until the next
    mark, so there is no "end" to forget. Send each mark in the same message as the step's first
    **quick** action (opening a page, reading a file), so it costs no extra turn. Never put a mark
@@ -79,7 +87,12 @@ creating an account, newsletters or marketing opt-ins (leave those unticked).
 Timing: `cd ~/job-hunter && .venv/bin/jobhunter timing mark <job id> posting`.
 Do this first, so no time goes into a CV for a job that is closed or can't take you (the user's
 call, 2026-11-18).
-- Press **Open posting ↗**.
+- Press **Open posting ↗**. After `jobhunter links` it is usually the employer's own form
+  (Greenhouse, Ashby, Workday...): don't search for it again.
+- **Still a board's page** (Adzuna, Careerjet, JobLeads, Dice, naukrigulf, hirist, instahyre, a Telegram
+  channel): search once for the role on the company's own careers page or LinkedIn. Not found:
+  skip it as aggregator-only (reason "Agency, repost or gig"). A **jobgether.com** link is a
+  Jobgether repost (an agency in `filters.json`): skip it the same way, with no search.
 - If the posting is behind a sign-in or paywall (We Work Remotely always is), don't sign in and
   don't pay. Search for the same role on the company's own careers page or its job board (Greenhouse,
   Lever, Ashby, Workable, BambooHR, LinkedIn) and apply there. Match the title, and the location if
@@ -278,6 +291,7 @@ the minutes per form site, so name it every time; LinkedIn's URL for Easy Apply)
 
 ### 4. One LinkedIn contact (find and write, never send)
 Timing: `cd ~/job-hunter && .venv/bin/jobhunter timing mark <job id> linkedin`.
+Search in the run's one LinkedIn tab (Setup 2), never in a job's form tab.
 Outreach goes through LinkedIn now, not email (the user's call, 2026-10-29), so the job's card has a
 **LinkedIn** box (the person's profile link and the note) and no contact lookup or email composer at all.
 Search only on LinkedIn, where the user is already signed in; never use an email tool for this step.

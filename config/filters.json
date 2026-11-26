@@ -206,6 +206,12 @@
     "spring", "abap", "cobol", "perl", "delphi", "flutter", "react native", "angular", "vue"
   ],
 
+  "_other_stack": "A role built on another language that the title doesn't name (the user's call 2026-11-26, after 195 skips with the reason 'Wrong stack'; the title rule above only sees 'Backend Engineer (Java)'). Rejected, code other_stack, quoting the sentence, when the posting names none of `yours` anywhere (any case; React, Go, Rust, Ruby and Rails only as written) and requires one of `others` in a sentence that is no bonus, choice or thing to learn ('C++ is a plus', 'Java or a comparable language', 'willingness to work in Go' never count; relevance.py). 'Go' counts only as a language: 'in Go', 'Kotlin / Go'. Checked against the stored jobs 2026-11-26: 46 of the 195 wrong-stack skips, 12 of 342 applied jobs (all built on Java, Go, C# or .NET), 3 of the 58 in To apply.",
+  "other_stack": {
+    "yours": ["Python", "TypeScript", "JavaScript", "Node.js", "NodeJS", "React", "Next.js", "Django", "FastAPI"],
+    "others": ["Java", "C#", ".NET", "C++", "Golang", "Go", "Scala", "Kotlin", "Rust", "PHP", "Ruby", "Rails", "Elixir"]
+  },
+
   "_fit_weights": "Points per skill found in the posting, based on profile/master_profile.md. Only used to sort the report.",
   "fit_weights": {
     "python": 3, "fastapi": 3, "django": 2, "flask": 1, "sqlalchemy": 1, "celery": 1, "pydantic": 1, "asyncio": 1,

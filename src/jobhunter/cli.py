@@ -132,6 +132,8 @@ def cmd_run(args) -> int:
         print()
     if summary.discovery and (summary.discovery.added or summary.discovery.errors):
         _print_discovery(summary.discovery)
+    if not date_range:
+        _run_links_step(paths)
     store = JobStore(paths.db_file)
     try:
         _print_report_counts(store, report_paths)
@@ -140,6 +142,31 @@ def cmd_run(args) -> int:
     if args.digest:
         _run_digest_step(paths, args.no_ai)
     return 0
+
+
+def _run_links_step(paths: Paths) -> None:
+    """The To apply jobs' real application pages (links.py), so apply-job opens the employer's form, not a
+    board's. Closed postings are listed, never moved: apply-job's `links --skip-closed` does that. A failure
+    is printed and logged, never the run's."""
+    from . import links
+    from .http import Http
+
+    store = JobStore(paths.db_file)
+    try:
+        now = utcnow()
+        rows = [r for r in links.to_apply(store, now) if links.wanted(r)]
+        with Http() as http:
+            found = [links.resolve(http, row) for row in rows]
+        links.save(store, found, now)
+        store.commit()
+        closed = [f"#{f.job_id}: {f.closed}" for f in found if f.closed]
+        print(f"Application links: {sum(1 for f in found if f.url)} found for {len(rows)} To apply jobs"
+              + (f"; closed: {', '.join(closed)}" if closed else "") + "\n")
+    except Exception as exc:
+        logging.getLogger(__name__).exception("links failed")
+        print(f"Application links failed: {' '.join(str(exc).split())[:300]}\n")
+    finally:
+        store.close()
 
 
 def _run_digest_step(paths: Paths, no_ai: bool) -> None:
@@ -446,6 +473,41 @@ def cmd_check(args) -> int:
     for path in rebuilt:
         print(f"rebuilt {path}")
     return 1 if result.errors and not result.checked else 0
+
+
+def cmd_links(args) -> int:
+    """The real application page of each To apply job a board listed, and which postings are closed (links.py)."""
+    from . import links
+    from .http import Http
+
+    paths, _, _ = _load(args)
+    now = utcnow()
+    store = JobStore(paths.db_file)
+    try:
+        rows = [store.get(i) for i in args.job_ids] if args.job_ids else links.to_apply(store, now)
+        rows = [r for r in rows if r is not None and (args.job_ids or links.wanted(r))]
+        if not rows:
+            print("nothing to look up")
+            return 0
+        print(f"looking up {len(rows)} jobs\n")
+        found = []
+        with Http() as http:
+            for row in rows:
+                link = links.resolve(http, row, args.pause)
+                found.append(link)
+                if link.url or link.closed or link.note:
+                    print(links.line(row, link))
+        if not args.dry_run:
+            links.save(store, found, now, skip_closed=args.skip_closed)
+            store.commit()
+    finally:
+        store.close()
+    new = sum(1 for f in found if f.url)
+    closed = sum(1 for f in found if f.closed)
+    print(f"\n{new} application pages found, {closed} closed" + (" (moved to Closed as skipped)"
+          if args.skip_closed and closed and not args.dry_run else "") + (". Dry run: nothing was written."
+          if args.dry_run else ""))
+    return 0
 
 
 def cmd_dates(args) -> int:
@@ -1075,6 +1137,20 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--limit", type=int, metavar="N", help="check at most N jobs (default: max_jobs_per_run)")
     p.add_argument("--recheck", action="store_true", help="include jobs already checked (unknown or unverified)")
     p.set_defaults(func=cmd_check)
+
+    p = sub.add_parser(
+        "links",
+        help="find the real application page of To apply jobs a board listed, and which are closed (links.py)",
+        description="freehire's Apply redirect and Arbeitnow's /apply are followed to the employer's own form, which "
+        "becomes the job's application link; freehire's closed_at and LinkedIn's 'No longer accepting applications' "
+        "say a posting is closed. Without ids: the To apply column's freehire, Arbeitnow and LinkedIn jobs.",
+    )
+    p.add_argument("job_ids", type=int, nargs="*", help="look up these jobs")
+    p.add_argument("--skip-closed", action="store_true",
+                   help="move closed postings to Closed as skipped (reason: Not open to me), quoting why")
+    p.add_argument("--dry-run", action="store_true", help="print what was found, write nothing")
+    p.add_argument("--pause", type=float, default=1.0, help="seconds to wait before each request (default 1)")
+    p.set_defaults(func=cmd_links)
 
     p = sub.add_parser(
         "dates",

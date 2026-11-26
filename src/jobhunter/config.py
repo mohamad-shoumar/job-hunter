@@ -135,6 +135,21 @@ class JuniorOnly:
 
 
 @dataclass
+class OtherStack:
+    """A posting built on a language you don't use (relevance.other_stack_ask): `yours` are the profile's
+    languages and frameworks (any one named anywhere keeps the job), `others` the languages that reject."""
+    yours: list[str] = field(default_factory=list)
+    others: list[str] = field(default_factory=list)
+
+    @classmethod
+    def from_dict(cls, data: dict | None) -> OtherStack | None:
+        if not data:
+            return None
+        return cls([str(x) for x in data.get("yours", []) if str(x).strip()],
+                   [str(x) for x in data.get("others", []) if str(x).strip()])
+
+
+@dataclass
 class Filters:
     max_posting_age_days: int | None
     reject_if_required_yoe_at_least: int | None
@@ -163,6 +178,8 @@ class Filters:
     senior_title_words: list[str] = field(default_factory=list)
     # Where you live (geo.Home, homes.py): every location rule is judged against it. Lebanon by default.
     home: Home = LEBANON_HOME
+    # A posting whose required language is not yours (relevance.py); None: the rule is off.
+    other_stack: OtherStack | None = None
 
     @classmethod
     def from_dict(cls, data: dict) -> Filters:
@@ -195,6 +212,7 @@ class Filters:
             senior_title_words=[w for w in (normalize_words(x) for x in (data.get("senior") or {}).get("title_words", []))
                                 if w],
             home=home_from(data.get("home")),
+            other_stack=OtherStack.from_dict(data.get("other_stack")),
         )
 
     @classmethod

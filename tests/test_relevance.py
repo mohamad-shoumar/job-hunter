@@ -199,3 +199,61 @@ def test_real_filters_reject_senior_and_five_years():
     from jobhunter.config import Filters
     real = Filters.load(Path(__file__).parent.parent / "config" / "filters.json")
     assert real.senior_title_words == ["senior"] and real.reject_if_required_yoe_at_least == 5
+
+
+def _real_other_stack():
+    from pathlib import Path
+
+    from jobhunter.config import Filters
+    return Filters.load(Path(__file__).parent.parent / "config" / "filters.json").other_stack
+
+
+@pytest.mark.parametrize(
+    "description, language, quote",
+    [
+        # Stored postings that were skipped by hand as "Wrong stack" (2026-11-26 check).
+        ("- 3+ years of professional software engineering experience in C++ or Java.", "Java",
+         "- 3+ years of professional software engineering experience in C++ or Java."),
+        ("*Tech stack:* Windows, macOS, MSI, MDM, Rust/C++, EDR and endpoint security tools.", "C++",
+         "*Tech stack:* Windows, macOS, MSI, MDM, Rust/C++, EDR and endpoint security tools."),
+        ("We work in Go, gRPC, Temporal and Kubernetes.", "Go", "We work in Go, gRPC, Temporal and Kubernetes."),
+        ("Strong knowledge of C#, ASP.NET Core, Entity Framework Core, and SQL.", "C#",
+         "Strong knowledge of C#, ASP.NET Core, Entity Framework Core, and SQL."),
+        ("Solid knowledge of our development ecosystem: PHP (Laravel), Databases (MySQL), Git/Github, CI/CD", "PHP",
+         "Solid knowledge of our development ecosystem: PHP (Laravel), Databases (MySQL), Git/Github, CI/CD"),
+    ],
+)
+def test_a_posting_built_on_another_language_is_rejected(description, language, quote, filters):
+    filters.other_stack = _real_other_stack()
+    job = enrich(make_job(title="Software Engineer", description=f"About us. We ship daily.\n{description}"))
+    assessment, _ = assess_relevance(job, filters)
+    assert assessment.code == "other_stack"
+    assert assessment.reasons == [f'Built on {language}, and the posting names none of your languages: "{quote}"']
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "Strong proficiency in Java and Spring Boot. You will also build AI agents in Python.",  # one of yours named
+        "Hands-on experience with Java services and React interfaces.",
+        "Experience with C++ is a plus. You build trading tools.",  # a bonus
+        "Nice to have: Experience working with Java & Spring Framework.",
+        "Proficiency in Go, or other strongly typed languages.",  # a choice
+        "Our backend runs primarily on Java/JVM, but we're more interested in strong engineering fundamentals "
+        "and the ability to learn than experience in a specific language.\nWork within our Java backend.",
+        "Strong programming skills in Java (or a comparable language).",
+        "Through our values: Be Bold, Go Fast, Collaborate.",  # "Go" the verb
+        "Own the outcome, Go further together.",
+        "Apply at careers.example.net today.",  # ".net" in a web address
+        "We react to incidents fast; you write SQL.",  # no language at all
+    ],
+)
+def test_other_languages_that_are_not_required_keep_the_job(description, filters):
+    filters.other_stack = _real_other_stack()
+    job = enrich(make_job(title="Software Engineer", description=description))
+    assert assess_relevance(job, filters)[0].code != "other_stack"
+
+
+def test_other_stack_rule_is_off_without_the_setting(filters):
+    job = enrich(make_job(title="Software Engineer", description="Strong hands-on experience in Java/J2EE."))
+    assert filters.other_stack is None and assess_relevance(job, filters)[0].code != "other_stack"
