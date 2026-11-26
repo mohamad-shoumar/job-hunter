@@ -34,6 +34,8 @@ FREEHIRE_GO = "https://freehire.me/api/v1/go/{slug}?src=web"
 FREEHIRE_JOB = "https://freehire.me/api/v1/jobs/{slug}"
 _LINKEDIN_JOB = re.compile(r"linkedin\.com/jobs/view/(?:[^/?#]*-)?(\d{6,})")
 _LINKEDIN_CLOSED = "closed-job__flavor--closed"
+# LinkedIn answers about one request a second with HTTP 429 (sources/linkedin.py waits 2.5 s): never faster.
+LINKEDIN_PAUSE = 2.5
 
 
 @dataclass
@@ -72,9 +74,9 @@ def resolve(http, row, pause: float = 1.0) -> Link:
     """One job's Link. A request that fails costs only its own part (noted), never the run."""
     link = Link(row["id"])
 
-    def get(fn, url):
-        if pause:
-            time.sleep(pause)
+    def get(fn, url, wait=pause):
+        if wait:
+            time.sleep(wait)
         return fn(url)
 
     slug = (row["source_url"] or "").rstrip("/").rsplit("/", 1)[-1]
@@ -95,7 +97,7 @@ def resolve(http, row, pause: float = 1.0) -> Link:
     found = _LINKEDIN_JOB.search(link.url or row["application_url"] or "")
     if found and not link.closed:
         try:
-            page = get(http.get_text, LINKEDIN_POSTING.format(id=found.group(1)))
+            page = get(http.get_text, LINKEDIN_POSTING.format(id=found.group(1)), pause and max(pause, LINKEDIN_PAUSE))
             if _LINKEDIN_CLOSED in page:
                 link.closed = "LinkedIn: No longer accepting applications"
         except httpx.HTTPStatusError as exc:

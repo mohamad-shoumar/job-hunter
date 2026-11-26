@@ -134,3 +134,11 @@ def test_final_url_raises_only_when_the_first_request_fails():
         http.final_url("https://a.example/x")
     http, _ = web({"https://a.example/x": "https://b.example/y", "https://b.example/y": "drop"})
     assert http.final_url("https://a.example/x") == "https://b.example/y"
+
+
+def test_linkedin_is_asked_no_faster_than_its_source_allows(monkeypatch):
+    waits = []
+    monkeypatch.setattr(links.time, "sleep", waits.append)
+    http, _ = web({"https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4494496507": ("html", "")})
+    links.resolve(http, row(source="linkedin", application_url="https://www.linkedin.com/jobs/view/4494496507"), pause=1.0)
+    assert waits == [links.LINKEDIN_PAUSE]
