@@ -650,7 +650,7 @@ Chrome with the Claude extension connected; the script starts the app and Chrome
 Permissions are Claude Code's `auto` mode (nothing is bypassed) with the Chrome tools allowed up front, and
 anything that would still ask is denied, never waited on. The session writes its report to
 `reports/apply_<date>.md` job by job; Claude's output and the start/end lines go to `data/apply_job.log`; a
-macOS notification says when it is done. It stops after 5 hours (`APPLY_JOB_MAX_SECONDS`). A failed pipeline
+macOS notification says when it is done. Jobs an earlier run already prepared (a LinkedIn or Tracking note on a card still in To apply, read from the app's own lists) are listed in the prompt and left alone, so a form waiting for your Submit is not filled again every night. The Mac and screen are kept awake (`caffeinate`) while it runs. It stops after 5 hours (`APPLY_JOB_MAX_SECONDS`). A failed pipeline
 run skips it (logged). Run it alone with `sh scripts/apply_job.sh`; remove `--apply-job` from the plist to
 fetch only.
 
