@@ -642,6 +642,18 @@ launchctl print gui/$(id -u)/local.jobhunter.evening | grep "last exit"
 launchctl bootout gui/$(id -u)/local.jobhunter.evening      # stop the schedule
 ```
 
+**Then apply-job, with nobody at the keyboard** (the user's ask, 2026-11-27). The plist passes `--apply-job`,
+so when the pipeline succeeds `run_daily.sh` runs `scripts/apply_job.sh`: Claude Code (`claude -p --chrome
+--model opus`) follows the apply-job skill in your real Chrome, fills each To apply form and stops before the
+final Submit, as the skill always does; the tabs stay open for you to press it. It needs the Mac awake and
+Chrome with the Claude extension connected; the script starts the app and Chrome if they are not running.
+Permissions are Claude Code's `auto` mode (nothing is bypassed) with the Chrome tools allowed up front, and
+anything that would still ask is denied, never waited on. The session writes its report to
+`reports/apply_<date>.md` job by job; Claude's output and the start/end lines go to `data/apply_job.log`; a
+macOS notification says when it is done. It stops after 5 hours (`APPLY_JOB_MAX_SECONDS`). A failed pipeline
+run skips it (logged). Run it alone with `sh scripts/apply_job.sh`; remove `--apply-job` from the plist to
+fetch only.
+
 To change the time, edit `Hour`/`Minute` in the plist, install it in `~/Library/LaunchAgents/` again, then
 `bootout` and `bootstrap` it.
 
